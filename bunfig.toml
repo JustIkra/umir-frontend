@@ -1,0 +1,3 @@
+[test]
+preload = ["./tests/quality/setup.mjs"]
+timeout = 60000

@@ -6,17 +6,35 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "arch": "depcruise --config .dependency-cruiser.cjs --output-type err --no-ignore-known src",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "quality:test": "bun test ./tests/quality",
+    "test": "bun test ./tests",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run arch && npm test && npm run build"
   },
   "dependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "dependency-cruiser": "18.5.0",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.5.0",
+    "prettier": "3.9.10",
+    "sass": "1.105.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
     "vite": "8.3.4"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   }
 }
-

@@ -1,35 +1,25 @@
 # Repository instructions
 
-## Shared development rules
+Read [README.md](README.md) before changing the stack, architecture, commands or CI. Keep setup and architecture documentation there; record changes under «Не выпущено» in [CHANGELOG.md](CHANGELOG.md). Preserve unrelated work and inspect the final diff. Do not commit, push, publish or rewrite shared history without an explicit request.
 
-- Read the project memory map before broad exploration. Keep developer commands and architecture in README.md.
-- Direct source dependencies toward business rules. Define small ports at their consumer and assemble implementations explicitly.
-- Inject time, IDs and external mechanisms. Use Europe/Moscow unless the contract specifies another zone.
-- Keep contracts typed, validate business values, handle errors and preserve wrapped causes.
-- Protect shared mutable data and give goroutines an owner, cancellation and completion.
-- Keep fixtures and fault injection in tests/examples. Remove replaced code. Comment only non-obvious behavior.
-- Preserve unrelated edits. Inspect status and both diffs; stage reviewed paths. Do not hide failures with exclusions or skipped tests.
-- Use Conventional Commits. Mark incompatible behavior with ! or BREAKING CHANGE and document migration. No Co-Authored-By or generated-by footers.
-- Use SemVer for public contracts. Before 1.0, compatible fixes increment patch; additions/breaking changes increment minor. Published versions/tags are immutable.
-- Use annotated vX.Y.Z release tags. Nested published Go modules prefix the module directory; Go v2+ uses matching major module/import paths.
-- Release repositories/modules independently. Umir images remain sha-<full-SHA>; factory pins exact component identities.
-- Do not rewrite shared history or create/push releases without specific authorization.
-- Record actual checks and limitations. Run git diff --check before handoff.
+## Architecture and ownership
 
-## Repository boundary
+- Keep dependencies within the five layers and their allowed directions documented in README. Run `npm run arch`; do not add suppressions to bypass a boundary.
+- Production source under `src` must use `.ts` or `.tsx`. Keep type-only imports and `@/` aliases within the same layer rules. Inline ESLint disables are prohibited.
+- Keep `domain` framework-independent. Put external mechanisms behind small ports owned by application consumers and assemble adapters in `app`.
+- Inject time, IDs, network and storage mechanisms into domain/application. Presentation must not call `fetch` (including `window.fetch`) or browser storage directly.
+- Backend owns availability, FEFO, expiration and order decisions. Frontend presents gateway outcomes and does not reproduce business rules.
+- Keep test fixtures outside production source. Do not import test support into production code.
+- Use Europe/Moscow for displayed and entered times unless a contract specifies otherwise. Preserve established responsive breakpoints, relative sizing, design tokens and accessibility.
 
-Frontend uses React/Vite with JavaScript or TypeScript. SCSS and Chakra UI are approved choices, consistent with slide 8 of the organizer's case presentation. TypeScript migration and test tooling are authorized within the frontend UI/API task.
+## Checks and API behavior
 
-openapi-typescript for public API types, Vitest for unit tests, and Playwright for browser/E2E checks are approved development tools. If API types are generated, tie them to an exact approved public OpenAPI revision. Go linters/modules do not apply to this repository.
+- Use `npm ci` for dependencies and the pinned Bun version from `.bun-version` for tests. Run `npm run check` before handoff; CI also builds the existing container.
+- Do not claim checks passed unless they were run. `npm run quality:test` checks `tests/quality`; `npm run test` runs the complete `tests` suite. Both use Bun, and test preload verifies its exact version.
+- If API types are generated, tie them to the exact approved OpenAPI commit and `info.version`, and check generated files in CI.
+- Validate network JSON at runtime and exhaustively handle known `kind/type` variants. Preserve integer strings or use `BigInt`; never assume TypeScript string types make numeric conversion safe.
+- Unknown or malformed command results and `ConfirmationPending` are not success or proof of non-commit. Preserve the original attempt and `commandID`; do not retry with a new ID.
+- Future browser acceptance first uses frontend → gateway → HTTP mocks. Real-service acceptance is a separate check. Build success does not prove UI behavior.
+- Import React and libraries through documented public exports. Avoid redundant derived state and effects; run independent requests in parallel. Split feature modules when real screens establish useful boundaries.
 
-Business decisions belong to backend; UI presents contract states. Preserve approved design tokens, breakpoints, relative sizing and accessibility when configuring Chakra or SCSS.
-
-## Documentation
-
-Update README.md alongside changes to the actual stack, setup, architecture, npm scripts and CI. Separate implemented tools from approved or planned additions. Record relevant changes under Unreleased in CHANGELOG.md. Keep AGENTS.md concise and link to developer documentation; API contracts belong to factory OpenAPI and business-core documents. Follow the documentation ownership rules in the factory README.
-
-## Frontend verification
-
-Use npm ci and npm run build, plus the existing container build. A TypeScript implementation must add a separate tsc --noEmit check. If API types are generated, CI must check them against the selected schema. Run the unit and browser/E2E scripts added by the frontend task in CI.
-
-Validate network responses at runtime and handle every known kind/type variant exhaustively. Keep exact integer strings and BigInt; generated string types do not make Number conversion safe. Unknown or malformed outcomes must not become OrderConfirmed or proof of non-commit. Browser acceptance uses frontend → gateway → HTTP mocks, followed by real-service acceptance when connected. New UI behavior needs relevant rendered/browser checks; build success alone does not prove UI/API behavior.
+Public HTTP fields and outcomes belong in the factory OpenAPI; business rules belong in the factory business-core specification. Follow [README.md](README.md) for the current stack and developer commands.
