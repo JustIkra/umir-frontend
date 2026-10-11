@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM node:24.10.0-alpine AS build
+FROM --platform=$BUILDPLATFORM node:24.21.0-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=secret,id=npmrc,target=/root/.npmrc,required=false --mount=type=cache,target=/root/.npm npm ci
@@ -7,7 +7,7 @@ COPY index.html ./
 COPY src ./src
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.28.0-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.30.5-alpine AS runtime
 WORKDIR /usr/share/nginx/html
 COPY --link --from=build /app/dist ./
 COPY --link nginx.conf /etc/nginx/conf.d/default.conf
