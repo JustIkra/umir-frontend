@@ -18,8 +18,18 @@
 
 ## Repository boundary
 
-Frontend remains React/Vite. Go linters/modules do not apply. Business decisions belong to backend; UI presents contract states. Preserve frontend design rules; do not introduce an unrelated TypeScript migration or frontend test stack.
+Frontend uses React/Vite with JavaScript or TypeScript. SCSS and Chakra UI are approved choices, consistent with slide 8 of the organizer's case presentation. TypeScript migration and test tooling are authorized within the frontend UI/API task.
+
+openapi-typescript for public API types, Vitest for unit tests, and Playwright for browser/E2E checks are approved development tools. If API types are generated, tie them to an exact approved public OpenAPI revision. Go linters/modules do not apply to this repository.
+
+Business decisions belong to backend; UI presents contract states. Preserve approved design tokens, breakpoints, relative sizing and accessibility when configuring Chakra or SCSS.
+
+## Documentation
+
+Update README.md alongside changes to the actual stack, setup, architecture, npm scripts and CI. Separate implemented tools from approved or planned additions. Record relevant changes under Unreleased in CHANGELOG.md. Keep AGENTS.md concise and link to developer documentation; API contracts belong to factory OpenAPI and business-core documents. Follow the documentation ownership rules in the factory README.
 
 ## Frontend verification
 
-Use npm ci and npm run build, plus the existing container build. New UI behavior needs relevant rendered/browser checks. Instructions alone do not prove UI/API behavior.
+Use npm ci and npm run build, plus the existing container build. A TypeScript implementation must add a separate tsc --noEmit check. If API types are generated, CI must check them against the selected schema. Run the unit and browser/E2E scripts added by the frontend task in CI.
+
+Validate network responses at runtime and handle every known kind/type variant exhaustively. Keep exact integer strings and BigInt; generated string types do not make Number conversion safe. Unknown or malformed outcomes must not become OrderConfirmed or proof of non-commit. Browser acceptance uses frontend → gateway → HTTP mocks, followed by real-service acceptance when connected. New UI behavior needs relevant rendered/browser checks; build success alone does not prove UI/API behavior.

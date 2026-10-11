@@ -2,6 +2,8 @@
 
 ## Не выпущено
 
+- Expanded the approved frontend stack to JavaScript or TypeScript, SCSS and Chakra UI on React/Vite after inspecting the organizer's presentation. Authorized openapi-typescript, Vitest and Playwright within the frontend task; their integration remains part of that PR.
+- Documented how to maintain README, AGENTS and changelog alongside implementation, with separate current, approved and planned status and exact API revision references.
 - Обновлены закреплённые GitHub Actions до выпусков с поддержкой Node.js 24.
 - Уточнены границы готового ядра, целевого OpenAPI и следующего этапа интерфейса.
 - Обновлены закреплённые версии Node.js и Nginx; CI использует Node.js 24.21.0.
