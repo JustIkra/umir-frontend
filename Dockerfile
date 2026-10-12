@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=secret,id=npmrc,target=/root/.npmrc,required=false --mount=type=cache,target=/root/.npm npm ci
 COPY index.html ./
+COPY public ./public
 COPY tsconfig.json vite.config.mjs ./
 COPY src ./src
 RUN npm run typecheck && npm run build

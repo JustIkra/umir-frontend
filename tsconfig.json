@@ -17,6 +17,7 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["vite/client"],
+    "skipLibCheck": true,
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"]
