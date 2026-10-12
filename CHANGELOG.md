@@ -3,7 +3,7 @@
 ## Не выпущено
 
 - Добавлена публичная часть «Ровного хода» по макету Figma. В неё входят лендинг на `/`, политика конфиденциальности, политика cookie, текст согласия, баннер cookie и страница «Страница не найдена». Подключены Chakra UI с собственной темой из токенов макета, react-router и шрифты IBM Plex через `@fontsource`. В `tsconfig.json` включён `skipLibCheck`, потому что типы Ark UI несовместимы с `exactOptionalPropertyTypes`.
-- Форма обратной связи проверяет поля по контракту umir-feedback#1 и повторно использует `submissionID` для того же черновика. Отправка не подключена: адаптер всегда отвечает «Сервис временно недоступен», пока backend не реализует `POST /api/feedback`.
+- Форма обратной связи проверяет поля по контракту umir-feedback#1 и повторно использует `submissionID` для того же черновика. Отправка не подключена: адаптер всегда отвечает «Сервис временно недоступен», хотя gateway уже принимает `POST /api/feedback`.
 - Добавлены фавиконки, `favicon.ico` и `manifest.webmanifest`. Docker-сборка теперь копирует `public/`, а Nginx отдаёт манифест с типом `application/manifest+json`, которого нет в стандартном `mime.types`.
 - Оглавление документов подсвечивает текущий раздел до конца страницы. Короткие последние разделы получают свой участок прокрутки. Раздел, выбранный в оглавлении или по ссылке с якорем, остаётся выделенным, пока читатель не прокрутит страницу.
 - В блоке «Возможности» на планшете и компьютере белые панели карточек одного ряда начинаются и заканчиваются на одной линии при любой длине заголовка и описания. На телефоне панель по-прежнему показывает фрагмент фиксированной высоты.
@@ -13,6 +13,8 @@
 - Документированы команды проверки, CI и границы backend/frontend. Для будущих экранов сохранены runtime-проверка API, генерация типов из закреплённой OpenAPI, HTTP-моки и браузерная приёмка; экраны, API-клиент и E2E-проверки в этот этап не входят.
 - Chakra UI оставлена выбранной для будущих экранов, но пока не устанавливается. Prettier обрабатывает SCSS; семантическая проверка стилей отложена до появления production-стилей.
 - Expanded the approved frontend stack to JavaScript or TypeScript, SCSS and Chakra UI on React/Vite after inspecting the organizer's presentation. Authorized openapi-typescript and Playwright as future additions; Bun is the selected test runner.
+- Браузерная приёмка использует реальные serving/warehouse через frontend/gateway; документы согласованы с межмодульными и HTTP-проверками фабрики.
+- Прокси API (gateway#8, gateway#10): `Host` браузера передаётся вместе с портом; конечные таймауты (5 с соединение, 30 с отправка и чтение), без повторов и кеширования; собственные ошибки Nginx `502`, `504` и `413` — JSON в формах gateway вместо HTML; `POST /api/feedback` ограничен 16 КиБ. `npm run test:nginx` и CI проверяют `nginx.conf` с заглушкой gateway.
 - Documented how to maintain README, AGENTS and changelog alongside implementation, with separate current, approved and planned status and exact API revision references.
 - Обновлены закреплённые GitHub Actions до выпусков с поддержкой Node.js 24.
 - Уточнены границы готового ядра, целевого OpenAPI и следующего этапа интерфейса.

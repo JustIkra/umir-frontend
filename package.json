@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "quality:test": "bun test ./tests/quality",
     "test": "bun test ./tests",
-    "check": "npm run format:check && npm run typecheck && npm run lint && npm run arch && npm test && npm run build"
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run arch && npm test && npm run build",
+    "test:nginx": "sh tests/nginx/run.sh"
   },
   "dependencies": {
     "@chakra-ui/react": "3.37.0",

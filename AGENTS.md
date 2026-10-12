@@ -19,7 +19,7 @@ Read [README.md](README.md) before changing the stack, architecture, commands or
 - If API types are generated, tie them to the exact approved OpenAPI commit and `info.version`, and check generated files in CI.
 - Validate network JSON at runtime and exhaustively handle known `kind/type` variants. Preserve integer strings or use `BigInt`; never assume TypeScript string types make numeric conversion safe.
 - Unknown or malformed command results and `ConfirmationPending` are not success or proof of non-commit. Preserve the original attempt and `commandID`; do not retry with a new ID.
-- Future browser acceptance first uses frontend → gateway → HTTP mocks. Real-service acceptance is a separate check. Build success does not prove UI behavior.
+- Browser acceptance uses frontend/Nginx → gateway → real serving/warehouse processes. Factory Runtime bridge and HTTP acceptance cover separate levels; controlled transport faults and provider doubles do not replace the real business services. Build success does not prove UI behavior.
 - Import React and libraries through documented public exports. Avoid redundant derived state and effects; run independent requests in parallel. Split feature modules when real screens establish useful boundaries.
 
 Public HTTP fields and outcomes belong in the factory OpenAPI; business rules belong in the factory business-core specification. Follow [README.md](README.md) for the current stack and developer commands.
