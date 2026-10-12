@@ -5,6 +5,7 @@ import {
   reconnectDelayMs,
   staleAfterMs,
 } from '../../src/application/live-sync.ts';
+import { createReadModel } from '../../src/application/read-model.ts';
 
 // Virtual time: advance() runs due callbacks in order.
 function manualScheduler() {
@@ -390,4 +391,36 @@ test('stop cancels a scheduled reconnect and the stale timer', async () => {
   scheduler.advance(60_000);
   assert.equal(feed.subscriptions, 1);
   assert.equal(sync.getSnapshot().connection, 'closed');
+});
+
+test('signals during a read cause exactly one more read', async () => {
+  const feed = manualFeed();
+  const sync = createLiveSync({
+    feed,
+    scheduler: manualScheduler(),
+    visibility: manualVisibility(),
+    sessionCheck: sessionIs('active'),
+    resolvePending: () => Promise.resolve(),
+  });
+  const calls = [];
+  const model = createReadModel(
+    (options) =>
+      new Promise((resolve) => {
+        calls.push({ options, resolve });
+      }),
+    { refreshOnTick: false, now: () => 0 },
+  );
+  sync.track(model);
+  model.subscribe(() => undefined);
+  sync.start();
+  feed.status('open');
+  feed.emit(change('1'));
+  feed.emit(change('2'));
+  feed.emit(change('3'));
+  calls[0].resolve('v1');
+  await settled();
+  assert.deepEqual(
+    calls.map((call) => call.options),
+    [{ background: false }, { background: true }],
+  );
 });

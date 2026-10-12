@@ -1,0 +1,100 @@
+import type { StaleScope, StaleTarget } from '@/application/live-sync';
+
+export interface LoadOptions {
+  // True when a live signal or tick caused the read; the request then sends
+  // X-Umir-Activity: background and does not extend the session.
+  readonly background: boolean;
+}
+
+export interface ReadModelSnapshot<T> {
+  // The response to the latest settled request, or the previous one if that
+  // request failed.
+  readonly value: T | undefined;
+  // Clock time of the last successful read in milliseconds since the epoch.
+  readonly loadedAt: number | undefined;
+  readonly loading: boolean;
+  readonly failed: boolean;
+}
+
+export interface ReadModel<T> extends StaleTarget {
+  readonly subscribe: (listener: () => void) => () => void;
+  readonly getSnapshot: () => ReadModelSnapshot<T>;
+  // A read the operator caused. It starts at once and supersedes the request
+  // in flight.
+  refresh(): void;
+}
+
+export interface ReadModelOptions {
+  // Re-read on every tick, for models that depend on the current time.
+  readonly refreshOnTick: boolean;
+  readonly now: () => number;
+}
+
+// Data of one view. Only the response to the latest request is applied: the
+// order comes from a client request counter, not from stateVersion. A model
+// without subscribers only remembers that it is stale and reads on the next
+// subscription.
+export function createReadModel<T>(
+  load: (options: LoadOptions) => Promise<T>,
+  { refreshOnTick, now }: ReadModelOptions,
+): ReadModel<T> {
+  const listeners = new Set<() => void>();
+  let snapshot: ReadModelSnapshot<T> = {
+    value: undefined,
+    loadedAt: undefined,
+    loading: false,
+    failed: false,
+  };
+  let latest = 0;
+  let stale = true;
+
+  function update(next: ReadModelSnapshot<T>): void {
+    snapshot = next;
+    for (const listener of listeners) listener();
+  }
+
+  function start(background: boolean): void {
+    latest += 1;
+    const request = latest;
+    stale = false;
+    update({ ...snapshot, loading: true });
+    load({ background }).then(
+      (value) => {
+        settle(request, {
+          value,
+          loadedAt: now(),
+          loading: false,
+          failed: false,
+        });
+      },
+      () => {
+        settle(request, { ...snapshot, loading: false, failed: true });
+      },
+    );
+  }
+
+  function settle(request: number, next: ReadModelSnapshot<T>): void {
+    if (request !== latest) return;
+    update(next);
+    if (stale && listeners.size > 0) start(true);
+  }
+
+  return {
+    subscribe: (listener) => {
+      listeners.add(listener);
+      if (listeners.size === 1 && stale && !snapshot.loading) start(false);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getSnapshot: () => snapshot,
+    refresh() {
+      start(false);
+    },
+    markStale(scope: StaleScope) {
+      if (scope === 'time' && !refreshOnTick) return;
+      stale = true;
+      if (listeners.size > 0 && !snapshot.loading) start(true);
+    },
+  };
+}
