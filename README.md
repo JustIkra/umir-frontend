@@ -37,8 +37,8 @@ React-приложение для оператора одного рестора
 Сейчас слои заполнены так:
 
 - `domain/feedback.ts` — черновик формы обратной связи и проверка формата полей по [контракту feedback](https://github.com/JustIkra/umir-feedback/issues/1).
-- `application` — порты `CookieNoticeStore` и `FeedbackSender`, сценарий `createFeedbackSubmitter`. Сценарий сначала проверяет черновик. Для повторной отправки того же черновика он сохраняет `submissionID`, а после ответа `sent` создаёт новый.
-- `adapters` — хранилище закрытия cookie-уведомления в `localStorage` под ключом `umir.cookieNotice`. Если storage недоступен, состояние хранится в памяти. Там же адаптер отправки обратной связи, который пока всегда отвечает `unavailable`.
+- `application` — порты `CookieNoticeStore` и `FeedbackSender`, сценарий `createFeedbackSubmitter`. Сценарий сначала проверяет черновик. Для повторной отправки того же черновика он сохраняет `submissionID`, а после ответа `sent` создаёт новый. Порт `LiveFeed` описывает сигналы потока `/api/live`: события `change`, `tick`, `session`, `session-ended`, `upstream` и состояние соединения `connecting`, `open`, `closed`.
+- `adapters` — хранилище закрытия cookie-уведомления в `localStorage` под ключом `umir.cookieNotice`. Если storage недоступен, состояние хранится в памяти. Там же адаптер отправки обратной связи, который пока всегда отвечает `unavailable`. `live` открывает `EventSource('/api/live')` и проверяет `data` каждого события во время выполнения.
 - `presentation` — `theme`, общие компоненты `ui`, элементы сайта `site`, лендинг `landing` и документы `documents`. Компоненты получают адаптеры через `ServicesProvider`, а не создают их сами.
 - `app/main.tsx` — подключает шрифты, собирает адаптеры с `crypto.randomUUID()` и монтирует провайдеры и маршрутизатор.
 
@@ -72,6 +72,12 @@ React-приложение для оператора одного рестора
 
 Публичные поля и варианты ответов описаны в [OpenAPI фабрики](https://github.com/JustIkra/umir-factory/blob/main/docs/api/openapi.yml), а бизнес-правила — в [спецификации business-core](https://github.com/JustIkra/umir-factory/blob/main/docs/business-core.md). Фабрика выбирает опубликованные образы по точным SHA; новая версия исходников не меняет выбранную сборку автоматически. Сверяйте контракт и образы с выбранными SHA фабрики.
 
+### Обновления в реальном времени
+
+Gateway сообщает об изменениях потоком SSE `GET /api/live` (операция `streamLiveUpdates` в [OpenAPI фабрики](https://github.com/JustIkra/umir-factory/blob/main/docs/api/openapi.yml), версия `1.1.0-draft.1`). Поток передаёт только сигналы, а данные экраны перечитывают обычными GET.
+
+Адаптер разбирает `data` каждого события по контракту. `seq` сохраняется как `BigInt`, время должно быть полным `MoscowTimestamp` со смещением `+03:00` и существующей датой, лишние и пропущенные поля не допускаются. Некорректное событие закрывает `EventSource`, и адаптер сообщает `closed`. После разрыва соединения браузер переподключается сам. После ответа, отличного от `200 text/event-stream` (`401`, `403`, `405`, `429` или `502` от Nginx), браузер закрывает поток, и адаптер тоже сообщает `closed`.
+
 ## Разработка
 
 Для npm-команд нужен Node.js 22.13+, 24.x или 26+. CI и Docker-сборка закреплены на Node.js 24.21.0. Bun 1.4.3 закреплён в `.bun-version`; тестовый preload проверяет, что запущена именно эта версия. Установите её по [инструкции Bun](https://bun.com/docs/installation#installing-a-specific-version). npm остаётся менеджером установки и использует `package-lock.json`.
@@ -89,17 +95,17 @@ npm run check
 
 `check` последовательно выполняет `format:check`, `typecheck`, `lint`, `arch`, полный набор тестов и production-сборку. Отдельные команды:
 
-| Команда                | Проверка                                                                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`    | TypeScript `tsc --noEmit`.                                                                                                          |
-| `npm run lint`         | ESLint; предупреждения считаются ошибками.                                                                                          |
-| `npm run arch`         | Архитектурные границы и разрешение импортов через dependency-cruiser.                                                               |
-| `npm run format:check` | Проверка форматирования Prettier без записи файлов.                                                                                 |
-| `npm run format`       | Форматирование Prettier.                                                                                                            |
-| `npm run quality:test` | Положительные и отрицательные сценарии ESLint и архитектурных правил: `bun test ./tests/quality`.                                   |
-| `npm run test`         | Полный набор тестов: `bun test ./tests`, включая `tests/unit` для формы обратной связи, cookie-уведомления и оглавления документов. |
-| `npm run build`        | Production-сборка Vite.                                                                                                             |
-| `npm run test:nginx`   | Проверка `nginx.conf` с заглушкой gateway, см. [прокси API](#прокси-api); нужны Docker с Compose и Node.js.                         |
+| Команда                | Проверка                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run typecheck`    | TypeScript `tsc --noEmit`.                                                                                                                                         |
+| `npm run lint`         | ESLint; предупреждения считаются ошибками.                                                                                                                         |
+| `npm run arch`         | Архитектурные границы и разрешение импортов через dependency-cruiser.                                                                                              |
+| `npm run format:check` | Проверка форматирования Prettier без записи файлов.                                                                                                                |
+| `npm run format`       | Форматирование Prettier.                                                                                                                                           |
+| `npm run quality:test` | Положительные и отрицательные сценарии ESLint и архитектурных правил: `bun test ./tests/quality`.                                                                  |
+| `npm run test`         | Полный набор тестов: `bun test ./tests`, включая `tests/unit` для формы обратной связи, cookie-уведомления, оглавления документов и обновлений в реальном времени. |
+| `npm run build`        | Production-сборка Vite.                                                                                                                                            |
+| `npm run test:nginx`   | Проверка `nginx.conf` с заглушкой gateway, см. [прокси API](#прокси-api); нужны Docker с Compose и Node.js.                                                        |
 
 `npm run lint` также проверяет, что production-модули в `src` имеют расширение `.ts` или `.tsx`: `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` и `.cts` отклоняются. Подавление ESLint через inline-комментарии запрещено. Prettier форматирует и разбирает будущие SCSS-файлы, но отдельная семантическая проверка SCSS отложена до появления production-стилей.
 
