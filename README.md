@@ -1,72 +1,119 @@
 # umir-frontend
 
-Точка входа React и Vite для системы одного ресторана. Контейнер раздаёт статические файлы и передаёт `/api/` в gateway.
+React-приложение для оператора одного ресторана. Vite собирает статические файлы, а Nginx раздаёт их и передаёт `/api/` в gateway.
 
-## Рекомендации и выбранный стек
+## Стек
 
-Слайд 8 исходной презентации кейса «Мониторинг остатков, сроков годности и стоп-листов» рекомендует JavaScript или TypeScript со SCSS, React и Chakra. Организаторы оставляют выбор языка участникам.
+| Область            | Выбор                                                 | Состояние                                                                                |
+| ------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Язык и интерфейс   | TypeScript, React, Vite                               | Используются для публичной части.                                                        |
+| Маршрутизация      | react-router                                          | `createBrowserRouter`; маршруты перечислены в «Текущем состоянии».                       |
+| Компоненты и стили | Chakra UI с Emotion                                   | Собственная тема из Figma; стандартные токены и recipes Chakra не подключены.            |
+| SCSS               | Sass                                                  | Установлен, но не используется: стили описаны токенами и recipes темы Chakra.            |
+| Шрифты             | IBM Plex Sans и IBM Plex Mono через `@fontsource`     | Раздаются вместе со сборкой, без сторонних CDN.                                          |
+| Проверки           | ESLint, dependency-cruiser, Prettier, TypeScript, Bun | Проверки выполняются командами из раздела «Разработка».                                  |
+| Сборка и раздача   | Node.js, Vite, Nginx                                  | Существующий контейнерный процесс сохранён; Docker-сборка копирует `public/` с иконками. |
 
-| Область | Используется сейчас | Разрешено для frontend-задачи |
-| --- | --- | --- |
-| Язык и интерфейс | JavaScript, React | JavaScript или TypeScript, React |
-| Сборка и раздача | Vite, Node.js, Nginx | Тот же процесс сборки и раздачи |
-| Стили и компоненты | Каркас без экранов | SCSS, Chakra UI с проектной темой |
-| Типы API и тесты | Отдельных typecheck/test scripts пока нет | openapi-typescript, tsc, Vitest, Playwright |
+Презентация организаторов рекомендует JavaScript или TypeScript, React, SCSS и Chakra UI. Выбраны TypeScript и Chakra UI. SCSS не понадобился, потому что цвета, отступы, типографика, радиусы, анимации и точки перелома хранятся в одной теме Chakra. Версии React и Vite не менялись.
 
-При выборе TypeScript переход JS-каркаса и интеграция выбранных инструментов выполняются в frontend PR. Существующие JS-файлы могут сохраняться. Версии зависимостей и lockfile обновляются вместе с конфигурацией. При использовании Chakra тема сохраняет согласованные дизайн-токены, точки перелома, относительные размеры и доступность.
+Тема собрана через `createSystem(defaultBaseConfig, …)` в `src/presentation/theme`. В ней только токены из [макета UmirHack](https://www.figma.com/design/6Y1Jglyvc1xVsTzII54A2u/UmirHack); CSS-переменные имеют префикс `--umir-`. Размеры задаются в `rem`. Точки перелома mobile-first: `sm` 768px, `md` 881px, `lg` 1025px, `xl` 1201px, `2xl` 1367px, `3xl` 2400px. Макеты 390, 1024 и 1440 соответствуют базовым стилям, `sm`–`lg` и `xl`. Новые цвета и отступы добавляйте в тему, а не значениями в компонентах.
 
-При генерации типов используется точная принятая ревизия публичной OpenAPI фабрики. CI проверяет такую генерацию и отдельно выполняет `tsc --noEmit`, если выбран TypeScript; unit/browser проверки и сборка входят в приёмку frontend. Клиент проверяет JSON во время выполнения, полноту вариантов `kind/type` и точность целочисленных строк. Браузерные сценарии проходят через frontend/Nginx → gateway → реальные serving/warehouse. Межмодульные tests/business и HTTP-проверки tests/http фабрики подтверждают свои уровни поведения; отдельная браузерная приёмка требуется после реализации UI.
+В `tsconfig.json` включён `skipLibCheck`. Без него TypeScript находит 17 ошибок в типах Ark UI, Chakra UI и zag-js, которые несовместимы с `exactOptionalPropertyTypes`. Код в `src` проверяется полностью.
 
-## Ведение документации
+## Архитектура
 
-Обновляйте этот README в том же PR, где меняются стек, зависимости, установка, архитектура, npm scripts или CI. Добавляйте команды после их реализации и указывайте, какие проверки действительно выполнены. Сохраняйте различие между текущим каркасом и разрешёнными или запланированными инструментами.
+Исходники разделены на пять слоёв. Зависимости направлены к бизнес-правилам интерфейса; сборка приложения соединяет слои.
 
-Публичные HTTP-поля и варианты результатов берутся из OpenAPI фабрики; бизнес-правила — из business-core. В README давайте ссылки на эти источники. AGENTS.md содержит короткие инструкции для работы с репозиторием. Изменения поведения, проверок и совместимости записывайте в CHANGELOG.md под «Не выпущено». Общая карта документов и порядок их обновления находятся в [README фабрики](https://github.com/JustIkra/umir-factory#ведение-документации).
+| Слой               | Ответственность                                                    | Может зависеть от                       |
+| ------------------ | ------------------------------------------------------------------ | --------------------------------------- |
+| `src/domain`       | Независимые от фреймворка значения и состояния интерфейса.         | `domain`                                |
+| `src/application`  | Сценарии интерфейса и порты, определённые их потребителями.        | `application`, `domain`                 |
+| `src/adapters`     | HTTP, хранилища, runtime-декодирование и другие внешние механизмы. | `adapters`, `application`, `domain`     |
+| `src/presentation` | React-представление, тема Chakra и статические ассеты.             | `presentation`, `application`, `domain` |
+| `src/app`          | Точка входа и сборка приложения.                                   | Все слои                                |
 
-## Текущее состояние
+Только `adapters`, `presentation` и `app` могут импортировать сторонние runtime-пакеты. Представление не создаёт HTTP-адаптеры. В пустые слои не добавляют фиктивную бизнес-логику. Production-код в `src` использует только `.ts` и `.tsx`; ESLint отклоняет JavaScript. Dependency-cruiser проверяет допустимые зависимости, включая type-only импорты и алиас `@/`, циклы, неразрешённые и нераспознанные импорты и импорты тестовых данных в production-код. ESLint запрещает inline disable, прямые `fetch` и storage-вызовы из presentation, а также неинъецируемые часы, ID и внешние механизмы в domain/application.
 
-React смонтирован в корневой элемент и пока отображает пустое содержимое. Экраны и бизнес-взаимодействия ещё не реализованы.
-Контейнер отвечает на `GET /healthz`; это проверка раздачи HTTP, а не бизнес-функций.
+Сейчас слои заполнены так:
 
-## Объём текущего этапа
+- `domain/feedback.ts` — черновик формы обратной связи и проверка формата полей по [контракту feedback](https://github.com/JustIkra/umir-feedback/issues/1).
+- `application` — порты `CookieNoticeStore` и `FeedbackSender`, сценарий `createFeedbackSubmitter`. Сценарий сначала проверяет черновик. Для повторной отправки того же черновика он сохраняет `submissionID`, а после ответа `sent` создаёт новый.
+- `adapters` — хранилище закрытия cookie-уведомления в `localStorage` под ключом `umir.cookieNotice`. Если storage недоступен, состояние хранится в памяти. Там же адаптер отправки обратной связи, который пока всегда отвечает `unavailable`.
+- `presentation` — `theme`, общие компоненты `ui`, элементы сайта `site`, лендинг `landing` и документы `documents`. Компоненты получают адаптеры через `ServicesProvider`, а не создают их сами.
+- `app/main.tsx` — подключает шрифты, собирает адаптеры с `crypto.randomUUID()` и монтирует провайдеры и маршрутизатор.
 
-Бизнес-HTTP API реализован в исходниках backend-сервисов. Состояние хранится в памяти процесса и теряется при его перезапуске. Фабрика выбирает опубликованные образы по точным SHA; новая версия исходников не меняет выбранную сборку автоматически. Версию [опубликованного OpenAPI](https://github.com/JustIkra/umir-factory/blob/main/docs/api/openapi.yml) проверяйте вместе с выбранными SHA фабрики: рабочая HTTP-реализация может опережать публикацию контракта и образов. Новые экраны и бизнес-взаимодействия frontend остаются следующим этапом; этот репозиторий содержит каркас интерфейса.
+Бизнес-правила остаются на backend. Warehouse и serving определяют доступность, FEFO, истечение сроков и допустимый состав заказа. Frontend отображает ответы gateway и управляет только состоянием интерфейса. Он не дублирует решения сервисов.
 
-| Файл | Назначение |
-| --- | --- |
-| `index.html` | HTML-точка монтирования приложения. |
-| `src/main.js` | Запуск React и монтирование корневого элемента. |
-| `nginx.conf` | Раздача сборки и передача `/api/` в gateway внутри Compose-сети, см. [прокси API](#прокси-api). |
-| `tests/nginx/` | Проверка `nginx.conf` с заглушкой gateway (`npm run test:nginx`). |
+При разработке экранов используйте React и библиотеки через публичные exports, а не внутренние пути пакетов. Не храните в state значения, которые можно вычислить из props или другого state, и не используйте `useEffect` для вычислений render. Запускайте независимые запросы параллельно. Выделяйте feature-модули, когда реальные экраны формируют устойчивые границы.
 
-Frontend получает API через gateway. Будущие экраны показывают предложение заказа и требуют явного подтверждения оставшегося состава. Неизвестный результат запроса нельзя показывать как успех или повторять с новым `commandID`.
+## Текущее состояние и следующий этап
 
-Будущий API-клиент отделяет состояние результата сервера, включая неизвестный и ожидающий результат, от отображения интерфейса. Для адаптивной вёрстки используются согласованная шкала точек перелома проекта и относительные единицы.
+Реализована публичная часть «Ровного хода» по макету Figma:
 
-Границы Go-сервисов описаны в [документе архитектуры](https://github.com/JustIkra/umir-factory/blob/main/docs/go-architecture.md). Доступные проверки frontend — `npm ci`, `npm run build` и `npm run test:nginx`; unit- и браузерных тестов пока нет. CI также проверяет контейнерную сборку. Сборка Vite и process health не доказывают готовность бизнес-экранов.
+| Маршрут    | Страница                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| `/`        | Лендинг: hero с анимацией, возможности, процесс, принципы, контакты и форма обратной связи. |
+| `/privacy` | Политика конфиденциальности.                                                                |
+| `/cookies` | Политика cookie.                                                                            |
+| `/consent` | Согласие на обработку персональных данных.                                                  |
+| `*`        | «Страница не найдена» в оформлении документов; отдельного макета нет.                       |
+
+На лендинге и страницах документов показывается баннер о cookie, пока его не закроют. Фавиконки и `manifest.webmanifest` лежат в `public/`. Анимации hero сделаны на CSS keyframes. При `prefers-reduced-motion` элементы сразу показываются в конечном состоянии, а декор скрывается в режимах `forced-colors` и `prefers-contrast: more`.
+
+Форма обратной связи проверяет поля на клиенте, но отправка не подключена. Gateway уже принимает `POST /api/feedback`, но адаптер формы пока всегда возвращает «Сервис временно недоступен». Адрес офиса и часы поддержки — заполнители из макета; их нужно заполнить до публикации. Рабочих экранов на `/app` пока нет, и ссылки «Открыть приложение» ведут на страницу «Страница не найдена». Ещё не реализованы API-клиент, OpenAPI-типы, авторизация и браузерные/E2E-сценарии. `GET /healthz` проверяет раздачу HTTP, а не готовность бизнес-функций.
+
+Когда появится API-клиент, он будет обращаться к backend только через gateway. Если типы генерируются из публичной OpenAPI, укажите точный commit фабрики и `info.version` схемы, а CI должен проверять актуальность генерации. Типы TypeScript не заменяют проверку JSON во время выполнения. Декодер обязан разбирать все известные варианты `kind/type`; неизвестный или некорректный ответ команды не является успехом или доказательством отсутствия записи.
+
+Для следующего этапа разрешены `openapi-typescript` для API-типов и Playwright для браузерной приёмки. Unit-тесты используют Bun. Эти инструменты API и браузера пока не установлены.
+
+Целые количества из wire-контракта передаются строками. Не преобразуйте их в `Number`; сохраняйте строку или используйте `BigInt`. Даты должны сохранять полный timestamp и часовой пояс `Europe/Moscow`. Неизвестный результат подтверждения и `ConfirmationPending` сохраняют ту же попытку и `commandID`; их нельзя показывать как успех или повторять с новым идентификатором.
+
+Браузерные сценарии проходят через frontend/Nginx → gateway → реальные serving/warehouse. Межмодульные tests/business и HTTP-проверки tests/http фабрики подтверждают свои уровни поведения; отдельная браузерная приёмка требуется после реализации UI. Проверки интерфейса должны охватывать все варианты результата, клавиатурную навигацию и ширины 1440, 1024 и 390. Проверяйте длинные русские названия, точные большие количества, причины недоступности, фокус, ошибки, ожидание и подтверждённый результат. Сборка и статическая проверка архитектуры не доказывают корректность бизнес-семантики или runtime-JSON.
+
+Публичные поля и варианты ответов описаны в [OpenAPI фабрики](https://github.com/JustIkra/umir-factory/blob/main/docs/api/openapi.yml), а бизнес-правила — в [спецификации business-core](https://github.com/JustIkra/umir-factory/blob/main/docs/business-core.md). Фабрика выбирает опубликованные образы по точным SHA; новая версия исходников не меняет выбранную сборку автоматически. Сверяйте контракт и образы с выбранными SHA фабрики.
 
 ## Разработка
 
-Требуется Node.js 22.12+; Docker-сборка и CI закреплены на Node.js 24.21.0.
+Для npm-команд нужен Node.js 22.13+, 24.x или 26+. CI и Docker-сборка закреплены на Node.js 24.21.0. Bun 1.4.3 закреплён в `.bun-version`; тестовый preload проверяет, что запущена именно эта версия. Установите её по [инструкции Bun](https://bun.com/docs/installation#installing-a-specific-version). npm остаётся менеджером установки и использует `package-lock.json`.
 
 ```sh
 npm ci
-npm run build
 npm run dev
 ```
 
-Vite выводит адрес dev-сервера в консоль. Проксирование API сейчас настроено в Nginx-контейнере; dev-сервер Vite не содержит proxy-конфигурации.
+Перед передачей изменений выполните полный набор локальных проверок:
 
-Сборка отдельного контейнера:
+```sh
+npm run check
+```
+
+`check` последовательно выполняет `format:check`, `typecheck`, `lint`, `arch`, полный набор тестов и production-сборку. Отдельные команды:
+
+| Команда                | Проверка                                                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`    | TypeScript `tsc --noEmit`.                                                                                                          |
+| `npm run lint`         | ESLint; предупреждения считаются ошибками.                                                                                          |
+| `npm run arch`         | Архитектурные границы и разрешение импортов через dependency-cruiser.                                                               |
+| `npm run format:check` | Проверка форматирования Prettier без записи файлов.                                                                                 |
+| `npm run format`       | Форматирование Prettier.                                                                                                            |
+| `npm run quality:test` | Положительные и отрицательные сценарии ESLint и архитектурных правил: `bun test ./tests/quality`.                                   |
+| `npm run test`         | Полный набор тестов: `bun test ./tests`, включая `tests/unit` для формы обратной связи, cookie-уведомления и оглавления документов. |
+| `npm run build`        | Production-сборка Vite.                                                                                                             |
+| `npm run test:nginx`   | Проверка `nginx.conf` с заглушкой gateway, см. [прокси API](#прокси-api); нужны Docker с Compose и Node.js.                         |
+
+`npm run lint` также проверяет, что production-модули в `src` имеют расширение `.ts` или `.tsx`: `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` и `.cts` отклоняются. Подавление ESLint через inline-комментарии запрещено. Prettier форматирует и разбирает будущие SCSS-файлы, но отдельная семантическая проверка SCSS отложена до появления production-стилей.
+
+GitHub Actions устанавливает Bun по `.bun-version`, выполняет `npm ci`, затем `npm run check`, существующую контейнерную сборку и `npm run test:nginx`. Для воспроизводимости используйте lockfile и `npm ci`.
+
+Vite выводит адрес dev-сервера в консоль. Проксирование API настроено в Nginx-контейнере; dev-сервер Vite не проксирует API.
+
+Сборка frontend-контейнера:
 
 ```sh
 docker compose up --build -d --wait
 ```
 
-Отдельный Compose публикует `http://127.0.0.1:18080`.
-В [общей сборке фабрики](https://github.com/JustIkra/umir-factory#readme) frontend по умолчанию доступен на `http://127.0.0.1:8080`.
-Nginx использует адрес `http://gateway:8080` внутри сети Compose.
-Часовой пояс контейнера — `Europe/Moscow`.
+Отдельный Compose публикует `http://127.0.0.1:18080`. В [общей сборке фабрики](https://github.com/JustIkra/umir-factory#readme) frontend по умолчанию доступен на `http://127.0.0.1:8080`. Nginx обращается к gateway по адресу `http://gateway:8080` внутри Compose-сети.
 
 ### Прокси API
 
@@ -80,34 +127,16 @@ Nginx использует адрес `http://gateway:8080` внутри сет�
 
 `npm run test:nginx` запускает `nginx.conf` в закреплённом образе Nginx из `Dockerfile` вместе с заглушкой gateway на Node.js из того же файла и проверяет эти правила; нужны Docker с Compose и Node.js. Ответ `504` по таймауту автоматически не проверяется: это заняло бы 30 секунд.
 
-## Совместная работа
+## Документация и совместная работа
 
-Main защищён активным ruleset. Обновлять main и объединять PR может только `JustIkra`.
-`Kxqusos` добавлен с ролью write и работает в других ветках.
-Остальные пользователи GitHub могут создать issue, fork и PR.
-Владелец кода указан в `.github/CODEOWNERS`.
+Обновляйте этот README в том же PR, если меняются стек, зависимости, установка, архитектура, npm-команды или CI. В [AGENTS.md](AGENTS.md) находятся краткие правила для репозитория. Записывайте изменения в [CHANGELOG.md](CHANGELOG.md) под «Не выпущено». Общая карта документов и их владельцев описана в [README фабрики](https://github.com/JustIkra/umir-factory#ведение-документации).
 
-Перед PR выполните локальные проверки. Изменение межсервисного контракта согласуйте с вызывающей стороной.
+Изменение межсервисного контракта согласуйте с вызывающей стороной. Main защищён; обновлять main и объединять PR может только `JustIkra`. Секреты передаются через окружение; `.env` исключён из Git.
 
-## CI/CD
+## CI/CD и версии
 
-[GitHub Actions](https://github.com/JustIkra/umir-frontend/actions) проверяет push в ветки, PR в main и ручные запуски.
-После успешной проверки main публикует `ghcr.io/justikra/umir-frontend:sha-<полный SHA коммита>` для `linux/amd64` и `linux/arm64`.
-Публикация использует `GITHUB_TOKEN`, с `packages:write` только у задания публикации.
-Коммит документации запускает тот же workflow.
+[GitHub Actions](https://github.com/JustIkra/umir-frontend/actions) проверяет push в ветки, pull request в main и ручные запуски. После успешных проверок main публикует `ghcr.io/justikra/umir-frontend:sha-<полный SHA коммита>` для `linux/amd64` и `linux/arm64`. Задание публикации получает `packages:write`; остальные задания имеют только `contents:read`.
 
-[Фабрика](https://github.com/JustIkra/umir-factory) закрепляет выбранный SHA в `compose.yaml`.
-Обновление фабрики выполняется отдельным PR; новый образ не развёртывается автоматически.
-Секреты передаются через окружение; `.env` исключён из Git.
+Фабрика закрепляет выбранный SHA в `compose.yaml`. Обновление фабрики выполняется отдельным PR; новый образ не развёртывается автоматически.
 
-## Development standard and releases
-
-Repository instructions are in [AGENTS.md](AGENTS.md). Public compatibility covers documented requests, results, error states and operational interfaces; warehouse/serving also publish their declared Go contract surfaces when implemented. Internal refactoring does not automatically change this contract.
-
-This remains a React/Vite repository. Use `npm ci` and `npm run build`, plus the existing container build. Go quality tools do not apply to frontend sources.
-
-Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Stable incompatible changes increment major, compatible additions minor and fixes patch. Our pre-1.0 convention uses patch for compatible fixes and minor for additions or breaking changes. Mark breaking behavior and migration explicitly.
-
-Release repositories independently. Use annotated `vX.Y.Z` tags for actual releases; published nested Go modules prefix tags with the logical module subdirectory (excluding a trailing major-version directory), and Go v2+ needs the matching major import path. Published tags/versions stay immutable. Record changes under Unreleased before releasing. Preserve Umir `sha-<full-SHA>` image identities and exact factory component pins; SemVer does not replace them with `latest`. API versions and service releases are separate.
-
-Preserve unrelated local edits, stage reviewed paths and check `git diff --cached` and `git diff --check`. Tagging, publishing and shared-history rewrites require the corresponding user instruction. This standard does not create a release or change the current version.
+Используйте Conventional Commits и Semantic Versioning. До 1.0 совместимые исправления увеличивают patch, а новые возможности или несовместимые изменения — minor. Записывайте миграцию для несовместимых изменений. Репозитории и релизы ведутся отдельно. Для выпусков применяйте аннотированные `vX.Y.Z` теги; опубликованные версии и теги неизменны. Сохраняйте идентификаторы образов `sha-<полный SHA>` и точные pins фабрики.
