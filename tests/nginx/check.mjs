@@ -80,6 +80,26 @@ const checks = {
     await send('GET', '/api/serving/menu');
     assert.equal((await recorded()).length, before + 2);
   },
+
+  'answers a lost gateway answer with an outcome and never retries': async () => {
+    for (const [method, outcome] of [['GET', 'unavailable'], ['POST', 'unknown']]) {
+      const before = (await recorded()).filter((r) => r.url === '/api/drop' && r.method === method).length;
+      const response = await send(method, '/api/drop', { body: method === 'POST' ? '{}' : undefined });
+      assert.equal(response.status, 502);
+      assert.equal(response.headers['cache-control'], 'no-store');
+      assert.deepEqual(json(response), { code: 'UpstreamUnavailable', message: 'gateway did not respond', outcome });
+      const after = (await recorded()).filter((r) => r.url === '/api/drop' && r.method === method).length;
+      assert.equal(after, before + 1, `${method} was retried`);
+    }
+  },
+
+  'answers a body over the general limit with the JSON error envelope': async () => {
+    const before = (await recorded()).length;
+    const response = await send('POST', '/api/serving/orders', { body: 'x'.repeat(1024 * 1024 + 1) });
+    assert.equal(response.status, 413);
+    assert.equal(json(response).code, 'PayloadTooLarge');
+    assert.equal((await recorded()).length, before, 'the post reached gateway');
+  },
 };
 
 await ready();
