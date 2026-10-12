@@ -7,9 +7,14 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
+import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
+import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
 import { notConnectedFeedbackSender } from '@/adapters/feedback/not-connected-sender';
+import { createSessionCheck } from '@/adapters/http/session-check';
+import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createFeedbackSubmitter } from '@/application/feedback';
+import { createLiveSync } from '@/application/live-sync';
 import { routes } from '@/presentation/routes';
 import {
   ServicesProvider,
@@ -34,6 +39,15 @@ const services: PresentationServices = {
   feedback: createFeedbackSubmitter(notConnectedFeedbackSender, () =>
     crypto.randomUUID(),
   ),
+  // /app starts the stream after sign-in. No command client exists yet, so no
+  // ConfirmationPending attempt waits for resolution.
+  live: createLiveSync({
+    feed: createEventSourceFeed((url) => new EventSource(url)),
+    scheduler: createTimerScheduler(window),
+    visibility: createPageVisibility(document),
+    sessionCheck: createSessionCheck((path, init) => fetch(path, init)),
+    resolvePending: () => Promise.resolve(),
+  }),
 };
 const router = createBrowserRouter(routes);
 
