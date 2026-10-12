@@ -1,5 +1,6 @@
 // Checks the frontend Nginx API proxy against the gateway stand-in (gateway#8, gateway#10).
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -47,6 +48,31 @@ async function ready() {
     await sleep(500);
   }
   throw new Error('frontend did not become ready');
+}
+
+// Reads a response to the end and notes when each chunk arrived.
+function stream(path, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const request = http.request(
+      { host: '127.0.0.1', port, method: 'GET', path, headers },
+      (response) => {
+        const chunks = [];
+        response.on('data', (chunk) => {
+          chunks.push({ at: Date.now() - started, text: chunk.toString() });
+        });
+        response.on('end', () => {
+          resolve({
+            status: response.statusCode,
+            headers: response.headers,
+            chunks,
+          });
+        });
+      },
+    );
+    request.on('error', reject);
+    request.end();
+  });
 }
 
 function json(response) {
@@ -170,6 +196,68 @@ const checks = {
     });
     assert.equal(response.status, 200);
     assert.equal((await recorded()).at(-1).length, 20000);
+  },
+
+  // Nginx 1.30 already streams small chunks and speaks HTTP/1.1 upstream by
+  // default, so the contract's settings are checked in the file as well.
+  'configures /api/live for a long-lived stream': () => {
+    const config = readFileSync(
+      new URL('../../nginx.conf', import.meta.url),
+      'utf8',
+    );
+    const block = /location = \/api\/live \{([^}]*)\}/.exec(config)?.[1] ?? '';
+    for (const directive of [
+      'proxy_http_version 1.1;',
+      'proxy_set_header Connection "";',
+      'proxy_buffering off;',
+      'proxy_cache off;',
+      'gzip off;',
+      'proxy_read_timeout 60s;',
+    ]) {
+      assert.ok(block.includes(directive), `missing ${directive}`);
+    }
+  },
+
+  'passes /api/live over HTTP/1.1 with the browser headers': async () => {
+    const headers = {
+      Host: 'umir.example.test:8443',
+      Cookie: 'umir_operator_session=s',
+    };
+    assert.equal((await stream('/api/live', headers)).status, 200);
+    const last = (await recorded()).filter((r) => r.url === '/api/live').at(-1);
+    assert.deepEqual(
+      [last.httpVersion, last.connection, last.host, last.cookie],
+      ['1.1', null, headers.Host, headers.Cookie],
+    );
+  },
+
+  'passes each /api/live event at once': async () => {
+    const response = await stream('/api/live', { 'Accept-Encoding': 'gzip' });
+    assert.match(response.headers['content-type'], /^text\/event-stream/);
+    assert.equal(response.headers['content-encoding'], undefined);
+    // The stand-in writes the second event 1.5 s after the first.
+    const first = response.chunks.at(0);
+    const last = response.chunks.at(-1);
+    assert.ok(last.at - first.at >= 1000, 'Nginx held the first event back');
+    assert.match(first.text, /^retry: 3000\n\nevent: upstream\n/);
+    assert.match(last.text, /"available":false/);
+  },
+
+  'answers a lost /api/live answer with the JSON error envelope': async () => {
+    const before = (await recorded()).filter(
+      (r) => r.url === '/api/live?drop',
+    ).length;
+    const response = await send('GET', '/api/live?drop');
+    assert.equal(response.status, 502);
+    assert.deepEqual(json(response), {
+      code: 'UpstreamUnavailable',
+      message: 'gateway did not respond',
+      outcome: 'unavailable',
+    });
+    const after = (await recorded()).filter(
+      (r) => r.url === '/api/live?drop',
+    ).length;
+    assert.equal(after, before + 1, 'the stream request was retried');
   },
 };
 

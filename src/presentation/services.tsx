@@ -1,11 +1,14 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { CookieNoticeStore } from '@/application/cookie-notice';
 import type { FeedbackSubmitter } from '@/application/feedback';
+import type { LiveSync } from '@/application/live-sync';
 
 // Application ports the screens use; the app layer assembles the adapters.
 export interface PresentationServices {
   cookieNotice: CookieNoticeStore;
   feedback: FeedbackSubmitter;
+  // Not started: /app starts it after sign-in and stops it on sign-out.
+  live: LiveSync;
 }
 
 const ServicesContext = createContext<PresentationServices | null>(null);
