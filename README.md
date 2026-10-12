@@ -36,13 +36,14 @@ React смонтирован в корневой элемент и пока от
 | --- | --- |
 | `index.html` | HTML-точка монтирования приложения. |
 | `src/main.js` | Запуск React и монтирование корневого элемента. |
-| `nginx.conf` | Раздача сборки и передача `/api/` в gateway внутри Compose-сети. |
+| `nginx.conf` | Раздача сборки и передача `/api/` в gateway внутри Compose-сети, см. [прокси API](#прокси-api). |
+| `tests/nginx/` | Проверка `nginx.conf` с заглушкой gateway (`npm run test:nginx`). |
 
 Frontend получает API через gateway. Будущие экраны показывают предложение заказа и требуют явного подтверждения оставшегося состава. Неизвестный результат запроса нельзя показывать как успех или повторять с новым `commandID`.
 
 Будущий API-клиент отделяет состояние результата сервера, включая неизвестный и ожидающий результат, от отображения интерфейса. Для адаптивной вёрстки используются согласованная шкала точек перелома проекта и относительные единицы.
 
-Границы Go-сервисов описаны в [документе архитектуры](https://github.com/JustIkra/umir-factory/blob/main/docs/go-architecture.md). Доступные проверки frontend — `npm ci` и `npm run build`; отдельного test-скрипта в `package.json` нет. CI также проверяет контейнерную сборку. Сборка Vite и process health не доказывают готовность бизнес-экранов.
+Границы Go-сервисов описаны в [документе архитектуры](https://github.com/JustIkra/umir-factory/blob/main/docs/go-architecture.md). Доступные проверки frontend — `npm ci`, `npm run build` и `npm run test:nginx`; unit- и браузерных тестов пока нет. CI также проверяет контейнерную сборку. Сборка Vite и process health не доказывают готовность бизнес-экранов.
 
 ## Разработка
 
@@ -66,6 +67,18 @@ docker compose up --build -d --wait
 В [общей сборке фабрики](https://github.com/JustIkra/umir-factory#readme) frontend по умолчанию доступен на `http://127.0.0.1:8080`.
 Nginx использует адрес `http://gateway:8080` внутри сети Compose.
 Часовой пояс контейнера — `Europe/Moscow`.
+
+### Прокси API
+
+Браузер обращается к API только через этот Nginx (gateway#8, gateway#10). Для `/api/`:
+
+- `Host` браузера вместе с портом, `Origin`, cookie и `X-CSRF-Token` доходят до gateway без изменений, как и исходные путь и query. Статус, тело и `Set-Cookie` ответа gateway возвращаются без изменений, в том числе его ошибки.
+- Ответы не кешируются, запрос не повторяется. Таймаут или разрыв после передачи — неизвестный исход, его разрешает клиент.
+- Таймауты: соединение 5 с, отправка и чтение 30 с. Gateway ограничивает обмен `UPSTREAM_TIMEOUT` (15 с) и чтение тела запросов кабинета (10 с); если поднять `UPSTREAM_TIMEOUT`, `proxy_read_timeout` должен остаться больше.
+- Собственные ошибки Nginx — JSON в формах gateway вместо HTML-страниц: `502 UpstreamUnavailable` и `504 UpstreamTimeout` с `outcome` (`unavailable` для `GET`, `HEAD`, `OPTIONS`, иначе `unknown`) и `413 PayloadTooLarge` в конверте `{code, message, requestID}`, всё с `Cache-Control: no-store`.
+- `POST /api/feedback` (публичная форма обратной связи) принимает тело до 16 КиБ, остальные маршруты — до 1 МиБ, как по умолчанию в Nginx.
+
+`npm run test:nginx` запускает `nginx.conf` в закреплённом образе Nginx из `Dockerfile` вместе с заглушкой gateway на Node.js из того же файла и проверяет эти правила; нужны Docker с Compose и Node.js. Ответ `504` по таймауту автоматически не проверяется: это заняло бы 30 секунд.
 
 ## Совместная работа
 

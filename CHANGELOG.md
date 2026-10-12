@@ -2,6 +2,7 @@
 
 ## Не выпущено
 
+- Прокси API (gateway#8, gateway#10): `Host` браузера передаётся вместе с портом; конечные таймауты (5 с соединение, 30 с отправка и чтение), без повторов и кеширования; собственные ошибки Nginx `502`, `504` и `413` — JSON в формах gateway вместо HTML; `POST /api/feedback` ограничен 16 КиБ. `npm run test:nginx` и CI проверяют `nginx.conf` с заглушкой gateway.
 - Expanded the approved frontend stack to JavaScript or TypeScript, SCSS and Chakra UI on React/Vite after inspecting the organizer's presentation. Authorized openapi-typescript, Vitest and Playwright within the frontend task; their integration remains part of that PR.
 - Documented how to maintain README, AGENTS and changelog alongside implementation, with separate current, approved and planned status and exact API revision references.
 - Обновлены закреплённые GitHub Actions до выпусков с поддержкой Node.js 24.

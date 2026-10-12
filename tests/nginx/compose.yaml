@@ -1,0 +1,16 @@
+# Frontend Nginx configuration with a gateway stand-in; run.sh supplies the pinned images.
+name: umir-frontend-nginx-check
+services:
+  gateway:
+    image: ${NODE_IMAGE:?}
+    command: ["node", "/check/gateway.mjs"]
+    volumes:
+      - ./gateway.mjs:/check/gateway.mjs:ro
+  frontend:
+    image: ${NGINX_IMAGE:?}
+    volumes:
+      - ../../nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-18090}:8080"
+    depends_on:
+      - gateway
