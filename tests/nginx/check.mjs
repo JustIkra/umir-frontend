@@ -100,6 +100,30 @@ const checks = {
     assert.equal(json(response).code, 'PayloadTooLarge');
     assert.equal((await recorded()).length, before, 'the post reached gateway');
   },
+
+  'accepts a 16 KiB feedback post': async () => {
+    const response = await send('POST', '/api/feedback', { body: 'x'.repeat(16 * 1024) });
+    assert.equal(response.status, 200);
+    const last = (await recorded()).at(-1);
+    assert.deepEqual([last.url, last.length], ['/api/feedback', 16 * 1024]);
+  },
+
+  'answers a larger feedback post with the JSON error envelope': async () => {
+    const before = (await recorded()).length;
+    const response = await send('POST', '/api/feedback', { body: 'x'.repeat(16 * 1024 + 1) });
+    assert.equal(response.status, 413);
+    assert.equal(response.headers['cache-control'], 'no-store');
+    const problem = json(response);
+    assert.equal(problem.code, 'PayloadTooLarge');
+    assert.match(problem.requestID, /^[0-9a-f]{32}$/);
+    assert.equal((await recorded()).length, before, 'the post reached gateway');
+  },
+
+  'keeps the general body limit for other API routes': async () => {
+    const response = await send('POST', '/api/serving/orders', { body: 'x'.repeat(20000) });
+    assert.equal(response.status, 200);
+    assert.equal((await recorded()).at(-1).length, 20000);
+  },
 };
 
 await ready();
