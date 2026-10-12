@@ -20,10 +20,26 @@ const server = http.createServer((request, response) => {
       origin: request.headers.origin ?? null,
       cookie: request.headers.cookie ?? null,
       csrf: request.headers['x-csrf-token'] ?? null,
+      httpVersion: request.httpVersion,
+      connection: request.headers.connection ?? null,
       length: Buffer.concat(chunks).length,
     });
-    if (url.startsWith('/api/drop')) {
+    if (url.startsWith('/api/drop') || url === '/api/live?drop') {
       request.socket.destroy();
+      return;
+    }
+    // No X-Accel-Buffering here: the check proves Nginx's own settings.
+    if (url === '/api/live') {
+      response.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      response.write(
+        'retry: 3000\n\nevent: upstream\ndata: {"available":true}\n\n',
+      );
+      setTimeout(() => {
+        response.end('event: upstream\ndata: {"available":false}\n\n');
+      }, 1500);
       return;
     }
     const status = /^\/api\/respond\/(\d{3})$/.exec(url);

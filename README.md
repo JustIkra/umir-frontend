@@ -147,8 +147,9 @@ docker compose up --build -d --wait
 - Таймауты: соединение 5 с, отправка и чтение 30 с. Gateway ограничивает обмен `UPSTREAM_TIMEOUT` (15 с) и чтение тела запросов кабинета (10 с); если поднять `UPSTREAM_TIMEOUT`, `proxy_read_timeout` должен остаться больше.
 - Собственные ошибки Nginx — JSON в формах gateway вместо HTML-страниц: `502 UpstreamUnavailable` и `504 UpstreamTimeout` с `outcome` (`unavailable` для `GET`, `HEAD`, `OPTIONS`, иначе `unknown`) и `413 PayloadTooLarge` в конверте `{code, message, requestID}`, всё с `Cache-Control: no-store`.
 - `POST /api/feedback` (публичная форма обратной связи) принимает тело до 16 КиБ, остальные маршруты — до 1 МиБ, как по умолчанию в Nginx.
+- `GET /api/live` (поток SSE) идёт через отдельный `location = /api/live`: HTTP/1.1 с пустым `Connection`, без буферизации, кеша и gzip, таймаут чтения 60 с. Gateway шлёт `: ping` каждые 15 с, поэтому тихий поток не обрывается. Собственный `proxy_set_header` отменяет наследование серверных заголовков, поэтому `Host`, `X-Forwarded-For` и `X-Forwarded-Proto` в этом блоке повторены. Собственные ошибки Nginx `502` и `504` — тот же JSON с `outcome: unavailable`.
 
-`npm run test:nginx` запускает `nginx.conf` в закреплённом образе Nginx из `Dockerfile` вместе с заглушкой gateway на Node.js из того же файла и проверяет эти правила; нужны Docker с Compose и Node.js. Ответ `504` по таймауту автоматически не проверяется: это заняло бы 30 секунд.
+`npm run test:nginx` запускает `nginx.conf` в закреплённом образе Nginx из `Dockerfile` вместе с заглушкой gateway на Node.js из того же файла и проверяет эти правила; нужны Docker с Compose и Node.js. Ответ `504` по таймауту и 60-секундный таймаут потока автоматически не проверяются: это заняло бы 30 и 60 секунд. Nginx 1.30 и без отдельного блока ходит в gateway по HTTP/1.1 и сразу передаёт события, поэтому проверка дополнительно сверяет блок `/api/live` в `nginx.conf` с контрактом.
 
 ## Документация и совместная работа
 
