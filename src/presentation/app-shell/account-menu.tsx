@@ -1,5 +1,5 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
-import type { RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import { Link as RouterLink } from 'react-router';
 import closeIcon from '@/presentation/assets/icons/close-24.svg';
 import organizationIcon from '@/presentation/assets/icons/organization-24.svg';
@@ -20,6 +20,7 @@ import { SearchInput } from '@/presentation/ui/form';
 import { Icon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
 import { SidebarContent } from './sidebar';
+import { filterWorkplaces } from './workplaces';
 
 const MenuItem = chakra(RouterLink, {
   base: {
@@ -125,7 +126,11 @@ const menuOrganizations = [...organizations].sort(
     Number(a.name === placeholderAccount.organization),
 );
 
+// The search filters only the list already in the menu; with many restaurants
+// the API will search on the server.
 function Workplaces({ onLeave }: { onLeave: () => void }) {
+  const [query, setQuery] = useState('');
+  const shown = filterWorkplaces(menuOrganizations, query);
   return (
     // Shrinks with the window down to the heading, the search and about two
     // options; below that the whole panel scrolls (landscape phones, zoom).
@@ -133,33 +138,45 @@ function Workplaces({ onLeave }: { onLeave: () => void }) {
       <Text px="3" textStyle="caption.default" color="text.secondary">
         Рабочее место
       </Text>
-      <SearchInput label="Найти ресторан" />
-      <Stack
-        as="ul"
-        gap="1"
-        flex="1"
-        minH="0"
-        overflowY="auto"
-        listStyleType="none"
-      >
-        {menuOrganizations.map((organization) => (
-          <Stack as="li" key={organization.id} gap="1">
-            <Text px="3" textStyle="caption.strong" color="text.secondary">
-              {organization.name}
-            </Text>
-            <Stack as="ul" gap="1" listStyleType="none">
-              {organization.restaurants.map((restaurant) => (
-                <RestaurantOption
-                  key={restaurant.name}
-                  organization={organization}
-                  restaurant={restaurant}
-                  onLeave={onLeave}
-                />
-              ))}
+      <SearchInput
+        label="Найти ресторан"
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value);
+        }}
+      />
+      {shown.length === 0 ? (
+        <Text px="3" py="2" textStyle="body.default" color="text.secondary">
+          Ничего не найдено
+        </Text>
+      ) : (
+        <Stack
+          as="ul"
+          gap="1"
+          flex="1"
+          minH="0"
+          overflowY="auto"
+          listStyleType="none"
+        >
+          {shown.map((organization) => (
+            <Stack as="li" key={organization.id} gap="1">
+              <Text px="3" textStyle="caption.strong" color="text.secondary">
+                {organization.name}
+              </Text>
+              <Stack as="ul" gap="1" listStyleType="none">
+                {organization.restaurants.map((restaurant) => (
+                  <RestaurantOption
+                    key={restaurant.name}
+                    organization={organization}
+                    restaurant={restaurant}
+                    onLeave={onLeave}
+                  />
+                ))}
+              </Stack>
             </Stack>
-          </Stack>
-        ))}
-      </Stack>
+          ))}
+        </Stack>
+      )}
     </Stack>
   );
 }
