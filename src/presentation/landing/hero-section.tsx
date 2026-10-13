@@ -333,7 +333,7 @@ export function HeroSection() {
             color="text.action"
             css={enterMotion({ delay: 0.2, duration: 0.45, y: 12 })}
           >
-            Склад · меню · заказы для одного ресторана
+            Склад · меню · заказы для ресторанов организации
           </Text>
           <chakra.h1
             id={titleId}
@@ -362,7 +362,7 @@ export function HeroSection() {
             pt="2"
           >
             <ButtonLink
-              to="/app"
+              to="/login"
               css={enterMotion({ delay: 0.8, duration: 0.45, y: 16 })}
             >
               Открыть приложение

@@ -47,7 +47,7 @@ export function DocumentHeader({
       </HStack>
       {documentPage && (
         <TextLink
-          to="/app"
+          to="/login"
           size="label"
           display="inline-flex"
           alignItems="center"
@@ -81,8 +81,9 @@ export function DocumentFooter() {
       as="footer"
       direction={{ base: 'column', md: 'row' }}
       align={{ base: 'flex-start', md: 'center' }}
-      justify="space-between"
-      gap="3"
+      justify="flex-start"
+      columnGap="6"
+      rowGap="3"
       px={{ base: '4', md: '8' }}
       pt="calc({spacing.6} - 1px)"
       pb="6"
@@ -91,7 +92,8 @@ export function DocumentFooter() {
       borderColor="border.default"
     >
       <Text textStyle="caption.default" color="text.secondary">
-        © 2026 «Ровный ход» — веб-сервис для одного ресторана.
+        © 2026 «Ровный ход» — веб-сервис для единого учёта складской логистики
+        организации.
       </Text>
       <chakra.nav aria-label="Документы">
         <Stack

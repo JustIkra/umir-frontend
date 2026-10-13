@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 import menu20 from '@/presentation/assets/icons/menu-20.svg';
 import warehouse20 from '@/presentation/assets/icons/warehouse-20.svg';
+import analytics24 from '@/presentation/assets/icons/analytics-24.svg';
 import catalog24 from '@/presentation/assets/icons/catalog-24.svg';
 import chevron20 from '@/presentation/assets/icons/chevron-20.svg';
 import menu24 from '@/presentation/assets/icons/menu-24.svg';
@@ -86,6 +87,7 @@ function Sidebar() {
           <NavItem icon={warehouse24} label="Склад" />
           <NavItem icon={catalog24} label="Справочники" />
           <NavItem icon={menu24} label="Меню и рекомендации" />
+          <NavItem icon={analytics24} label="Аналитика" />
         </Stack>
       </Stack>
       <Stack gap="3" mt="auto" pb="1">
@@ -107,7 +109,7 @@ function Sidebar() {
               Марина Белова
             </Text>
             <Text textStyle="caption.default" color="text.secondary">
-              Учётная запись
+              На Пушкинской · Склад, Официант
             </Text>
           </Box>
           <Icon src={chevron20} size={20} transform="rotate(180deg)" />
@@ -237,7 +239,7 @@ function WarehouseTile() {
             ))}
           </Flex>
           <Text textStyle="caption.default" color="text.secondary">
-            Граница: 11.10.2026, 14:32 (Москва)
+            Граница: 11.10.2026, 14:32 (Москва, UTC+3)
           </Text>
         </Flex>
         <Stack gap="0.5">
@@ -382,7 +384,7 @@ export function ProductWindow(props: FlexProps) {
             <Stack gap="1">
               <Text textStyle="heading.h1">Обзор</Text>
               <Text textStyle="caption.default" color="text.secondary">
-                Суббота, 10 октября 2026 · время московское
+                Суббота, 10 октября 2026
               </Text>
             </Stack>
             <ButtonLook>Собрать заказ</ButtonLook>
@@ -460,7 +462,7 @@ function OrderFragment() {
         <Text flex="1" textStyle="caption.strong">
           Предложение заказа
         </Text>
-        <Text textStyle="caption.default">оценка 15:05:37 МСК</Text>
+        <Text textStyle="caption.default">оценка 15:05:37 UTC+3</Text>
       </Flex>
       <Box>
         <ProposalLine
@@ -535,7 +537,7 @@ function BatchFragment() {
         </Flex>
       </Stack>
       <Box>
-        <Fact label="Годна до" value="10.10.2026, 20:30 МСК" />
+        <Fact label="Годен до" value="10.10.2026, 20:30 UTC+3" />
         <Fact label="Поставка" value="№ 1187 · строка 2" />
         <Fact label="Расход на порцию" value="Ризотто с пармезаном — 40 г" />
       </Box>

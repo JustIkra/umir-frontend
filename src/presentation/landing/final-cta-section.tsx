@@ -185,7 +185,7 @@ export function FinalCtaSection() {
           </Text>
           <Box pt="2">
             <ButtonLink
-              to="/app"
+              to="/login"
               variant="secondary"
               w={{ base: 'full', sm: 'auto' }}
             >

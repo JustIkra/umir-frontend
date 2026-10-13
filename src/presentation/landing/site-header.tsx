@@ -50,7 +50,7 @@ export function SiteHeader() {
           ))}
         </HStack>
       </chakra.nav>
-      <ButtonLink to="/app" aria-label="Открыть приложение">
+      <ButtonLink to="/login" aria-label="Открыть приложение">
         <chakra.span display={{ base: 'none', md: 'inline' }}>
           Открыть приложение
         </chakra.span>

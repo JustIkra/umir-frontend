@@ -38,7 +38,8 @@ export function SiteFooter() {
         <Stack gap="3" flex="1" minW="0">
           <Wordmark />
           <Text textStyle="body.default" color="text.secondary">
-            Учёт продуктов, меню и заказов для одного ресторана.
+            Учёт продуктов, меню и заказов для единого учёта складской логистики
+            организации.
           </Text>
         </Stack>
         <Column title="Продукт">
@@ -48,7 +49,7 @@ export function SiteFooter() {
             </li>
           ))}
           <li>
-            <TextLink to="/app">Открыть приложение</TextLink>
+            <TextLink to="/login">Открыть приложение</TextLink>
           </li>
         </Column>
         <Column title="Документы">
@@ -60,7 +61,7 @@ export function SiteFooter() {
         </Column>
       </Flex>
       <Text mt="8" textStyle="caption.default" color="text.secondary">
-        © 2026 «Ровный ход». Время в интерфейсе — московское.
+        © 2026 «Ровный ход».
       </Text>
     </chakra.footer>
   );
