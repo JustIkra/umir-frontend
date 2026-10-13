@@ -11,7 +11,6 @@ import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
 import { notConnectedFeedbackSender } from '@/adapters/feedback/not-connected-sender';
-import { createSessionCheck } from '@/adapters/http/session-check';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createFeedbackSubmitter } from '@/application/feedback';
 import { createLiveSync } from '@/application/live-sync';
@@ -45,7 +44,10 @@ const services: PresentationServices = {
     feed: createEventSourceFeed((url) => new EventSource(url)),
     scheduler: createTimerScheduler(window),
     visibility: createPageVisibility(document),
-    sessionCheck: createSessionCheck((path, init) => fetch(path, init)),
+    // Replaced by the session store in task 10.
+    sessionCheck: { check: () => Promise.resolve('unknown') },
+    models: { markStale: () => undefined, markTime: () => undefined },
+    onAccessEnded: () => undefined,
     resolvePending: () => Promise.resolve(),
   }),
 };

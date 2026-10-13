@@ -1,9 +1,10 @@
+import type { Topic } from './api';
 import type {
+  AccessEndReason,
   LiveEvent,
   LiveFeed,
   LiveStatus,
-  SessionEndReason,
-} from '@/application/live-feed';
+} from './live-feed';
 
 export interface Scheduler {
   // Runs callback once after delayMs; the returned function cancels it.
@@ -17,94 +18,92 @@ export interface PageVisibility {
 
 export type SessionStatus = 'active' | 'ended' | 'unknown';
 
-// Tells whether the operator session still exists without extending it.
+// Tells whether the session still exists without extending it.
 export interface SessionCheck {
   check(): Promise<SessionStatus>;
 }
 
-// 'all' follows a state change; 'time' follows a tick and concerns models that
-// depend on the current time: the expiry window and recommendations.
+// 'all' follows a state change; 'time' concerns models that depend on the
+// current time: the expiry window and recommendations.
 export type StaleScope = 'all' | 'time';
 
 export interface StaleTarget {
   markStale(scope: StaleScope): void;
 }
 
-export interface LiveSession {
-  readonly idleExpiresAt: string;
-  readonly absoluteExpiresAt: string;
+// The model registry, as the stream sees it.
+export interface LiveModels {
+  markStale(restaurantID: string, topics: readonly Topic[] | 'all'): void;
+  markTime(restaurantID: string): void;
 }
 
 export interface LiveState {
   readonly connection: LiveStatus;
   // Shown data may be outdated: the stream has not been open for
-  // staleAfterMs, or gateway reports the warehouse unavailable.
+  // staleAfterMs.
   readonly stale: boolean;
-  readonly serverTime: string | undefined;
-  readonly session: LiveSession | undefined;
-  readonly sessionEnded: SessionEndReason | undefined;
+  readonly restaurantID: string | undefined;
 }
 
 export interface LiveSync {
-  start(): void;
+  // One stream at a time: starting another restaurant closes the first.
+  start(restaurantID: string): void;
   stop(): void;
-  track(target: StaleTarget): () => void;
   readonly subscribe: (listener: () => void) => () => void;
   readonly getSnapshot: () => LiveState;
 }
 
 export interface LiveSyncOptions {
-  feed: LiveFeed;
-  scheduler: Scheduler;
-  visibility: PageVisibility;
+  readonly feed: LiveFeed;
+  readonly scheduler: Scheduler;
+  readonly visibility: PageVisibility;
   // Asked after the feed gave up: the browser hides whether a 401 or a 502
   // refused the stream.
-  sessionCheck: SessionCheck;
-  // Re-checks ConfirmationPending attempts with their original commandID and
-  // proposalID. A rejection keeps the attempts for the next signal.
-  resolvePending: () => Promise<void>;
+  readonly sessionCheck: SessionCheck;
+  readonly models: LiveModels;
+  readonly onAccessEnded: (
+    restaurantID: string,
+    reason: AccessEndReason,
+  ) => void;
+  // Re-checks ConfirmationPending attempts with their original commandID.
+  readonly resolvePending: () => Promise<void>;
 }
 
 export const staleAfterMs = 10_000;
 // Matches the stream's retry: 3000 for a feed that gave up.
 export const reconnectDelayMs = 3_000;
+// v2 has no tick event: time-dependent models are re-read every minute.
+export const timeRefreshMs = 60_000;
 
 export function createLiveSync({
   feed,
   scheduler,
   visibility,
   sessionCheck,
+  models,
+  onAccessEnded,
   resolvePending,
 }: LiveSyncOptions): LiveSync {
-  const targets = new Set<StaleTarget>();
   const listeners = new Set<() => void>();
-  let running = false;
+  let restaurantID: string | undefined;
   let connection: LiveStatus = 'closed';
   let disconnectedTooLong = false;
-  let upstreamAvailable = true;
-  let serverTime: string | undefined;
-  let session: LiveSession | undefined;
-  let sessionEnded: SessionEndReason | undefined;
   let state = snapshot();
-  let known: { epoch: string; seq: bigint } | undefined;
+  let known: { epoch: string; sequence: bigint } | undefined;
   let firstChangeOfConnection = false;
-  let deferred: StaleScope | undefined;
+  let deferred: Set<Topic> | 'all' | undefined;
+  let deferredTime = false;
   let resolving = false;
   let resolveAgain = false;
   let unsubscribeFeed: (() => void) | undefined;
   let cancelReconnect: (() => void) | undefined;
   let pendingCheck: object | undefined;
   let cancelStaleTimer: (() => void) | undefined;
+  let cancelTimeTick: (() => void) | undefined;
   let stopVisibility: (() => void) | undefined;
 
   function snapshot(): LiveState {
-    return {
-      connection,
-      stale: disconnectedTooLong || !upstreamAvailable,
-      serverTime,
-      session,
-      sessionEnded,
-    };
+    return { connection, stale: disconnectedTooLong, restaurantID };
   }
 
   function publish(): void {
@@ -130,8 +129,9 @@ export function createLiveSync({
   }
 
   function connect(): void {
+    if (restaurantID === undefined) return;
     setConnection('connecting');
-    unsubscribeFeed = feed.subscribe(onEvent, onStatus);
+    unsubscribeFeed = feed.subscribe(restaurantID, onEvent, onStatus);
   }
 
   function disconnect(): void {
@@ -169,7 +169,8 @@ export function createLiveSync({
     if (pendingCheck !== token) return;
     pendingCheck = undefined;
     if (status === 'ended') {
-      endSession('expired');
+      halt();
+      publish();
       return;
     }
     cancelReconnect = scheduler.schedule(reconnectDelayMs, () => {
@@ -178,72 +179,101 @@ export function createLiveSync({
     });
   }
 
-  function endSession(reason: SessionEndReason): void {
-    halt();
-    sessionEnded = reason;
-    publish();
-  }
-
   function onEvent(event: LiveEvent): void {
+    if (restaurantID === undefined || event.tenantID !== restaurantID) return;
     switch (event.type) {
       case 'change':
-        onChange(event.epoch, event.seq);
+        onChange(event.epoch, event.sequence, event.topics);
         return;
-      case 'tick':
-        serverTime = event.serverTime;
-        publish();
-        markStale('time');
+      case 'refresh-required':
+        known = { epoch: event.epoch, sequence: 0n };
+        firstChangeOfConnection = false;
+        markStale('all');
+        requestResolve();
         return;
-      case 'session':
-        session = {
-          idleExpiresAt: event.idleExpiresAt,
-          absoluteExpiresAt: event.absoluteExpiresAt,
-        };
-        publish();
-        return;
-      case 'session-ended':
-        endSession(event.reason);
-        return;
-      case 'upstream':
-        upstreamAvailable = event.available;
-        publish();
+      case 'access-ended':
+        accessEnded(restaurantID, event.reason);
         return;
     }
   }
 
-  // The first change after start or a new epoch re-reads everything: a model
-  // read before the stream opened may already be outdated. A smaller or equal
-  // seq of the same epoch changes nothing.
-  function onChange(epoch: string, seq: bigint): void {
+  // A new epoch re-reads everything. A smaller or equal sequence of the same
+  // epoch changes nothing, but the first change after a reconnect still
+  // re-checks pending attempts.
+  function onChange(
+    epoch: string,
+    sequence: bigint,
+    topics: readonly Topic[],
+  ): void {
     const reconnected = firstChangeOfConnection;
     firstChangeOfConnection = false;
-    const newer = known?.epoch !== epoch || seq > known.seq;
-    if (newer) {
-      known = { epoch, seq };
+    if (known?.epoch !== epoch) {
+      known = { epoch, sequence };
       markStale('all');
-    }
-    if (newer || reconnected) requestResolve();
-  }
-
-  // A hidden tab keeps one pending scope and re-reads once it is shown.
-  function markStale(scope: StaleScope): void {
-    if (!visibility.isVisible()) {
-      deferred = deferred === 'all' ? 'all' : scope;
+      requestResolve();
       return;
     }
-    for (const target of targets) target.markStale(scope);
+    if (sequence > known.sequence) {
+      known = { epoch, sequence };
+      markStale(topics);
+      requestResolve();
+      return;
+    }
+    if (reconnected) requestResolve();
+  }
+
+  // auth-unavailable is temporary: the stream reconnects once /me answers.
+  // Every other reason ends the stream of this restaurant.
+  function accessEnded(id: string, reason: AccessEndReason): void {
+    if (reason === 'auth-unavailable') {
+      disconnect();
+      setConnection('closed');
+      checkSession();
+    } else {
+      halt();
+      publish();
+    }
+    onAccessEnded(id, reason);
+  }
+
+  // A hidden tab keeps the topics and re-reads once it is shown.
+  function markStale(scope: readonly Topic[] | 'all'): void {
+    if (restaurantID === undefined) return;
+    if (!visibility.isVisible()) {
+      deferred =
+        scope === 'all' || deferred === 'all'
+          ? 'all'
+          : new Set([...(deferred ?? []), ...scope]);
+      return;
+    }
+    models.markStale(restaurantID, scope);
+  }
+
+  function tick(): void {
+    cancelTimeTick = scheduler.schedule(timeRefreshMs, () => {
+      cancelTimeTick = undefined;
+      if (restaurantID === undefined) return;
+      if (visibility.isVisible()) models.markTime(restaurantID);
+      else deferredTime = true;
+      tick();
+    });
   }
 
   function onVisibilityChange(): void {
-    if (deferred === undefined || !visibility.isVisible()) return;
-    const scope = deferred;
-    deferred = undefined;
-    markStale(scope);
+    if (!visibility.isVisible() || restaurantID === undefined) return;
+    if (deferred !== undefined) {
+      const scope = deferred;
+      deferred = undefined;
+      models.markStale(restaurantID, scope === 'all' ? 'all' : [...scope]);
+    }
+    if (deferredTime) {
+      deferredTime = false;
+      models.markTime(restaurantID);
+    }
   }
 
   // Attempts are checked one call at a time. Signals during a call cause
-  // exactly one more call after it. A rejected call keeps its attempts for
-  // the next signal.
+  // exactly one more call after it.
   function requestResolve(): void {
     if (resolving) {
       resolveAgain = true;
@@ -255,47 +285,43 @@ export function createLiveSync({
 
   function resolved(): void {
     resolving = false;
-    const again = resolveAgain && running;
+    const again = resolveAgain && restaurantID !== undefined;
     resolveAgain = false;
     if (again) requestResolve();
   }
 
   function halt(): void {
-    running = false;
     disconnect();
     pendingCheck = undefined;
     cancelStaleTimer?.();
     cancelStaleTimer = undefined;
+    cancelTimeTick?.();
+    cancelTimeTick = undefined;
     stopVisibility?.();
     stopVisibility = undefined;
     deferred = undefined;
+    deferredTime = false;
     connection = 'closed';
     disconnectedTooLong = false;
+    restaurantID = undefined;
   }
 
   return {
-    start() {
-      if (running) return;
-      running = true;
+    start(id) {
+      if (restaurantID === id) return;
+      if (restaurantID !== undefined) halt();
+      restaurantID = id;
       known = undefined;
-      upstreamAvailable = true;
-      session = undefined;
-      sessionEnded = undefined;
       stopVisibility = visibility.subscribe(onVisibilityChange);
+      tick();
       connect();
     },
     stop() {
-      if (!running) return;
+      if (restaurantID === undefined) return;
       halt();
       publish();
     },
-    track(target) {
-      targets.add(target);
-      return () => {
-        targets.delete(target);
-      };
-    },
-    subscribe: (listener) => {
+    subscribe(listener) {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);

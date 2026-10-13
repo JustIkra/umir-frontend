@@ -1,81 +1,60 @@
-import type { LiveEvent, SessionEndReason } from '@/application/live-feed';
+import type { Topic } from '@/application/api';
+import type { AccessEndReason, LiveEvent } from '@/application/live-feed';
+import { isEntityId } from '@/domain/ids';
 
 export const liveEventNames = [
   'change',
-  'tick',
-  'session',
-  'session-ended',
-  'upstream',
+  'refresh-required',
+  'access-ended',
 ] as const;
 
 export type LiveEventName = (typeof liveEventNames)[number];
 
-type Fields = Record<string, unknown>;
+type Fields = Readonly<Record<string, unknown>>;
 
 const maxInt64 = 9223372036854775807n;
-const nonNegativeInt64 = /^(?:0|[1-9][0-9]{0,18})$/;
-const moscowTimestamp =
-  /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.[0-9]{1,9})?\+03:00$/;
-const endReasons: readonly SessionEndReason[] = [
-  'signed_out',
+const positiveInt64 = /^[1-9][0-9]{0,18}$/;
+const topics: readonly Topic[] = [
+  'catalog',
+  'stock',
+  'menu',
+  'orders',
+  'analytics',
+];
+const reasons: readonly AccessEndReason[] = [
   'revoked',
-  'expired',
+  'deleted',
+  'session-expired',
+  'auth-unavailable',
 ];
 
-// Accepts an object with exactly the given keys, like the contract's
-// additionalProperties: false.
-function fields(value: unknown, keys: readonly string[]): Fields | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return undefined;
-  }
-  const actual = Object.keys(value);
-  return actual.length === keys.length &&
-    keys.every((key) => actual.includes(key))
+function fieldsOf(value: unknown): Fields | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Fields)
     : undefined;
 }
 
-function decodeSeq(value: unknown): bigint | undefined {
-  if (typeof value !== 'string' || !nonNegativeInt64.test(value)) {
+function sequenceOf(value: unknown): bigint | undefined {
+  if (typeof value !== 'string' || !positiveInt64.test(value)) return undefined;
+  const sequence = BigInt(value);
+  return sequence <= maxInt64 ? sequence : undefined;
+}
+
+// 1–5 known topics, none repeated.
+function topicsOf(value: unknown): readonly Topic[] | undefined {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 5)
     return undefined;
-  }
-  const seq = BigInt(value);
-  return seq <= maxInt64 ? seq : undefined;
-}
-
-function daysInMonth(year: number, month: number): number {
-  if (month === 2) {
-    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    return leap ? 29 : 28;
-  }
-  return [4, 6, 9, 11].includes(month) ? 30 : 31;
-}
-
-// MoscowTimestamp: full RFC 3339 time with the +03:00 offset and a real date.
-function isMoscowTimestamp(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const match = moscowTimestamp.exec(value);
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  return (
-    month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month)
+  const list = value.map((item: unknown) =>
+    topics.find((topic) => topic === item),
   );
-}
-
-function isEpoch(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const length = Array.from(value).length;
-  return length >= 1 && length <= 64;
-}
-
-function isEndReason(value: unknown): value is SessionEndReason {
-  return endReasons.some((reason) => reason === value);
+  if (list.some((item) => item === undefined)) return undefined;
+  const known = list.filter((item): item is Topic => item !== undefined);
+  return new Set(known).size === known.length ? known : undefined;
 }
 
 // Returns undefined for anything the contract does not allow: invalid JSON,
-// missing, extra or mistyped fields.
+// a type other than the SSE event name, missing or mistyped fields. Fields
+// the contract may add later are ignored.
 export function decodeLiveEvent(
   name: LiveEventName,
   data: unknown,
@@ -87,43 +66,30 @@ export function decodeLiveEvent(
   } catch {
     return undefined;
   }
+  const event = fieldsOf(value);
+  if (event?.type !== name || !isEntityId(event.tenantID)) return undefined;
+  const tenantID = event.tenantID;
   switch (name) {
     case 'change': {
-      const event = fields(value, ['epoch', 'seq']);
-      const seq = decodeSeq(event?.seq);
-      return event && isEpoch(event.epoch) && seq !== undefined
-        ? { type: 'change', epoch: event.epoch, seq }
-        : undefined;
-    }
-    case 'tick': {
-      const event = fields(value, ['serverTime']);
-      return event && isMoscowTimestamp(event.serverTime)
-        ? { type: 'tick', serverTime: event.serverTime }
-        : undefined;
-    }
-    case 'session': {
-      const event = fields(value, ['idleExpiresAt', 'absoluteExpiresAt']);
-      return event &&
-        isMoscowTimestamp(event.idleExpiresAt) &&
-        isMoscowTimestamp(event.absoluteExpiresAt)
+      const sequence = sequenceOf(event.sequence);
+      const list = topicsOf(event.topics);
+      return isEntityId(event.epoch) && sequence !== undefined && list
         ? {
-            type: 'session',
-            idleExpiresAt: event.idleExpiresAt,
-            absoluteExpiresAt: event.absoluteExpiresAt,
+            type: 'change',
+            tenantID,
+            epoch: event.epoch,
+            sequence,
+            topics: list,
           }
         : undefined;
     }
-    case 'session-ended': {
-      const event = fields(value, ['reason']);
-      return event && isEndReason(event.reason)
-        ? { type: 'session-ended', reason: event.reason }
+    case 'refresh-required':
+      return isEntityId(event.epoch)
+        ? { type: 'refresh-required', tenantID, epoch: event.epoch }
         : undefined;
-    }
-    case 'upstream': {
-      const event = fields(value, ['available']);
-      return event && typeof event.available === 'boolean'
-        ? { type: 'upstream', available: event.available }
-        : undefined;
+    case 'access-ended': {
+      const reason = reasons.find((item) => item === event.reason);
+      return reason ? { type: 'access-ended', tenantID, reason } : undefined;
     }
   }
 }

@@ -4,8 +4,14 @@ import {
   createLiveSync,
   reconnectDelayMs,
   staleAfterMs,
+  timeRefreshMs,
 } from '../../src/application/live-sync.ts';
-import { createReadModel } from '../../src/application/read-model.ts';
+
+const R = '33333333-3333-4333-8333-333333333333';
+const Q = '55555555-5555-4555-8555-555555555555';
+const E1 = '44444444-4444-4444-8444-444444444444';
+const E2 = '66666666-6666-4666-8666-666666666666';
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // Virtual time: advance() runs due callbacks in order.
 function manualScheduler() {
@@ -32,16 +38,15 @@ function manualScheduler() {
       }
       now = until;
     },
-    pending: () => tasks.filter((task) => !task.done).length,
   };
 }
 
 function manualFeed() {
   const feed = {
-    subscriptions: 0,
+    opened: [],
     active: undefined,
-    subscribe(onEvent, onStatus) {
-      feed.subscriptions += 1;
+    subscribe(restaurantID, onEvent, onStatus) {
+      feed.opened.push(restaurantID);
       const subscription = { onEvent, onStatus };
       feed.active = subscription;
       return () => {
@@ -71,356 +76,197 @@ function manualVisibility() {
   return visibility;
 }
 
-function recordingTarget() {
-  const marks = [];
-  return { marks, markStale: (scope) => marks.push(scope) };
-}
-
-// Answers every check with the given state.
-const sessionIs = (status) => ({ check: () => Promise.resolve(status) });
-
-// Holds each check until the test answers it.
-function heldSessionCheck() {
-  const answers = [];
-  return {
-    answers,
-    check: () =>
-      new Promise((resolve) => {
-        answers.push(resolve);
-      }),
-  };
-}
-
-const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-function setup({
-  resolvePending = () => Promise.resolve(),
-  session = sessionIs('active'),
-} = {}) {
+function setup({ session = 'active' } = {}) {
   const feed = manualFeed();
   const scheduler = manualScheduler();
   const visibility = manualVisibility();
-  const sync = createLiveSync({
+  const marks = [];
+  const ended = [];
+  let resolves = 0;
+  const checks = { count: 0, answer: session };
+  const live = createLiveSync({
     feed,
     scheduler,
     visibility,
-    sessionCheck: session,
-    resolvePending,
+    sessionCheck: {
+      check: () => {
+        checks.count += 1;
+        return Promise.resolve(checks.answer);
+      },
+    },
+    models: {
+      markStale: (restaurantID, topics) => marks.push([restaurantID, topics]),
+      markTime: (restaurantID) => marks.push([restaurantID, 'time']),
+    },
+    onAccessEnded: (restaurantID, reason) => ended.push([restaurantID, reason]),
+    resolvePending: () => {
+      resolves += 1;
+      return Promise.resolve();
+    },
   });
-  const target = recordingTarget();
-  sync.track(target);
-  sync.start();
-  feed.status('open');
-  return { feed, scheduler, visibility, sync, target };
-}
-
-const change = (seq, epoch = 'e1') => ({
-  type: 'change',
-  epoch,
-  seq: BigInt(seq),
-});
-
-test('the first change and every larger seq mark all models stale', () => {
-  const { feed, target } = setup();
-  feed.emit(change('9007199254740992'));
-  feed.emit(change('9007199254740993'));
-  feed.emit(change('9007199254740993'));
-  feed.emit(change('9007199254740991'));
-  assert.deepEqual(target.marks, ['all', 'all']);
-});
-
-test('a new epoch re-reads everything and restarts the comparison', () => {
-  const { feed, target } = setup();
-  feed.emit(change('40'));
-  feed.emit(change('1', 'e2'));
-  feed.emit(change('1', 'e2'));
-  feed.emit(change('2', 'e2'));
-  assert.deepEqual(target.marks, ['all', 'all', 'all']);
-});
-
-test('a tick updates the server time and marks time models stale', () => {
-  const { feed, sync, target } = setup();
-  feed.emit({ type: 'tick', serverTime: '2026-10-12T12:01:00+03:00' });
-  assert.equal(sync.getSnapshot().serverTime, '2026-10-12T12:01:00+03:00');
-  assert.deepEqual(target.marks, ['time']);
-});
-
-test('session deadlines are stored', () => {
-  const { feed, sync } = setup();
-  feed.emit({
-    type: 'session',
-    idleExpiresAt: '2026-10-12T12:30:00+03:00',
-    absoluteExpiresAt: '2026-10-12T20:00:00+03:00',
-  });
-  assert.deepEqual(sync.getSnapshot().session, {
-    idleExpiresAt: '2026-10-12T12:30:00+03:00',
-    absoluteExpiresAt: '2026-10-12T20:00:00+03:00',
-  });
-});
-
-test('a hidden tab waits and re-reads once when shown', () => {
-  const { feed, visibility, target } = setup();
-  visibility.set(false);
-  feed.emit(change('1'));
-  feed.emit({ type: 'tick', serverTime: '2026-10-12T12:01:00+03:00' });
-  feed.emit(change('2'));
-  assert.deepEqual(target.marks, []);
-  visibility.set(true);
-  visibility.set(true);
-  assert.deepEqual(target.marks, ['all']);
-});
-
-test('a hidden tab that only saw ticks re-reads time models', () => {
-  const { feed, visibility, target } = setup();
-  feed.emit(change('1'));
-  visibility.set(false);
-  feed.emit({ type: 'tick', serverTime: '2026-10-12T12:01:00+03:00' });
-  visibility.set(true);
-  assert.deepEqual(target.marks, ['all', 'time']);
-});
-
-test('data turns stale after 10 s without an open stream', () => {
-  const { feed, scheduler, sync } = setup();
-  feed.status('connecting');
-  scheduler.advance(staleAfterMs - 1);
-  assert.equal(sync.getSnapshot().stale, false);
-  scheduler.advance(1);
-  assert.equal(sync.getSnapshot().stale, true);
-  feed.status('open');
-  assert.equal(sync.getSnapshot().stale, false);
-});
-
-test('reconnect attempts do not restart the 10 s count', async () => {
-  const { feed, scheduler, sync } = setup();
-  feed.status('connecting');
-  scheduler.advance(6000);
-  feed.status('closed');
-  await settled();
-  scheduler.advance(reconnectDelayMs);
-  assert.equal(feed.subscriptions, 2);
-  scheduler.advance(staleAfterMs - 6000 - reconnectDelayMs);
-  assert.equal(sync.getSnapshot().stale, true);
-});
-
-test('the stream counts as not open from start', () => {
-  const feed = manualFeed();
-  const scheduler = manualScheduler();
-  const sync = createLiveSync({
+  return {
+    live,
     feed,
     scheduler,
-    visibility: manualVisibility(),
-    sessionCheck: sessionIs('active'),
-    resolvePending: () => Promise.resolve(),
-  });
-  sync.start();
-  assert.equal(sync.getSnapshot().connection, 'connecting');
-  scheduler.advance(staleAfterMs);
-  assert.equal(sync.getSnapshot().stale, true);
+    visibility,
+    marks,
+    ended,
+    checks,
+    resolves: () => resolves,
+  };
+}
+
+const change = (sequence, topics, epoch = E1, tenantID = R) => ({
+  type: 'change',
+  tenantID,
+  epoch,
+  sequence,
+  topics,
 });
 
-test('an unavailable warehouse makes data stale while the stream is open', () => {
-  const { feed, sync } = setup();
-  feed.emit({ type: 'upstream', available: false });
-  assert.equal(sync.getSnapshot().stale, true);
-  feed.emit({ type: 'upstream', available: true });
-  assert.equal(sync.getSnapshot().stale, false);
-});
-
-test('a closed feed of an active session is subscribed again after the retry delay', async () => {
-  const { feed, scheduler } = setup();
-  feed.status('closed');
+test('start opens the restaurant stream; stop closes it', () => {
+  const { live, feed } = setup();
+  live.start(R);
+  assert.deepEqual(feed.opened, [R]);
+  assert.equal(live.getSnapshot().restaurantID, R);
+  assert.equal(live.getSnapshot().connection, 'connecting');
+  feed.status('open');
+  assert.equal(live.getSnapshot().connection, 'open');
+  live.stop();
   assert.equal(feed.active, undefined);
-  await settled();
-  scheduler.advance(reconnectDelayMs - 1);
-  assert.equal(feed.subscriptions, 1);
-  scheduler.advance(1);
-  assert.equal(feed.subscriptions, 2);
+  assert.equal(live.getSnapshot().restaurantID, undefined);
 });
 
-test('a closed feed of an ended session stops for good', async () => {
-  const { feed, scheduler, sync } = setup({ session: sessionIs('ended') });
-  feed.status('closed');
-  await settled();
-  assert.equal(scheduler.pending(), 0);
-  scheduler.advance(60_000);
-  assert.equal(feed.subscriptions, 1);
-  assert.deepEqual(sync.getSnapshot(), {
-    connection: 'closed',
-    stale: false,
-    serverTime: undefined,
-    session: undefined,
-    sessionEnded: 'expired',
-  });
+test('starting another restaurant switches the stream', () => {
+  const { live, feed } = setup();
+  live.start(R);
+  live.start(R);
+  live.start(Q);
+  assert.deepEqual(feed.opened, [R, Q]);
 });
 
-test('an unknown or failed session check subscribes again', async () => {
-  for (const session of [
-    sessionIs('unknown'),
-    { check: () => Promise.reject(new Error('offline')) },
-  ]) {
-    const { feed, scheduler, sync } = setup({ session });
-    feed.status('closed');
-    await settled();
-    scheduler.advance(reconnectDelayMs);
-    assert.equal(feed.subscriptions, 2);
-    assert.equal(sync.getSnapshot().sessionEnded, undefined);
+test('a change marks only its topics; an older sequence changes nothing; a new epoch marks all', () => {
+  const { live, feed, marks } = setup();
+  live.start(R);
+  feed.status('open');
+  feed.emit(change(5n, ['stock']));
+  feed.emit(change(6n, ['menu', 'orders']));
+  feed.emit(change(6n, ['catalog']));
+  feed.emit(change(1n, ['catalog'], E2));
+  assert.deepEqual(marks, [
+    [R, 'all'],
+    [R, ['menu', 'orders']],
+    [R, 'all'],
+  ]);
+});
+
+test('refresh-required marks everything; later changes of that epoch mark topics', () => {
+  const { live, feed, marks } = setup();
+  live.start(R);
+  feed.emit({ type: 'refresh-required', tenantID: R, epoch: E1 });
+  feed.emit(change(1n, ['stock']));
+  assert.deepEqual(marks, [
+    [R, 'all'],
+    [R, ['stock']],
+  ]);
+});
+
+test('events of another restaurant are ignored', () => {
+  const { live, feed, marks } = setup();
+  live.start(R);
+  feed.emit(change(1n, ['stock'], E1, Q));
+  feed.emit({ type: 'access-ended', tenantID: Q, reason: 'revoked' });
+  assert.deepEqual(marks, []);
+  assert.equal(live.getSnapshot().restaurantID, R);
+});
+
+test('a hidden tab keeps the topics and marks them once when shown', () => {
+  const { live, feed, visibility, marks } = setup();
+  live.start(R);
+  feed.emit({ type: 'refresh-required', tenantID: R, epoch: E1 });
+  marks.length = 0;
+  visibility.set(false);
+  feed.emit(change(1n, ['stock']));
+  feed.emit(change(2n, ['menu']));
+  assert.deepEqual(marks, []);
+  visibility.set(true);
+  assert.deepEqual(marks, [[R, ['stock', 'menu']]]);
+  visibility.set(false);
+  feed.emit(change(3n, ['stock']));
+  feed.emit({ type: 'refresh-required', tenantID: R, epoch: E1 });
+  visibility.set(true);
+  assert.deepEqual(marks.at(-1), [R, 'all']);
+});
+
+test('time-dependent models are marked every minute, deferred while hidden', () => {
+  const { live, scheduler, visibility, marks } = setup();
+  live.start(R);
+  scheduler.advance(timeRefreshMs);
+  assert.deepEqual(marks, [[R, 'time']]);
+  visibility.set(false);
+  scheduler.advance(timeRefreshMs);
+  assert.equal(marks.length, 1);
+  visibility.set(true);
+  assert.deepEqual(marks.at(-1), [R, 'time']);
+});
+
+test('revoked or deleted access stops the stream for good', () => {
+  for (const reason of ['revoked', 'deleted', 'session-expired']) {
+    const { live, feed, scheduler, ended } = setup();
+    live.start(R);
+    feed.emit({ type: 'access-ended', tenantID: R, reason });
+    assert.deepEqual(ended, [[R, reason]]);
+    assert.equal(live.getSnapshot().restaurantID, undefined);
+    scheduler.advance(reconnectDelayMs * 3);
+    assert.deepEqual(feed.opened, [R], reason);
   }
 });
 
-test('the 10 s count runs while the session is checked', () => {
-  const session = heldSessionCheck();
-  const { feed, scheduler, sync } = setup({ session });
-  feed.status('closed');
-  scheduler.advance(staleAfterMs);
-  assert.equal(session.answers.length, 1);
-  assert.equal(sync.getSnapshot().stale, true);
+test('auth-unavailable reconnects after the session check answers', async () => {
+  const { live, feed, scheduler, ended, checks } = setup();
+  live.start(R);
+  feed.emit({ type: 'access-ended', tenantID: R, reason: 'auth-unavailable' });
+  assert.deepEqual(ended, [[R, 'auth-unavailable']]);
+  await settled();
+  assert.equal(checks.count, 1);
+  scheduler.advance(reconnectDelayMs);
+  assert.deepEqual(feed.opened, [R, R]);
 });
 
-test('stop during a session check does not subscribe again', async () => {
-  const session = heldSessionCheck();
-  const { feed, scheduler, sync } = setup({ session });
-  feed.status('closed');
-  sync.stop();
-  session.answers[0]('active');
+test('a refused stream checks the session: ended stops, otherwise reconnect', async () => {
+  const active = setup();
+  active.live.start(R);
+  active.feed.status('closed');
   await settled();
-  assert.equal(scheduler.pending(), 0);
-  scheduler.advance(60_000);
-  assert.equal(feed.subscriptions, 1);
+  active.scheduler.advance(reconnectDelayMs);
+  assert.deepEqual(active.feed.opened, [R, R]);
+  const ended = setup({ session: 'ended' });
+  ended.live.start(R);
+  ended.feed.status('closed');
+  await settled();
+  ended.scheduler.advance(reconnectDelayMs);
+  assert.deepEqual(ended.feed.opened, [R]);
+  assert.equal(ended.live.getSnapshot().restaurantID, undefined);
 });
 
-test('a restart ignores the answer of the check it replaced', async () => {
-  const session = heldSessionCheck();
-  const { feed, sync } = setup({ session });
-  feed.status('closed');
-  sync.stop();
-  sync.start();
-  session.answers[0]('ended');
-  await settled();
-  assert.equal(sync.getSnapshot().sessionEnded, undefined);
-  assert.notEqual(feed.active, undefined);
-});
-
-function countingResolver() {
-  const calls = [];
-  const resolvePending = () =>
-    new Promise((resolve) => {
-      calls.push(resolve);
-    });
-  return { calls, resolvePending };
-}
-
-test('pending attempts are resolved once per change signal', async () => {
-  const resolver = countingResolver();
-  const { feed } = setup(resolver);
-  feed.emit(change('1'));
-  assert.equal(resolver.calls.length, 1);
-  resolver.calls[0]();
-  await settled();
-  feed.emit(change('1'));
-  assert.equal(resolver.calls.length, 1);
-  feed.emit(change('2'));
-  assert.equal(resolver.calls.length, 2);
-});
-
-test('a reconnect without new changes resolves attempts but re-reads nothing', async () => {
-  const resolver = countingResolver();
-  const { feed, target } = setup(resolver);
-  feed.emit(change('5'));
-  resolver.calls[0]();
-  await settled();
-  feed.status('connecting');
+test('the data is stale after staleAfterMs without an open stream', () => {
+  const { live, feed, scheduler } = setup();
+  live.start(R);
+  scheduler.advance(staleAfterMs - 1);
+  assert.equal(live.getSnapshot().stale, false);
+  scheduler.advance(1);
+  assert.equal(live.getSnapshot().stale, true);
   feed.status('open');
-  feed.emit(change('5'));
-  assert.equal(resolver.calls.length, 2);
-  assert.deepEqual(target.marks, ['all']);
+  assert.equal(live.getSnapshot().stale, false);
 });
 
-test('resolve calls never overlap and signals during a call add one call', async () => {
-  const resolver = countingResolver();
-  const { feed } = setup(resolver);
-  feed.emit(change('1'));
-  feed.emit(change('2'));
-  feed.emit(change('3'));
-  assert.equal(resolver.calls.length, 1);
-  resolver.calls[0]();
-  await settled();
-  assert.equal(resolver.calls.length, 2);
-  resolver.calls[1]();
-  await settled();
-  assert.equal(resolver.calls.length, 2);
-});
-
-test('a failed resolve call does not block later signals', async () => {
-  let calls = 0;
-  const { feed } = setup({
-    resolvePending: () => {
-      calls += 1;
-      return Promise.reject(new Error('UpstreamUnavailable'));
-    },
-  });
-  feed.emit(change('1'));
-  await settled();
-  feed.emit(change('2'));
-  assert.equal(calls, 2);
-});
-
-test('session-ended stops the stream for good', () => {
-  const { feed, scheduler, sync, target } = setup();
-  feed.emit({ type: 'session-ended', reason: 'expired' });
-  assert.equal(feed.active, undefined);
-  assert.equal(scheduler.pending(), 0);
-  scheduler.advance(60_000);
-  assert.equal(feed.subscriptions, 1);
-  assert.deepEqual(sync.getSnapshot(), {
-    connection: 'closed',
-    stale: false,
-    serverTime: undefined,
-    session: undefined,
-    sessionEnded: 'expired',
-  });
-  assert.deepEqual(target.marks, []);
-});
-
-test('stop cancels a scheduled reconnect and the stale timer', async () => {
-  const { feed, scheduler, sync } = setup();
-  feed.status('closed');
-  await settled();
-  assert.equal(scheduler.pending(), 2);
-  sync.stop();
-  assert.equal(scheduler.pending(), 0);
-  scheduler.advance(60_000);
-  assert.equal(feed.subscriptions, 1);
-  assert.equal(sync.getSnapshot().connection, 'closed');
-});
-
-test('signals during a read cause exactly one more read', async () => {
-  const feed = manualFeed();
-  const sync = createLiveSync({
-    feed,
-    scheduler: manualScheduler(),
-    visibility: manualVisibility(),
-    sessionCheck: sessionIs('active'),
-    resolvePending: () => Promise.resolve(),
-  });
-  const calls = [];
-  const model = createReadModel(
-    (options) =>
-      new Promise((resolve) => {
-        calls.push({ options, resolve });
-      }),
-    { refreshOnTick: false, now: () => 0 },
-  );
-  sync.track(model);
-  model.subscribe(() => undefined);
-  sync.start();
+test('pending attempts are checked once per burst of signals', async () => {
+  const { live, feed, resolves } = setup();
+  live.start(R);
   feed.status('open');
-  feed.emit(change('1'));
-  feed.emit(change('2'));
-  feed.emit(change('3'));
-  calls[0].resolve('v1');
+  feed.emit({ type: 'refresh-required', tenantID: R, epoch: E1 });
+  feed.emit(change(1n, ['orders']));
+  feed.emit(change(2n, ['orders']));
   await settled();
-  assert.deepEqual(
-    calls.map((call) => call.options),
-    [{ background: false }, { background: true }],
-  );
+  assert.equal(resolves(), 2);
 });

@@ -1,19 +1,29 @@
-// Signals of gateway's GET /api/live stream. The stream carries no business
-// data: screens re-read their models with ordinary GET requests. Timestamps
-// stay MoscowTimestamp strings; seq is the exact journal number.
+import type { Topic } from './api';
 
-export type SessionEndReason = 'signed_out' | 'revoked' | 'expired';
+// Signals of gateway's GET /api/v2/r/{restaurantID}/live. The stream carries
+// no business data: screens re-read their models with ordinary GET requests.
+
+export type AccessEndReason =
+  'revoked' | 'deleted' | 'session-expired' | 'auth-unavailable';
 
 export type LiveEvent =
-  | { readonly type: 'change'; readonly epoch: string; readonly seq: bigint }
-  | { readonly type: 'tick'; readonly serverTime: string }
   | {
-      readonly type: 'session';
-      readonly idleExpiresAt: string;
-      readonly absoluteExpiresAt: string;
+      readonly type: 'change';
+      readonly tenantID: string;
+      readonly epoch: string;
+      readonly sequence: bigint;
+      readonly topics: readonly Topic[];
     }
-  | { readonly type: 'session-ended'; readonly reason: SessionEndReason }
-  | { readonly type: 'upstream'; readonly available: boolean };
+  | {
+      readonly type: 'refresh-required';
+      readonly tenantID: string;
+      readonly epoch: string;
+    }
+  | {
+      readonly type: 'access-ended';
+      readonly tenantID: string;
+      readonly reason: AccessEndReason;
+    };
 
 export type LiveStatus = 'connecting' | 'open' | 'closed';
 
@@ -22,6 +32,7 @@ export type LiveStatus = 'connecting' | 'open' | 'closed';
 // callback runs after the returned unsubscribe.
 export interface LiveFeed {
   subscribe(
+    restaurantID: string,
     onEvent: (event: LiveEvent) => void,
     onStatus: (status: LiveStatus) => void,
   ): () => void;
