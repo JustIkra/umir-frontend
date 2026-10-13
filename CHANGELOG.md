@@ -40,6 +40,28 @@
 
 - Added repository development and release rules; that documentation change did not alter the frontend toolchain.
 
+### Добавлено
+
+- Подключение к backend v2:
+  - HTTP-клиент gateway с CSRF и исходами потерянных ответов;
+  - команды с `commandID`, эпохи сервисов, модели данных по темам потока;
+  - сессия, вход паролем и выход (`/logout`);
+  - доступ и права по ролям ресторана.
+- Адреса разделов ресторана `/app/r/:restaurantID/…`; `/app` открывает последний или первый доступный ресторан.
+- Состояния доступа из Figma: W10–W17, «Данные обновились».
+- Закреплённый контракт `api/` и проверка `npm run api:check`.
+
+### Изменено
+
+- Поток обновлений — `GET /api/v2/r/{restaurantID}/live` с событиями `change`, `refresh-required` и `access-ended`.
+- Nginx: поток v2, лимит 16 КиБ для обеих форм обратной связи, ошибки Nginx в форме `#Error`.
+- Политика cookie: `umir.lastRestaurant`, `__Host-umir_operator_preauth`, сроки сессии.
+
+### Удалено
+
+- Шаг входа с кодом `/login/code` (решение 13.10).
+- Адаптеры v1 `/api/live` и `/api/operator/me`.
+
 ## [0.1.0] - 2026-10-10
 
 - Добавлены каркас React, контейнер Nginx и CI/CD для образов.
