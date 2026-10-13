@@ -171,7 +171,7 @@ export function CheckboxField({
             bgColor: 'bg.action',
             borderWidth: '1.5px',
             borderColor: 'bg.action',
-            bgImage: `url(${checkIcon})`,
+            bgImage: `url("${checkIcon}")`,
           }}
           _disabled={{
             bgColor: 'bg.subtle',
@@ -179,7 +179,7 @@ export function CheckboxField({
             _checked: {
               bgColor: 'bg.subtle',
               borderColor: 'border.default',
-              bgImage: `url(${checkDisabledIcon})`,
+              bgImage: `url("${checkDisabledIcon}")`,
             },
           }}
           disabled={disabled}
