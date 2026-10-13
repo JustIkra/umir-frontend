@@ -2,6 +2,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { createElement as h } from 'react';
 import { renderToString } from 'react-dom/server';
 import {
+  MemoryRouter,
   StaticRouterProvider,
   createStaticHandler,
   createStaticRouter,
@@ -54,3 +55,11 @@ export const labels = (html) =>
 // Links only: SVG <image href> and similar point at bundled files.
 export const hrefs = (html) =>
   [...html.matchAll(/<a\s[^>]*?href="([^"]+)"/g)].map((m) => m[1]);
+
+// Renders a component with the theme and a router, for state components.
+export function renderElement(element) {
+  return renderToString(
+    h(ChakraProvider, { value: system }, h(MemoryRouter, null, element)),
+  );
+}
+export const text = (html) => plain(html);

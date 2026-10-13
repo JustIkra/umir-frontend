@@ -4,6 +4,7 @@ import alertIcon from '@/presentation/assets/icons/alert-24.svg';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import chevronDownIcon from '@/presentation/assets/icons/chevron-down-16.svg';
 import clockIcon from '@/presentation/assets/icons/clock-24.svg';
+import infoIcon from '@/presentation/assets/icons/info-24.svg';
 import { Icon } from './icon';
 
 const tones = {
@@ -19,6 +20,12 @@ const tones = {
     icon: checkIcon,
     role: 'status',
   },
+  info: {
+    bg: 'bg.subtle',
+    border: 'border.default',
+    icon: infoIcon,
+    role: 'status',
+  },
   unknown: {
     bg: 'bg.subtle',
     border: 'border.strong',
@@ -29,7 +36,7 @@ const tones = {
 
 // Figma Diagnostic details 147:1833: for support only, focus stays on the
 // toggle and the content appears without a height animation.
-function DiagnosticDetails({ children }: { children: ReactNode }) {
+export function DiagnosticDetails({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const contentId = useId();
   return (
@@ -73,7 +80,7 @@ function DiagnosticDetails({ children }: { children: ReactNode }) {
 }
 
 // Figma Form message 147:1929. Error and Unknown are assertive alerts; Success
-// is a polite status. Unknown never promises success or failure.
+// and Info are polite statuses. Unknown never promises success or failure.
 export function FormMessage({
   tone,
   title,
