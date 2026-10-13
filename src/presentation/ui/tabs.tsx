@@ -39,7 +39,7 @@ export function Tabs({
   };
   return (
     <>
-      <Flex wrap="wrap" align="center" columnGap="4" rowGap="3">
+      <Flex wrap="wrap" align="center" columnGap="3" rowGap="3">
         <SegmentBar role="tablist" aria-label={label}>
           {tabs.map((tab, index) => (
             <SegmentButton

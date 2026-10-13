@@ -13,7 +13,10 @@ const pages = [
     ['Новый пароль', 'Повторите новый пароль'],
   ],
   ['/app', 'Обзор', []],
-  ['/app/orders', 'Заказы', []],
+  ['/app/orders', 'Новый заказ', []],
+  ['/app/orders/draft', 'Новый заказ', []],
+  ['/app/orders/proposal', 'Новый заказ', []],
+  ['/app/orders/placed', 'Новый заказ', []],
   ['/app/warehouse', 'Склад', []],
   ['/app/warehouse/expiry', 'Склад', []],
   ['/app/warehouse/history', 'Склад', []],
@@ -225,4 +228,18 @@ test('the warehouse shows the sample stock, expiry and history', async () => {
     (await renderRoute('/app/warehouse/expiry')).includes('через 20 ч 38 мин'),
   );
   assert.ok((await renderRoute('/app/warehouse/history')).includes('#1057'));
+});
+
+test('the order flow goes from the menu to the placed order', async () => {
+  assert.ok(
+    hrefs(await renderRoute('/app/orders')).includes('/app/orders/draft'),
+  );
+  const draft = await renderRoute('/app/orders/draft');
+  assert.ok(draft.includes('5 позиций · 9 порций'));
+  assert.ok(hrefs(draft).includes('/app/orders/proposal'));
+  const proposalHtml = await renderRoute('/app/orders/proposal');
+  assert.ok(proposalHtml.includes('Не весь заказ можно приготовить'));
+  const placed = await renderRoute('/app/orders/placed');
+  assert.ok(placed.includes('ord-20261010-0042'));
+  assert.ok(hrefs(placed).includes('/app/warehouse/history'));
 });

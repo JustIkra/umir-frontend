@@ -30,6 +30,7 @@ import {
   memberLoader,
   organizationLoader,
 } from './organizations/loaders';
+import { OrdersPage } from './orders/orders-page';
 import { InvitationsPage } from './organizations/invitations-page';
 import { InvitePage } from './organizations/invite-page';
 import { MemberPage } from './organizations/member-page';
@@ -94,6 +95,19 @@ export const routes: RouteObject[] = [
             element: <DishPage />,
           },
           { path: 'catalog/products/new', element: <NewProductPage /> },
+          { path: 'orders', element: <OrdersPage key="empty" step="empty" /> },
+          {
+            path: 'orders/draft',
+            element: <OrdersPage key="draft" step="draft" />,
+          },
+          {
+            path: 'orders/proposal',
+            element: <OrdersPage key="proposal" step="proposal" />,
+          },
+          {
+            path: 'orders/placed',
+            element: <OrdersPage key="placed" step="placed" />,
+          },
           { path: 'warehouse', element: <StockPage /> },
           { path: 'warehouse/expiry', element: <ExpiryPage /> },
           { path: 'warehouse/history', element: <HistoryPage /> },
@@ -133,9 +147,12 @@ export const routes: RouteObject[] = [
           ...appSections
             .filter(
               (section) =>
-                !['/app', '/app/catalog', '/app/warehouse'].includes(
-                  section.path,
-                ),
+                ![
+                  '/app',
+                  '/app/catalog',
+                  '/app/orders',
+                  '/app/warehouse',
+                ].includes(section.path),
             )
             .map((section) => ({
               path: section.path.replace('/app/', ''),
