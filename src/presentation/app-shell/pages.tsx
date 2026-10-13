@@ -1,4 +1,5 @@
-import { Stack, Text, chakra } from '@chakra-ui/react';
+import { Flex, Stack, Text, chakra } from '@chakra-ui/react';
+import { type ReactNode } from 'react';
 import { placeholderAccount } from '@/presentation/placeholder-account';
 
 export function PageHeader({
@@ -6,13 +7,15 @@ export function PageHeader({
   eyebrow,
   caption,
   documentTitle = title,
+  action,
 }: {
   title: string;
   eyebrow?: string | undefined;
   caption?: string | undefined;
   documentTitle?: string;
+  action?: ReactNode;
 }) {
-  return (
+  const heading = (
     <Stack gap="1">
       <title>{`${documentTitle} — Ровный ход`}</title>
       {eyebrow && (
@@ -27,6 +30,18 @@ export function PageHeader({
         </Text>
       )}
     </Stack>
+  );
+  if (!action) return heading;
+  return (
+    <Flex
+      direction={{ base: 'column', sm: 'row' }}
+      justify="space-between"
+      align={{ base: 'stretch', sm: 'flex-start' }}
+      gap="4"
+    >
+      {heading}
+      {action}
+    </Flex>
   );
 }
 

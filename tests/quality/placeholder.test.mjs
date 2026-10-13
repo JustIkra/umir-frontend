@@ -11,16 +11,19 @@ const files = (dir) =>
     return statSync(path).isDirectory() ? files(path) : [path];
   });
 const sample =
-  /Марина Белова|m\.belova|Восток Фуд|На Пушкинской|Южного федерального|Ковалёва|restoran\.example|Уральская кухня/;
+  /Марина Белова|m\.belova|Восток Фуд|На Пушкинской|Южного федерального|Ковалёва|restoran\.example|Уральская кухня|Тальятелле|Яйцо куриное|ord-20261010-0042|P-0158|Масло трюфельное/;
 // The landing illustration shows its own sample screen.
 const allowed = [
   'src/presentation/placeholder-account.ts',
   'src/presentation/placeholder-organizations.ts',
+  'src/presentation/placeholder-catalog.ts',
+  'src/presentation/placeholder-warehouse.ts',
+  'src/presentation/placeholder-orders.ts',
   'src/presentation/landing/product-preview.tsx',
 ];
 
 test('placeholder data lives in marked modules', () => {
-  for (const module of allowed.slice(0, 2))
+  for (const module of allowed.filter((path) => path.includes('placeholder-')))
     assert.match(
       readFileSync(join(root, module), 'utf8'),
       /Temporary data from the Figma sample/,

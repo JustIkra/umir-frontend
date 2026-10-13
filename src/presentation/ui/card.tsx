@@ -18,3 +18,24 @@ export const CardForm = chakra('form', { base: card });
 export const ListCard = chakra('ul', {
   base: { ...card, gap: '0', p: '2', listStyleType: 'none' },
 });
+
+// Figma form footer: a grey strip at the bottom of the card with a note and
+// the actions (P1, K05, K13, K14).
+export const CardFooter = chakra('div', {
+  base: {
+    display: 'flex',
+    flexDirection: { base: 'column', sm: 'row' },
+    alignItems: { base: 'stretch', sm: 'center' },
+    justifyContent: 'space-between',
+    gap: '4',
+    mx: '-6',
+    mb: '-6',
+    mt: '2',
+    px: '6',
+    py: '4',
+    bg: 'bg.canvas',
+    borderTopWidth: '1px',
+    borderColor: 'border.default',
+    borderBottomRadius: 'md',
+  },
+});

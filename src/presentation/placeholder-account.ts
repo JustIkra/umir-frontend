@@ -8,4 +8,6 @@ export const placeholderAccount = {
   organization: 'Восток Фуд',
   restaurant: 'На Пушкинской',
   roles: 'Склад, Официант',
+  // Header date line of the sample day (W03, 01, S1, K01).
+  today: 'Суббота, 10 октября 2026 · Москва, UTC+3',
 } as const;

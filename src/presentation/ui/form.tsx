@@ -1,4 +1,5 @@
 import {
+  Box,
   Flex,
   HStack,
   Stack,
@@ -11,11 +12,13 @@ import { useState, type ReactNode, type Ref } from 'react';
 import alertIcon from '@/presentation/assets/icons/alert-16.svg';
 import checkDisabledIcon from '@/presentation/assets/icons/check-disabled-16.svg';
 import checkIcon from '@/presentation/assets/icons/check-on-action-16.svg';
+import chevronIcon from '@/presentation/assets/icons/chevron-down-24.svg';
 import eyeOffIcon from '@/presentation/assets/icons/eye-off-24.svg';
 import eyeIcon from '@/presentation/assets/icons/eye-24.svg';
 import lockIcon from '@/presentation/assets/icons/lock-24.svg';
 import searchIcon from '@/presentation/assets/icons/search-24.svg';
 import { Icon } from './icon';
+import { rem } from './units';
 
 // Figma Field 117:1418: label, control, then a hint or an error that says what
 // to fix. Error text replaces the hint and is linked through aria-describedby.
@@ -380,6 +383,172 @@ export function SearchInput({
           if (event.key === 'Enter') event.preventDefault();
         }}
       />
+    </Flex>
+  );
+}
+
+// Figma Select (P1, K14): a native <select> styled as Input 117:1393 with a
+// chevron; the placeholder is a disabled first option.
+export function SelectField({
+  placeholder,
+  options,
+  ...props
+}: {
+  placeholder: string;
+  options: readonly { value: string; label: string }[];
+} & HTMLChakraProps<'select'>) {
+  return (
+    <Box position="relative" w="full">
+      <chakra.select
+        {...controlStyles(false)}
+        appearance="none"
+        h="2.75rem"
+        pl="3"
+        pr="10"
+        cursor="pointer"
+        defaultValue=""
+        {...props}
+      >
+        <option value="" disabled>
+          {placeholder}
+        </option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </chakra.select>
+      <Icon
+        src={chevronIcon}
+        size={24}
+        position="absolute"
+        top="50%"
+        right="3"
+        transform="translateY(-50%)"
+        pointerEvents="none"
+      />
+    </Box>
+  );
+}
+
+// Figma Radio 641:4290 in a fieldset whose legend names the group (K05).
+export function RadioGroupField({
+  legend,
+  name,
+  options,
+  hint,
+  hintId,
+}: {
+  legend: string;
+  name: string;
+  options: readonly { value: string; label: string }[];
+  hint?: string;
+  hintId?: string;
+}) {
+  return (
+    <chakra.fieldset border="0" p="0" m="0" aria-describedby={hintId}>
+      <chakra.legend textStyle="caption.strong" mb="2">
+        {legend}
+      </chakra.legend>
+      <Flex wrap="wrap" columnGap="6" rowGap="3">
+        {options.map((option) => (
+          <chakra.label
+            key={option.value}
+            display="flex"
+            alignItems="center"
+            gap="2"
+            cursor="pointer"
+            textStyle="body.default"
+          >
+            <chakra.input
+              type="radio"
+              name={name}
+              value={option.value}
+              appearance="none"
+              boxSize="5"
+              m="0"
+              flexShrink="0"
+              bg="bg.surface"
+              borderWidth="1.5px"
+              borderColor="border.strong"
+              borderRadius="full"
+              cursor="inherit"
+              _checked={{ borderWidth: '6px', borderColor: 'bg.action' }}
+            />
+            {option.label}
+          </chakra.label>
+        ))}
+      </Flex>
+      {hint && hintId && <FieldMessage id={hintId} hint={hint} />}
+    </chakra.fieldset>
+  );
+}
+
+// Figma date and time fields: text inputs with «дд.мм.гггг» and «чч:мм»; the
+// service validates Moscow time, the browser does not pick dates.
+export function DateInput(
+  props: { ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>,
+) {
+  return (
+    <TextInput
+      inputMode="numeric"
+      placeholder="дд.мм.гггг"
+      w={rem(156)}
+      flexShrink="0"
+      {...props}
+    />
+  );
+}
+
+export function TimeInput(
+  props: { ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>,
+) {
+  return (
+    <TextInput
+      inputMode="numeric"
+      placeholder="чч:мм"
+      w={rem(96)}
+      flexShrink="0"
+      {...props}
+    />
+  );
+}
+
+// Figma quantity field: a number with its unit inside the right edge.
+export function QuantityInput({
+  unit,
+  ...props
+}: { unit: string } & HTMLChakraProps<'input'>) {
+  return (
+    <Flex
+      align="center"
+      gap="2"
+      h="2.75rem"
+      px="3"
+      bg="bg.surface"
+      borderWidth="1px"
+      borderColor="border.strong"
+      borderRadius="md"
+      _focusWithin={{
+        outline: '2px solid {colors.border.focus}',
+        outlineOffset: '2px',
+      }}
+    >
+      <chakra.input
+        inputMode="decimal"
+        placeholder="0"
+        flex="1"
+        minW="0"
+        bg="transparent"
+        textStyle="body.default"
+        color="text.primary"
+        _placeholder={{ color: 'text.secondary' }}
+        _focusVisible={{ outline: 'none' }}
+        {...props}
+      />
+      <Text as="span" textStyle="body.default" color="text.secondary">
+        {unit}
+      </Text>
     </Flex>
   );
 }
