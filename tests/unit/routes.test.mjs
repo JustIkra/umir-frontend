@@ -31,6 +31,16 @@ const pages = [
   ],
   ['/app/organizations/vostok-food', 'Восток Фуд', []],
   ['/app/organizations/vostok-food-europe', 'Восток Фуд Европа', []],
+  [
+    '/app/organizations/yug/members',
+    'Сеть ресторанов Южного федерального округа',
+    [],
+  ],
+  [
+    '/app/organizations/yug/members/i-kovaleva',
+    'Ирина Ковалёва',
+    ['Склад', 'Официант'],
+  ],
 ];
 
 for (const [path, title, fields] of pages) {
@@ -97,4 +107,21 @@ test('organization pages leave the sidebar without a current item', async () => 
   const current = (html) => html.match(/aria-current="page"/g)?.length ?? 0;
   assert.equal(current(await renderRoute('/app/organizations')), 0);
   assert.equal(current(await renderRoute('/app/organizations/yug')), 1);
+});
+
+test('staff and admin ids outside the sample show 404', async () => {
+  for (const path of [
+    '/app/organizations/vostok-food/members',
+    '/app/organizations/yug/members/m-belova',
+    '/app/organizations/yug/members/nobody',
+  ])
+    assert.equal(h1(await renderRoute(path)), notFound, path);
+});
+
+test('the member page checks the sample roles', async () => {
+  const html = await renderRoute('/app/organizations/yug/members/i-kovaleva');
+  assert.equal(
+    html.match(/<input[^>]*type="checkbox"[^>]*checked/g)?.length,
+    3,
+  );
 });

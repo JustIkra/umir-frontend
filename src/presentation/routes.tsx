@@ -18,7 +18,13 @@ import {
   PrivacyPolicyPage,
 } from './documents/pages';
 import { LandingPage } from './landing/landing-page';
-import { organizationLoader } from './organizations/loaders';
+import {
+  adminOrganizationLoader,
+  memberLoader,
+  organizationLoader,
+} from './organizations/loaders';
+import { MemberPage } from './organizations/member-page';
+import { MembersPage } from './organizations/members-page';
 import { OrganizationPage } from './organizations/organization-page';
 import { OrganizationsPage } from './organizations/organizations-page';
 
@@ -69,6 +75,16 @@ export const routes: RouteObject[] = [
             path: 'organizations/:org',
             loader: organizationLoader,
             element: <OrganizationPage />,
+          },
+          {
+            path: 'organizations/:org/members',
+            loader: adminOrganizationLoader,
+            element: <MembersPage />,
+          },
+          {
+            path: 'organizations/:org/members/:member',
+            loader: memberLoader,
+            element: <MemberPage />,
           },
           ...appSections
             .filter((section) => section.path !== '/app')

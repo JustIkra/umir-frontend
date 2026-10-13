@@ -5,6 +5,7 @@ import {
   Text,
   chakra,
   type HTMLChakraProps,
+  type SystemStyleObject,
 } from '@chakra-ui/react';
 import { useState, type ReactNode, type Ref } from 'react';
 import alertIcon from '@/presentation/assets/icons/alert-16.svg';
@@ -133,16 +134,19 @@ export function TextArea({
 }
 
 // Figma Checkbox 201:3174: a native checkbox inside the label, so the whole
-// row toggles it; the hit area is 28px.
+// row toggles it; the hit area is 28px. labelCss can hide the text visually
+// where a column head already names the box.
 export function CheckboxField({
   id,
   label,
+  labelCss,
   invalid = false,
   disabled = false,
   ...props
 }: {
   id: string;
   label: ReactNode;
+  labelCss?: SystemStyleObject;
   invalid?: boolean;
   disabled?: boolean;
   ref?: Ref<HTMLInputElement>;
@@ -196,6 +200,7 @@ export function CheckboxField({
         flex="1"
         textStyle="body.default"
         color={disabled ? 'text.disabled' : 'text.primary'}
+        css={labelCss}
       >
         {label}
       </Text>
