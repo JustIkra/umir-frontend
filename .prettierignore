@@ -3,3 +3,4 @@ coverage/
 node_modules/
 .memory-base/
 package-lock.json
+api/*.json

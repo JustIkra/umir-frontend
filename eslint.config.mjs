@@ -5,7 +5,14 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  { ignores: ['dist/**', 'coverage/**', '.memory-base/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      '.memory-base/**',
+      'src/adapters/api/backend-v2.d.ts',
+    ],
+  },
   {
     linterOptions: {
       noInlineConfig: true,
