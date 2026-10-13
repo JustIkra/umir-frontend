@@ -1,5 +1,6 @@
 import {
   Flex,
+  HStack,
   Stack,
   Text,
   chakra,
@@ -11,6 +12,8 @@ import checkDisabledIcon from '@/presentation/assets/icons/check-disabled-16.svg
 import checkIcon from '@/presentation/assets/icons/check-on-action-16.svg';
 import eyeOffIcon from '@/presentation/assets/icons/eye-off-24.svg';
 import eyeIcon from '@/presentation/assets/icons/eye-24.svg';
+import lockIcon from '@/presentation/assets/icons/lock-24.svg';
+import searchIcon from '@/presentation/assets/icons/search-24.svg';
 import { Icon } from './icon';
 
 // Figma Field 117:1418: label, control, then a hint or an error that says what
@@ -286,6 +289,83 @@ export function CodeInput({
       }}
       {...props}
     />
+  );
+}
+
+// Figma Read-only value: a label, a grey row with a lock and the value, then a
+// note. Logins and names are monospaced; the zone in OG03 uses the body font.
+export function ReadOnlyValue({
+  label,
+  value,
+  note,
+  mono = true,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  mono?: boolean;
+}) {
+  return (
+    <Stack gap="1">
+      <Text textStyle="caption.strong">{label}</Text>
+      <HStack
+        gap="2"
+        px="3"
+        py={mono ? '2.5' : '2'}
+        bg="bg.subtle"
+        borderRadius="md"
+        textStyle={mono ? 'mono.body' : 'body.default'}
+        color="text.primary"
+      >
+        <Icon src={lockIcon} size={16} />
+        <Text as="span" minW="0" overflowWrap="anywhere">
+          {value}
+        </Text>
+      </HStack>
+      <Text textStyle="caption.default" color="text.secondary">
+        {note}
+      </Text>
+    </Stack>
+  );
+}
+
+// Figma Search field 80:605: 48px with a search icon. The placeholder names
+// the search, aria-label repeats it for screen readers.
+export function SearchInput({
+  label,
+  ...props
+}: { label: string } & HTMLChakraProps<'input'>) {
+  return (
+    <Flex
+      align="center"
+      gap="2"
+      h="12"
+      px="calc({spacing.4} - 1px)"
+      bg="bg.surface"
+      borderWidth="1px"
+      borderColor="border.strong"
+      borderRadius="md"
+      _focusWithin={{
+        outline: '2px solid {colors.border.focus}',
+        outlineOffset: '2px',
+      }}
+    >
+      <Icon src={searchIcon} size={24} />
+      <chakra.input
+        type="search"
+        aria-label={label}
+        placeholder={label}
+        flex="1"
+        minW="0"
+        h="full"
+        bg="transparent"
+        textStyle="body.default"
+        color="text.primary"
+        _placeholder={{ color: 'text.secondary' }}
+        _focusVisible={{ outline: 'none' }}
+        {...props}
+      />
+    </Flex>
   );
 }
 

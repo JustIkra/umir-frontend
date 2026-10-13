@@ -10,19 +10,21 @@ const files = (dir) =>
     const path = join(dir, name);
     return statSync(path).isDirectory() ? files(path) : [path];
   });
-const sample = /Марина Белова|m\.belova|Восток Фуд|На Пушкинской/;
+const sample =
+  /Марина Белова|m\.belova|Восток Фуд|На Пушкинской|Южного федерального|Ковалёва|restoran\.example|Уральская кухня/;
 // The landing illustration shows its own sample screen.
 const allowed = [
   'src/presentation/placeholder-account.ts',
+  'src/presentation/placeholder-organizations.ts',
   'src/presentation/landing/product-preview.tsx',
 ];
 
-test('placeholder data lives in one module', () => {
-  const module = join(root, 'src/presentation/placeholder-account.ts');
-  assert.match(
-    readFileSync(module, 'utf8'),
-    /Temporary data from the Figma sample/,
-  );
+test('placeholder data lives in marked modules', () => {
+  for (const module of allowed.slice(0, 2))
+    assert.match(
+      readFileSync(join(root, module), 'utf8'),
+      /Temporary data from the Figma sample/,
+    );
   const offenders = files(join(root, 'src'))
     .map((path) => relative(root, path))
     .filter(

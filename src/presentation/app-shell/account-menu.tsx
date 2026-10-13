@@ -1,55 +1,17 @@
-import {
-  Box,
-  Flex,
-  Stack,
-  Text,
-  chakra,
-  type SystemStyleObject,
-} from '@chakra-ui/react';
-import type { ReactNode, RefObject } from 'react';
+import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
+import type { RefObject } from 'react';
 import { Link as RouterLink } from 'react-router';
 import closeIcon from '@/presentation/assets/icons/close-24.svg';
 import settingsIcon from '@/presentation/assets/icons/settings-24.svg';
 import signOutIcon from '@/presentation/assets/icons/sign-out-24.svg';
 import { documentLinks } from '@/presentation/documents/links';
 import { placeholderAccount } from '@/presentation/placeholder-account';
+import { media, scrim } from '@/presentation/theme/system';
 import { TextLink } from '@/presentation/ui/actions';
+import { Dialog } from '@/presentation/ui/dialog';
 import { Icon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
 import { SidebarContent } from './sidebar';
-
-// A modal <dialog>: the browser traps focus, closes on Esc and returns focus to
-// the opener. A click on the backdrop (the dialog box itself) closes it too.
-function Sheet({
-  dialogRef,
-  label,
-  children,
-  css,
-}: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  label: string;
-  children: ReactNode;
-  css: SystemStyleObject;
-}) {
-  return (
-    <chakra.dialog
-      ref={dialogRef}
-      aria-label={label}
-      p="0"
-      m="0"
-      border="0"
-      bg="transparent"
-      maxW="100vw"
-      maxH="100dvh"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) event.currentTarget.close();
-      }}
-      css={css}
-    >
-      {children}
-    </chakra.dialog>
-  );
-}
 
 const MenuItem = chakra(RouterLink, {
   base: {
@@ -78,7 +40,7 @@ export function AccountMenu({
 }) {
   const close = () => dialogRef.current?.close();
   return (
-    <Sheet
+    <Dialog
       dialogRef={dialogRef}
       label="Учётная запись"
       css={{
@@ -87,8 +49,8 @@ export function AccountMenu({
         insetBlockEnd: '0',
         insetBlockStart: 'auto',
         width: '100%',
-        '&::backdrop': { background: 'rgba(23, 43, 77, 0.32)' },
-        '@media (min-width: 768px)': {
+        '&::backdrop': { background: scrim },
+        [media.sm]: {
           insetInlineStart: '0.75rem',
           insetInlineEnd: 'auto',
           insetBlockEnd: rem(66),
@@ -179,7 +141,7 @@ export function AccountMenu({
           ))}
         </Stack>
       </Stack>
-    </Sheet>
+    </Dialog>
   );
 }
 
@@ -193,7 +155,7 @@ export function NavigationDrawer({
 }) {
   const close = () => dialogRef.current?.close();
   return (
-    <Sheet
+    <Dialog
       dialogRef={dialogRef}
       label="Навигация"
       css={{
@@ -202,7 +164,7 @@ export function NavigationDrawer({
         insetInlineStart: '0',
         height: '100dvh',
         width: rem(280),
-        '&::backdrop': { background: 'rgba(23, 43, 77, 0.32)' },
+        '&::backdrop': { background: scrim },
       }}
     >
       <Box position="relative" h="full" bg="bg.surface">
@@ -225,6 +187,6 @@ export function NavigationDrawer({
         </chakra.button>
         <SidebarContent onNavigate={close} onOpenAccount={onOpenAccount} />
       </Box>
-    </Sheet>
+    </Dialog>
   );
 }

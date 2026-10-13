@@ -8,6 +8,26 @@ import {
   defineTokens,
 } from '@chakra-ui/react';
 
+// Mobile-first form of the project scale from the design brief:
+// Mobile Portrait ≤767 is the base, Mobile Landscape ≤880, Tablet Portrait ≤1024,
+// Tablet Landscape ≤1200, Laptop ≤1366, Desktop above, Widescreen ≥2400.
+const breakpoints = {
+  sm: '768px',
+  md: '881px',
+  lg: '1025px',
+  xl: '1201px',
+  '2xl': '1367px',
+  '3xl': '2400px',
+} as const;
+
+// Media queries for CSS that Chakra props cannot reach (dialog backdrops,
+// :modal states) and for matchMedia.
+export const atLeast = { sm: `(min-width: ${breakpoints.sm})` } as const;
+export const media = { sm: `@media ${atLeast.sm}` } as const;
+
+// Figma Overlay scrim under modal dialogs and sheets.
+export const scrim = 'rgba(23, 43, 77, 0.32)';
+
 // Values mirror the Figma variables of the UmirHack Foundations page.
 // Semantic paths keep the Figma names: color/bg/action → `bg.action`.
 const colors = defineSemanticTokens.colors({
@@ -25,6 +45,7 @@ const colors = defineSemanticTokens.colors({
     tintViolet: { value: '#F2EFFC' },
     tintSky: { value: '#EAF4FC' },
     tintMint: { value: '#EAF7EF' },
+    scrim: { value: scrim },
   },
   text: {
     primary: { value: '#172B4D' },
@@ -261,17 +282,7 @@ const config = defineConfig({
     },
   },
   theme: {
-    // Mobile-first form of the project scale from the design brief:
-    // Mobile Portrait ≤767 is the base, Mobile Landscape ≤880, Tablet Portrait ≤1024,
-    // Tablet Landscape ≤1200, Laptop ≤1366, Desktop above, Widescreen ≥2400.
-    breakpoints: {
-      sm: '768px',
-      md: '881px',
-      lg: '1025px',
-      xl: '1201px',
-      '2xl': '1367px',
-      '3xl': '2400px',
-    },
+    breakpoints,
     tokens: {
       fonts: {
         body: { value: "'IBM Plex Sans', system-ui, sans-serif" },

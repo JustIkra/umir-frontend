@@ -10,6 +10,7 @@ import {
   FieldLabel,
   FieldMessage,
   PasswordInput,
+  ReadOnlyValue,
 } from '@/presentation/ui/form';
 import { Icon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
@@ -39,41 +40,6 @@ function Section({
         <chakra.h2 textStyle="heading.h3">{title}</chakra.h2>
       </HStack>
       {children}
-    </Stack>
-  );
-}
-
-// Figma Read-only value: a label, a grey row with a lock and the monospaced
-// value, then a note.
-function ReadOnlyValue({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <Stack gap="1">
-      <Text textStyle="caption.strong">{label}</Text>
-      <HStack
-        gap="2"
-        px="3"
-        py="2.5"
-        bg="bg.subtle"
-        borderRadius="md"
-        textStyle="mono.body"
-        color="text.primary"
-      >
-        <Icon src={lockIcon} size={16} />
-        <Text as="span" minW="0" overflowWrap="anywhere">
-          {value}
-        </Text>
-      </HStack>
-      <Text textStyle="caption.default" color="text.secondary">
-        {note}
-      </Text>
     </Stack>
   );
 }

@@ -5,14 +5,16 @@ export function PageHeader({
   title,
   eyebrow,
   caption,
+  documentTitle = title,
 }: {
   title: string;
-  eyebrow?: string;
-  caption?: string;
+  eyebrow?: string | undefined;
+  caption?: string | undefined;
+  documentTitle?: string;
 }) {
   return (
     <Stack gap="1">
-      <title>{`${title} — Ровный ход`}</title>
+      <title>{`${documentTitle} — Ровный ход`}</title>
       {eyebrow && (
         <Text textStyle="caption.default" color="text.secondary">
           {eyebrow}
