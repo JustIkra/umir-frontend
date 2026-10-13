@@ -77,6 +77,7 @@ const controlStyles = (invalid: boolean) =>
     borderRadius: 'md',
     color: 'text.primary',
     textStyle: 'body.default',
+    _placeholder: { color: 'text.secondary' },
     _readOnly: {
       bg: 'bg.subtle',
       borderColor: 'border.default',
@@ -293,7 +294,8 @@ export function CodeInput({
 }
 
 // Figma Read-only value: a label, a grey row with a lock and the value, then a
-// note. Logins and names are monospaced; the zone in OG03 uses the body font.
+// note. Logins and names are monospaced with a 16px lock; the zone in OG03
+// uses the body font and a 24px lock.
 export function ReadOnlyValue({
   label,
   value,
@@ -317,7 +319,7 @@ export function ReadOnlyValue({
         textStyle={mono ? 'mono.body' : 'body.default'}
         color="text.primary"
       >
-        <Icon src={lockIcon} size={16} />
+        <Icon src={lockIcon} size={mono ? 16 : 24} />
         <Text as="span" minW="0" overflowWrap="anywhere">
           {value}
         </Text>

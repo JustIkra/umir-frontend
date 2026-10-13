@@ -5,6 +5,7 @@ import { rem } from './units';
 
 // A modal <dialog>: the browser traps focus, closes on Esc and returns focus to
 // the opener. A click on the backdrop (the dialog box itself) closes it too.
+// The browser paints dialog text CanvasText (black), so the theme colour is set.
 export function Dialog({
   dialogRef,
   label,
@@ -27,6 +28,7 @@ export function Dialog({
       m="0"
       border="0"
       bg="transparent"
+      color="text.primary"
       maxW="100vw"
       maxH="100dvh"
       onClick={(event) => {

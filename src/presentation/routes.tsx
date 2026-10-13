@@ -11,13 +11,16 @@ import {
 } from './auth/password-reset-pages';
 import { SignInCodePage } from './auth/sign-in-code-page';
 import { SignInPage } from './auth/sign-in-page';
-import { NotFoundPage } from './documents/not-found-page';
+import { NotFoundBoundary, NotFoundPage } from './documents/not-found-page';
 import {
   CookiePolicyPage,
   PersonalDataConsentPage,
   PrivacyPolicyPage,
 } from './documents/pages';
 import { LandingPage } from './landing/landing-page';
+import { organizationLoader } from './organizations/loaders';
+import { OrganizationPage } from './organizations/organization-page';
+import { OrganizationsPage } from './organizations/organizations-page';
 
 // Opens every page at its top or at the linked section. React Router's
 // ScrollRestoration is not used: it keeps positions in sessionStorage, which
@@ -57,9 +60,16 @@ export const routes: RouteObject[] = [
       {
         path: '/app',
         element: <AppShell />,
+        errorElement: <NotFoundBoundary />,
         children: [
           { index: true, element: <OverviewPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'organizations', element: <OrganizationsPage /> },
+          {
+            path: 'organizations/:org',
+            loader: organizationLoader,
+            element: <OrganizationPage />,
+          },
           ...appSections
             .filter((section) => section.path !== '/app')
             .map((section) => ({

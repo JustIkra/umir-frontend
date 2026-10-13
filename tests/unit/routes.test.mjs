@@ -23,6 +23,14 @@ const pages = [
     'Учётная запись',
     ['Текущий пароль', 'Новый пароль', 'Повторите новый пароль'],
   ],
+  ['/app/organizations', 'Организации и рестораны', []],
+  [
+    '/app/organizations/yug',
+    'Сеть ресторанов Южного федерального округа',
+    ['Название ресторана'],
+  ],
+  ['/app/organizations/vostok-food', 'Восток Фуд', []],
+  ['/app/organizations/vostok-food-europe', 'Восток Фуд Европа', []],
 ];
 
 for (const [path, title, fields] of pages) {
@@ -65,4 +73,28 @@ test('the landing opens the app through sign-in', async () => {
   const links = hrefs(await renderRoute('/'));
   assert.ok(links.includes('/login'));
   assert.ok(!links.includes('/app'));
+});
+
+const notFound = 'Страница не найдена';
+
+test('unknown ids show the 404 page', async () => {
+  for (const path of [
+    '/app/organizations/nobody',
+    '/app/organizations/nobody/members',
+  ])
+    assert.equal(h1(await renderRoute(path)), notFound, path);
+});
+
+test('the administrator sees organization tabs, a staff member does not', async () => {
+  const admin = hrefs(await renderRoute('/app/organizations/yug'));
+  for (const tab of ['', '/members', '/invitations', '/profile'])
+    assert.ok(admin.includes(`/app/organizations/yug${tab}`), `tab ${tab}`);
+  const staff = hrefs(await renderRoute('/app/organizations/vostok-food'));
+  assert.ok(!staff.includes('/app/organizations/vostok-food/members'));
+});
+
+test('organization pages leave the sidebar without a current item', async () => {
+  const current = (html) => html.match(/aria-current="page"/g)?.length ?? 0;
+  assert.equal(current(await renderRoute('/app/organizations')), 0);
+  assert.equal(current(await renderRoute('/app/organizations/yug')), 1);
 });

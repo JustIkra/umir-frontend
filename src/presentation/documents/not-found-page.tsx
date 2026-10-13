@@ -1,4 +1,5 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
+import { useRouteError } from 'react-router';
 import { SkipLink, mainContentId } from '@/presentation/site/skip-link';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { DocumentBackground } from './document-background';
@@ -86,4 +87,14 @@ export function NotFoundPage() {
       <DocumentFooter />
     </Flex>
   );
+}
+
+// Thrown by route loaders for ids outside the sample: the /app boundary shows
+// this page instead of an empty shell. Other errors keep propagating.
+export class NotFound extends Error {}
+
+export function NotFoundBoundary() {
+  const error = useRouteError();
+  if (error instanceof NotFound) return <NotFoundPage />;
+  throw error;
 }
