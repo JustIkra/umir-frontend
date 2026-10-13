@@ -88,6 +88,16 @@ test('internal links lead to existing pages', async () => {
     '/password-reset/new',
     '/app',
     '/app/settings',
+    '/app/organizations',
+    '/app/organizations/yug',
+    '/app/organizations/vostok-food',
+    '/app/organizations/yug/members',
+    '/app/organizations/yug/members/i-kovaleva',
+    '/app/organizations/yug/invitations',
+    '/app/organizations/yug/invitations/new',
+    '/app/organizations/yug/profile',
+    '/app/organizations/new',
+    '/app/no-restaurants',
   ];
   const checked = new Set();
   for (const source of sources)
