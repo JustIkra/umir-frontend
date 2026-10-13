@@ -15,6 +15,10 @@ export function AppShell() {
   const drawer = useRef<HTMLDialogElement>(null);
   const openAccount = () => menu.current?.showModal();
   const openNav = () => drawer.current?.showModal();
+  const leave = () => {
+    menu.current?.close();
+    drawer.current?.close();
+  };
   return (
     <Flex minH="100dvh" bg="bg.canvas">
       <SkipLink />
@@ -55,7 +59,7 @@ export function AppShell() {
           <DocumentFooter />
         </Box>
       </Flex>
-      <AccountMenu dialogRef={menu} />
+      <AccountMenu dialogRef={menu} onLeave={leave} />
       <NavigationDrawer dialogRef={drawer} onOpenAccount={openAccount} />
     </Flex>
   );

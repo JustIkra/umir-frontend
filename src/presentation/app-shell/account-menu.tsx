@@ -67,10 +67,14 @@ const MenuItem = chakra(RouterLink, {
 
 // Figma Account menu, Рабочие места=Один: 280px above the sidebar trigger on
 // wide screens, a bottom sheet on 390.
+// Links leave through onLeave, which also closes the 390 navigation drawer the
+// menu may have been opened from; «Закрыть» only closes the menu.
 export function AccountMenu({
   dialogRef,
+  onLeave,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
+  onLeave: () => void;
 }) {
   const close = () => dialogRef.current?.close();
   return (
@@ -152,11 +156,11 @@ export function AccountMenu({
           </Stack>
         </Stack>
         <Box h="1px" bg="border.default" />
-        <MenuItem to="/app/settings" onClick={close}>
+        <MenuItem to="/app/settings" onClick={onLeave}>
           <Icon src={settingsIcon} size={20} />
           Учётная запись
         </MenuItem>
-        <MenuItem to="/login" onClick={close}>
+        <MenuItem to="/login" onClick={onLeave}>
           <Icon src={signOutIcon} size={20} />
           Выйти
         </MenuItem>
@@ -168,7 +172,7 @@ export function AccountMenu({
               to={link.path}
               size="caption"
               color="text.secondary"
-              onClick={close}
+              onClick={onLeave}
             >
               {link.title}
             </TextLink>

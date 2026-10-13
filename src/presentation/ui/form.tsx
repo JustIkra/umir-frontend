@@ -255,7 +255,8 @@ export function PasswordInput({
   );
 }
 
-// Figma Code field 444:3520: one 56px box for the six digits, pasted whole;
+// Figma Code field 444:3520: one 56px box for the six digits, pasted whole
+// (no length limit: the email shows the code as «482 913»);
 // the digits are monospaced, the «6 цифр» placeholder uses the body font.
 export function CodeInput({
   id,
@@ -268,7 +269,6 @@ export function CodeInput({
       inputMode="numeric"
       autoComplete="one-time-code"
       pattern="[0-9]*"
-      maxLength={6}
       placeholder="6 цифр"
       w="full"
       h="3.5rem"
