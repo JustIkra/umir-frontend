@@ -20,3 +20,27 @@ export function Icon({
     />
   );
 }
+
+// Single-colour Figma icon that follows the text colour (navigation states).
+export function MaskIcon({
+  src,
+  size,
+  ...props
+}: { src: string; size: number } & HTMLChakraProps<'span'>) {
+  return (
+    <chakra.span
+      aria-hidden="true"
+      display="inline-block"
+      flexShrink="0"
+      boxSize={rem(size)}
+      bg="currentColor"
+      css={{
+        maskImage: `url("${src}")`,
+        maskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        maskSize: 'contain',
+      }}
+      {...props}
+    />
+  );
+}

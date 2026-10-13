@@ -1,5 +1,8 @@
 import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
+import { AppShell } from './app-shell/app-shell';
+import { OverviewPage, SectionPage } from './app-shell/pages';
+import { appSections } from './app-shell/sections';
 import {
   PasswordResetCodePage,
   PasswordResetNewPage,
@@ -50,6 +53,19 @@ export const routes: RouteObject[] = [
       { path: '/password-reset', element: <PasswordResetRequestPage /> },
       { path: '/password-reset/code', element: <PasswordResetCodePage /> },
       { path: '/password-reset/new', element: <PasswordResetNewPage /> },
+      {
+        path: '/app',
+        element: <AppShell />,
+        children: [
+          { index: true, element: <OverviewPage /> },
+          ...appSections
+            .filter((section) => section.path !== '/app')
+            .map((section) => ({
+              path: section.path.replace('/app/', ''),
+              element: <SectionPage title={section.title} />,
+            })),
+        ],
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

@@ -28,6 +28,7 @@ type Shape =
       width: number;
       height: number;
       blur: number;
+      opacity?: number;
     };
 
 export type DecorPiece = Shape &
@@ -114,6 +115,7 @@ function Piece({ piece }: { piece: DecorPiece }) {
           bg={piece.color}
           borderRadius="full"
           filter={`blur(${rem(piece.blur / 2)})`}
+          opacity={piece.opacity}
         />
       );
     case 'plus': {
