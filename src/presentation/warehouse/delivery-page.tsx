@@ -1,6 +1,7 @@
 import { Box, Flex, Grid, Stack, Text, chakra } from '@chakra-ui/react';
 import { useId, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
 import { PageHeader } from '@/presentation/app-shell/pages';
@@ -85,6 +86,7 @@ interface Row {
 // column on 390. Rows are added and removed in place; nothing is checked or
 // sent: «Принять поставку» returns to the stock.
 export function DeliveryPage() {
+  const path = useRestaurantPath();
   const navigate = useNavigate();
   const base = useId();
   const [rows, setRows] = useState<readonly Row[]>([{ key: 1, product: '' }]);
@@ -94,7 +96,7 @@ export function DeliveryPage() {
       <Stack gap={{ base: '4', sm: '6' }}>
         <Breadcrumbs
           items={[
-            { title: 'Склад', to: '/app/warehouse' },
+            { title: 'Склад', to: path('/warehouse') },
             { title: 'Поставки' },
             { title: 'Приём поставки' },
           ]}
@@ -108,7 +110,7 @@ export function DeliveryPage() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void navigate('/app/warehouse');
+          void navigate(path('/warehouse'));
         }}
       >
         <SplitCardBody>
@@ -371,7 +373,7 @@ export function DeliveryPage() {
             gap="3"
             flexShrink="0"
           >
-            <ButtonLink variant="secondary" to="/app/warehouse">
+            <ButtonLink variant="secondary" to={path('/warehouse')}>
               Отменить
             </ButtonLink>
             <Button type="submit">Принять поставку</Button>

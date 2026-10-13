@@ -1,4 +1,5 @@
 import { Flex, Stack, Text } from '@chakra-ui/react';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
 import {
@@ -25,10 +26,11 @@ const rowStyles = {
 
 // Figma «Добавить»: a 40px secondary button with a teal plus.
 function AddLink({ dish }: { dish: string }) {
+  const path = useRestaurantPath();
   return (
     <ButtonLink
       variant="secondary"
-      to="/app/orders/draft"
+      to={path('/orders/draft')}
       px="calc({spacing.3} - 1px)"
       py="calc({spacing.2} - 1px)"
       aria-label={`Добавить: ${dish}`}

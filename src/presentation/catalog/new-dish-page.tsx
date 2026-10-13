@@ -1,6 +1,7 @@
 import { Flex, Grid, Stack, Text, chakra } from '@chakra-ui/react';
 import { useId, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
 import { PageHeader } from '@/presentation/app-shell/pages';
@@ -56,6 +57,7 @@ interface Row {
 // 768, a card per ingredient on 390. Rows are added and removed in place; the
 // unit follows the chosen product. Nothing is checked or saved.
 export function NewDishPage() {
+  const path = useRestaurantPath();
   const navigate = useNavigate();
   const base = useId();
   const [rows, setRows] = useState<readonly Row[]>([]);
@@ -65,8 +67,8 @@ export function NewDishPage() {
       <Stack gap={{ base: '4', sm: '6' }}>
         <Breadcrumbs
           items={[
-            { title: 'Справочники', to: '/app/catalog' },
-            { title: 'Блюда', to: '/app/catalog/dishes' },
+            { title: 'Справочники', to: path('/catalog') },
+            { title: 'Блюда', to: path('/catalog/dishes') },
             { title: 'Новое блюдо' },
           ]}
         />
@@ -79,7 +81,7 @@ export function NewDishPage() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void navigate('/app/catalog/dishes');
+          void navigate(path('/catalog/dishes'));
         }}
       >
         <SplitCardBody>
@@ -261,7 +263,7 @@ export function NewDishPage() {
             gap="3"
             flexShrink="0"
           >
-            <ButtonLink variant="secondary" to="/app/catalog/dishes">
+            <ButtonLink variant="secondary" to={path('/catalog/dishes')}>
               Отменить
             </ButtonLink>
             <Button type="submit">Создать блюдо</Button>

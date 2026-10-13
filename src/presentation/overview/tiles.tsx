@@ -1,5 +1,6 @@
 import { Box, Flex, Grid, Stack, Text, chakra } from '@chakra-ui/react';
 import { useState, type ReactNode } from 'react';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import analyticsIcon from '@/presentation/assets/icons/analytics-24.svg';
 import catalogIcon from '@/presentation/assets/icons/catalog-24.svg';
 import clockIcon from '@/presentation/assets/icons/clock-24.svg';
@@ -130,6 +131,7 @@ function BatchRow({
 type Period = '24h' | '3d' | '7d';
 
 function WarehouseTile() {
+  const path = useRestaurantPath();
   const [period, setPeriod] = useState<Period>('24h');
   const data = overview.warehouse;
   return (
@@ -139,10 +141,10 @@ function WarehouseTile() {
       stamp={data.stamp}
       links={
         <>
-          <ButtonLink variant="secondary" to="/app/warehouse/delivery">
+          <ButtonLink variant="secondary" to={path('/warehouse/delivery')}>
             Принять поставку
           </ButtonLink>
-          <TileLink to="/app/warehouse">Все партии и остатки</TileLink>
+          <TileLink to={path('/warehouse')}>Все партии и остатки</TileLink>
         </>
       }
     >
@@ -187,6 +189,7 @@ function WarehouseTile() {
 
 // W03 puts the stamps beside the two subheadings, not in the tile header.
 function MenuTile() {
+  const path = useRestaurantPath();
   const data = overview.menu;
   return (
     <Tile
@@ -194,8 +197,8 @@ function MenuTile() {
       title="Меню и рекомендации"
       links={
         <>
-          <TileLink to="/app/menu">Меню и стоп-лист</TileLink>
-          <TileLink to="/app/menu">Все рекомендации</TileLink>
+          <TileLink to={path('/menu')}>Меню и стоп-лист</TileLink>
+          <TileLink to={path('/menu')}>Все рекомендации</TileLink>
         </>
       }
     >
@@ -239,11 +242,14 @@ function MenuTile() {
 }
 
 function OrdersTile() {
+  const path = useRestaurantPath();
   return (
     <Tile
       icon={ordersIcon}
       title="Заказы"
-      links={<TileLink to="/app/warehouse/history">История продаж</TileLink>}
+      links={
+        <TileLink to={path('/warehouse/history')}>История продаж</TileLink>
+      }
     >
       <Text textStyle="body.default">
         Сформируйте список позиций, проверьте корректность предложения и
@@ -286,6 +292,7 @@ function OrdersTile() {
 // Figma W03 tiles for «Склад» and «Официант»: two columns from 1201, one
 // below.
 export function OverviewTiles() {
+  const path = useRestaurantPath();
   const { catalog, writeoff, analytics } = overview;
   return (
     <Grid
@@ -304,8 +311,12 @@ export function OverviewTiles() {
         stamp={catalog.stamp}
         links={
           <>
-            <TileLink to="/app/catalog/products/new">Добавить продукт</TileLink>
-            <TileLink to="/app/catalog/dishes/new">Определить блюдо</TileLink>
+            <TileLink to={path('/catalog/products/new')}>
+              Добавить продукт
+            </TileLink>
+            <TileLink to={path('/catalog/dishes/new')}>
+              Определить блюдо
+            </TileLink>
           </>
         }
       >
@@ -322,7 +333,7 @@ export function OverviewTiles() {
         title="Под списание"
         stamp={writeoff.stamp}
         links={
-          <TileLink to="/app/warehouse/expiry">Перейти к списанию</TileLink>
+          <TileLink to={path('/warehouse/expiry')}>Перейти к списанию</TileLink>
         }
       >
         <Flex columnGap="8" rowGap="4" wrap="wrap">
@@ -338,7 +349,7 @@ export function OverviewTiles() {
         icon={analyticsIcon}
         title="Аналитика"
         stamp={analytics.stamp}
-        links={<TileLink to="/app/analytics">Открыть аналитику</TileLink>}
+        links={<TileLink to={path('/analytics')}>Открыть аналитику</TileLink>}
       >
         <Flex columnGap="8" rowGap="4" wrap="wrap">
           <Figure value={analytics.stocked} label="продукта с запасом" />

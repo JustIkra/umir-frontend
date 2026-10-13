@@ -2,6 +2,7 @@ import { Box, Flex, Grid, Stack, Text } from '@chakra-ui/react';
 import { useRef, useState, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { PageHeader } from '@/presentation/app-shell/pages';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { placeholderAccount } from '@/presentation/placeholder-account';
 import { draftOrder } from '@/presentation/placeholder-orders';
 import { media } from '@/presentation/theme/system';
@@ -76,6 +77,7 @@ function OrderBar({
 // (320px as in 02 1024, 400px from 1201); on 390 the menu and the order are
 // separate views (01/02/03-390, 05-390, 09-390).
 export function OrdersPage({ step }: { step: OrderStep }) {
+  const path = useRestaurantPath();
   const dialog = useRef<HTMLDialogElement>(null);
   const openButton = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
@@ -118,7 +120,7 @@ export function OrdersPage({ step }: { step: OrderStep }) {
       </Button>
     ) : (
       <TextLink
-        to={step === 'proposal' ? '/app/orders/draft' : '/app/orders'}
+        to={step === 'proposal' ? path('/orders/draft') : path('/orders')}
         alignSelf="flex-start"
         mx="1"
       >

@@ -1,6 +1,7 @@
 import { Flex, Stack, Text } from '@chakra-ui/react';
 import { useNavigate } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { unitNames, type Unit } from '@/presentation/placeholder-catalog';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
@@ -22,14 +23,15 @@ const units: readonly Unit[] = ['г', 'мл', 'шт'];
 
 // Figma K05 «Новый продукт». «Создать продукт» only returns to the catalog.
 export function NewProductPage() {
+  const path = useRestaurantPath();
   const navigate = useNavigate();
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <Stack gap={{ base: '4', sm: '6' }}>
         <Breadcrumbs
           items={[
-            { title: 'Справочники', to: '/app/catalog' },
-            { title: 'Продукты', to: '/app/catalog' },
+            { title: 'Справочники', to: path('/catalog') },
+            { title: 'Продукты', to: path('/catalog') },
             { title: 'Новый продукт' },
           ]}
         />
@@ -42,7 +44,7 @@ export function NewProductPage() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void navigate('/app/catalog');
+          void navigate(path('/catalog'));
         }}
       >
         <SplitCardBody gap="6">
@@ -90,7 +92,7 @@ export function NewProductPage() {
             gap="3"
             flexShrink="0"
           >
-            <ButtonLink variant="secondary" to="/app/catalog">
+            <ButtonLink variant="secondary" to={path('/catalog')}>
               Отменить
             </ButtonLink>
             <Button type="submit">Создать продукт</Button>

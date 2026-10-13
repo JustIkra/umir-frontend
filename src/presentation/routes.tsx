@@ -2,9 +2,17 @@ import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
+import {
+  AppEntry,
+  AppGate,
+  RestaurantScope,
+  SectionGate,
+  createAppLoader,
+  createEntryLoader,
+  createRestaurantLoader,
+} from './app-shell/gates';
 import { NoRestaurantsPage } from './app-shell/no-restaurants-page';
 import { SectionPage } from './app-shell/pages';
-import { appSections } from './app-shell/sections';
 import {
   PasswordResetCodePage,
   PasswordResetNewPage,
@@ -44,6 +52,7 @@ import { DeliveryPage } from './warehouse/delivery-page';
 import { ExpiryPage } from './warehouse/expiry-page';
 import { HistoryPage } from './warehouse/history-page';
 import { StockPage } from './warehouse/stock-page';
+import type { PresentationServices } from './services';
 
 // Opens every page at its top or at the linked section. React Router's
 // ScrollRestoration is not used: it keeps positions in sessionStorage, which
@@ -67,106 +76,136 @@ function Root() {
   );
 }
 
-export const routes: RouteObject[] = [
+// Restaurant sections under /app/r/:restaurantID; each section checks the
+// restaurant's rights (W14).
+const restaurantRoutes: RouteObject[] = [
+  { index: true, element: <OverviewPage /> },
   {
-    element: <Root />,
+    path: 'orders',
+    element: <SectionGate section="orders" />,
     children: [
-      { path: '/', element: <LandingPage /> },
-      { path: '/privacy', element: <PrivacyPolicyPage /> },
-      { path: '/cookies', element: <CookiePolicyPage /> },
-      { path: '/consent', element: <PersonalDataConsentPage /> },
-      { path: '/login', element: <SignInPage /> },
-      { path: '/login/code', element: <SignInCodePage /> },
-      { path: '/password-reset', element: <PasswordResetRequestPage /> },
-      { path: '/password-reset/code', element: <PasswordResetCodePage /> },
-      { path: '/password-reset/new', element: <PasswordResetNewPage /> },
+      { index: true, element: <OrdersPage key="empty" step="empty" /> },
+      { path: 'draft', element: <OrdersPage key="draft" step="draft" /> },
       {
-        path: '/app',
-        element: <AppShell />,
-        errorElement: <NotFoundBoundary />,
-        children: [
-          { index: true, element: <OverviewPage /> },
-          { path: 'settings', element: <AccountSettingsPage /> },
-          { path: 'catalog', element: <ProductsPage /> },
-          { path: 'catalog/dishes', element: <DishesPage /> },
-          { path: 'catalog/dishes/new', element: <NewDishPage /> },
-          {
-            path: 'catalog/dishes/:dish',
-            loader: dishLoader,
-            element: <DishPage />,
-          },
-          { path: 'catalog/products/new', element: <NewProductPage /> },
-          { path: 'orders', element: <OrdersPage key="empty" step="empty" /> },
-          {
-            path: 'orders/draft',
-            element: <OrdersPage key="draft" step="draft" />,
-          },
-          {
-            path: 'orders/proposal',
-            element: <OrdersPage key="proposal" step="proposal" />,
-          },
-          {
-            path: 'orders/placed',
-            element: <OrdersPage key="placed" step="placed" />,
-          },
-          { path: 'warehouse', element: <StockPage /> },
-          { path: 'warehouse/expiry', element: <ExpiryPage /> },
-          { path: 'warehouse/history', element: <HistoryPage /> },
-          { path: 'warehouse/delivery', element: <DeliveryPage /> },
-          { path: 'organizations', element: <OrganizationsPage /> },
-          { path: 'organizations/new', element: <NewOrganizationPage /> },
-          {
-            path: 'organizations/:org',
-            loader: organizationLoader,
-            element: <OrganizationPage />,
-          },
-          {
-            path: 'organizations/:org/members',
-            loader: adminOrganizationLoader,
-            element: <MembersPage />,
-          },
-          {
-            path: 'organizations/:org/members/:member',
-            loader: memberLoader,
-            element: <MemberPage />,
-          },
-          {
-            path: 'organizations/:org/invitations',
-            loader: adminOrganizationLoader,
-            element: <InvitationsPage />,
-          },
-          {
-            path: 'organizations/:org/invitations/new',
-            loader: adminOrganizationLoader,
-            element: <InvitePage />,
-          },
-          {
-            path: 'organizations/:org/profile',
-            loader: adminOrganizationLoader,
-            element: <OrganizationProfilePage />,
-          },
-          ...appSections
-            .filter(
-              (section) =>
-                ![
-                  '/app',
-                  '/app/catalog',
-                  '/app/orders',
-                  '/app/warehouse',
-                ].includes(section.path),
-            )
-            .map((section) => ({
-              path: section.path.replace('/app/', ''),
-              element: <SectionPage title={section.title} />,
-            })),
-        ],
+        path: 'proposal',
+        element: <OrdersPage key="proposal" step="proposal" />,
       },
-      {
-        path: '/app/no-restaurants',
-        element: <AppShell restaurant={false} />,
-        children: [{ index: true, element: <NoRestaurantsPage /> }],
-      },
-      { path: '*', element: <NotFoundPage /> },
+      { path: 'placed', element: <OrdersPage key="placed" step="placed" /> },
     ],
   },
+  {
+    path: 'warehouse',
+    element: <SectionGate section="warehouse" />,
+    children: [
+      { index: true, element: <StockPage /> },
+      { path: 'expiry', element: <ExpiryPage /> },
+      { path: 'history', element: <HistoryPage /> },
+      { path: 'delivery', element: <DeliveryPage /> },
+    ],
+  },
+  {
+    path: 'catalog',
+    element: <SectionGate section="catalog" />,
+    children: [
+      { index: true, element: <ProductsPage /> },
+      { path: 'dishes', element: <DishesPage /> },
+      { path: 'dishes/new', element: <NewDishPage /> },
+      { path: 'dishes/:dish', loader: dishLoader, element: <DishPage /> },
+      { path: 'products/new', element: <NewProductPage /> },
+    ],
+  },
+  {
+    path: 'menu',
+    element: <SectionGate section="menu" />,
+    children: [
+      { index: true, element: <SectionPage title="Меню и рекомендации" /> },
+    ],
+  },
+  {
+    path: 'analytics',
+    element: <SectionGate section="analytics" />,
+    children: [{ index: true, element: <SectionPage title="Аналитика" /> }],
+  },
 ];
+
+export function createRoutes(services: PresentationServices): RouteObject[] {
+  return [
+    {
+      element: <Root />,
+      children: [
+        { path: '/', element: <LandingPage /> },
+        { path: '/privacy', element: <PrivacyPolicyPage /> },
+        { path: '/cookies', element: <CookiePolicyPage /> },
+        { path: '/consent', element: <PersonalDataConsentPage /> },
+        { path: '/login', element: <SignInPage /> },
+        { path: '/login/code', element: <SignInCodePage /> },
+        { path: '/password-reset', element: <PasswordResetRequestPage /> },
+        { path: '/password-reset/code', element: <PasswordResetCodePage /> },
+        { path: '/password-reset/new', element: <PasswordResetNewPage /> },
+        {
+          path: '/app',
+          loader: createAppLoader(services),
+          element: <AppGate />,
+          errorElement: <NotFoundBoundary />,
+          children: [
+            {
+              index: true,
+              loader: createEntryLoader(services),
+              element: <AppEntry />,
+            },
+            {
+              path: 'r/:restaurantID',
+              loader: createRestaurantLoader(services),
+              element: <RestaurantScope />,
+              children: restaurantRoutes,
+            },
+            {
+              element: <AppShell />,
+              children: [
+                { path: 'settings', element: <AccountSettingsPage /> },
+                { path: 'organizations', element: <OrganizationsPage /> },
+                { path: 'organizations/new', element: <NewOrganizationPage /> },
+                {
+                  path: 'organizations/:org',
+                  loader: organizationLoader,
+                  element: <OrganizationPage />,
+                },
+                {
+                  path: 'organizations/:org/members',
+                  loader: adminOrganizationLoader,
+                  element: <MembersPage />,
+                },
+                {
+                  path: 'organizations/:org/members/:member',
+                  loader: memberLoader,
+                  element: <MemberPage />,
+                },
+                {
+                  path: 'organizations/:org/invitations',
+                  loader: adminOrganizationLoader,
+                  element: <InvitationsPage />,
+                },
+                {
+                  path: 'organizations/:org/invitations/new',
+                  loader: adminOrganizationLoader,
+                  element: <InvitePage />,
+                },
+                {
+                  path: 'organizations/:org/profile',
+                  loader: adminOrganizationLoader,
+                  element: <OrganizationProfilePage />,
+                },
+              ],
+            },
+            {
+              path: 'no-restaurants',
+              element: <AppShell restaurant={false} />,
+              children: [{ index: true, element: <NoRestaurantsPage /> }],
+            },
+          ],
+        },
+        { path: '*', element: <NotFoundPage /> },
+      ],
+    },
+  ];
+}

@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from 'react';
 import { useNavigate } from 'react-router';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import clockIcon from '@/presentation/assets/icons/clock-24.svg';
 import { shortage } from '@/presentation/placeholder-orders';
 import { media, scrim } from '@/presentation/theme/system';
@@ -174,6 +175,7 @@ export function ShortageDialog({
   dialogRef: RefObject<HTMLDialogElement | null>;
   returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
+  const path = useRestaurantPath();
   const navigate = useNavigate();
   const titleId = useId();
   const title = useRef<HTMLHeadingElement>(null);
@@ -311,7 +313,7 @@ export function ShortageDialog({
           <Flex direction={{ base: 'column', sm: 'row' }} gap="3">
             <Button
               onClick={() => {
-                void navigate('/app/orders/placed');
+                void navigate(path('/orders/placed'));
               }}
             >
               Оформить оставшиеся блюда
@@ -319,7 +321,7 @@ export function ShortageDialog({
             <Button
               variant="secondary"
               onClick={() => {
-                void navigate('/app/orders/draft');
+                void navigate(path('/orders/draft'));
               }}
             >
               Вернуться к изменению заказа

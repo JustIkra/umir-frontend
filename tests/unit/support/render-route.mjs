@@ -7,34 +7,152 @@ import {
   createStaticHandler,
   createStaticRouter,
 } from 'react-router';
-import { routes } from '../../../src/presentation/routes.tsx';
+import { permissionsFor } from '../../../src/domain/access.ts';
+import { createRoutes } from '../../../src/presentation/routes.tsx';
 import { ServicesProvider } from '../../../src/presentation/services.tsx';
 import { system } from '../../../src/presentation/theme/system.ts';
 
-// Screens only read these ports during render; nothing is sent.
-const services = {
-  cookieNotice: { isClosed: () => true, close: () => {} },
-  feedback: {},
-  live: {},
+export const R = '33333333-3333-4333-8333-333333333333';
+export const ORG = '22222222-2222-4222-8222-222222222222';
+
+const store = (snapshot) => ({
+  subscribe: () => () => {},
+  getSnapshot: () => snapshot,
+});
+
+export const sampleRestaurant = (overrides = {}) => {
+  const roles = overrides.roles ?? ['Warehouse', 'Waiter'];
+  return {
+    restaurantID: R,
+    orgID: ORG,
+    orgName: 'Восток Фуд',
+    name: 'На Пушкинской',
+    lifecycle: 'ready',
+    timeZone: 'Europe/Moscow',
+    ...overrides,
+    roles,
+    permissions: permissionsFor(roles),
+  };
 };
 
-export async function renderRoute(path) {
-  const handler = createStaticHandler(routes);
-  const context = await handler.query(new Request(`http://localhost${path}`));
-  if (context instanceof Response)
-    throw new Error(`${path}: ${context.status}`);
-  const router = createStaticRouter(handler.dataRoutes, context);
-  return renderToString(
-    h(
-      ChakraProvider,
-      { value: system },
+export const readyAccess = (restaurants = [sampleRestaurant()]) => ({
+  status: 'ready',
+  organizations:
+    restaurants.length === 0
+      ? []
+      : [
+          {
+            orgID: ORG,
+            name: 'Восток Фуд',
+            settings: { timeZone: 'Europe/Moscow', settingsVersion: '1' },
+            admin: false,
+            restaurants,
+          },
+        ],
+});
+
+export const activeSession = {
+  status: 'active',
+  user: {
+    userID: 'u',
+    login: 'm.belova',
+    displayName: 'Марина Белова',
+    email: 'm.belova@restoran.example',
+  },
+  session: {
+    expiresAt: { iso: '2026-10-10T23:00:00+03:00', epochMs: 0 },
+    idleExpiresAt: { iso: '2026-10-10T16:00:00+03:00', epochMs: 0 },
+    absoluteExpiresAt: { iso: '2026-10-10T23:00:00+03:00', epochMs: 0 },
+    rememberMe: false,
+  },
+};
+
+// Screens only read these ports during render; nothing is sent.
+export function fakeServices({
+  session = activeSession,
+  access = readyAccess(),
+  remembered,
+  attempts = [],
+} = {}) {
+  return {
+    cookieNotice: { isClosed: () => true, close: () => {} },
+    feedback: {},
+    session: {
+      ...store(session),
+      ensure: () => Promise.resolve(session),
+      check: () => Promise.resolve('active'),
+      signIn: () => Promise.reject(new Error('no sign-in in render tests')),
+      signOut: () => Promise.resolve('done'),
+      expire: () => {},
+    },
+    access: {
+      ...store(access),
+      ensure: () => Promise.resolve(access),
+      refresh: () => Promise.resolve(access),
+      nameOf: () => undefined,
+      clear: () => {},
+    },
+    lastRestaurant: { read: () => remembered, write: () => {} },
+    live: {
+      ...store({ connection: 'closed', stale: false, restaurantID: undefined }),
+      start: () => {},
+      stop: () => {},
+    },
+    models: {
+      subscribeNotice: () => () => {},
+      getNotice: () => undefined,
+      dismissNotice: () => {},
+    },
+    commands: {
+      ...store(attempts),
+      run: () => Promise.reject(new Error('no commands')),
+      retry: () => undefined,
+      discard: () => {},
+      clear: () => {},
+    },
+  };
+}
+
+async function query(path, services) {
+  const handler = createStaticHandler(createRoutes(services));
+  return {
+    handler,
+    context: await handler.query(new Request(`http://localhost${path}`)),
+  };
+}
+
+// The Location of a redirect answer, or undefined when the page renders.
+export async function redirectOf(path, options = {}) {
+  const { context } = await query(path, fakeServices(options));
+  return context instanceof Response
+    ? context.headers.get('Location')
+    : undefined;
+}
+
+// Renders the page at path, following redirects (at most five).
+export async function renderRoute(path, options = {}) {
+  const services = fakeServices(options);
+  let target = path;
+  for (let hop = 0; hop < 5; hop += 1) {
+    const { handler, context } = await query(target, services);
+    if (context instanceof Response) {
+      target = context.headers.get('Location');
+      continue;
+    }
+    const router = createStaticRouter(handler.dataRoutes, context);
+    return renderToString(
       h(
-        ServicesProvider,
-        { services },
-        h(StaticRouterProvider, { router, context }),
+        ChakraProvider,
+        { value: system },
+        h(
+          ServicesProvider,
+          { services },
+          h(StaticRouterProvider, { router, context }),
+        ),
       ),
-    ),
-  );
+    );
+  }
+  throw new Error(`${path}: too many redirects`);
 }
 
 // Emotion inlines <style> elements next to the markup during server rendering.

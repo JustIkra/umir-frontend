@@ -5,6 +5,7 @@ import userIcon from '@/presentation/assets/icons/user-24.svg';
 import { placeholderAccount } from '@/presentation/placeholder-account';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { LogoMark } from '@/presentation/ui/logo';
+import { useRestaurantPath } from './paths';
 import { appSections } from './sections';
 
 const NavAnchor = chakra(NavLink);
@@ -13,13 +14,14 @@ const NavAnchor = chakra(NavLink);
 // current page is teal on bg.actionSubtle. Subpages keep their section item
 // current; only «Обзор» matches its address exactly.
 export function SectionNav({ onNavigate }: { onNavigate?: () => void }) {
+  const path = useRestaurantPath();
   return (
     <Stack as="nav" aria-label="Разделы" gap="1">
       {appSections.map((section) => (
         <NavAnchor
-          key={section.path}
-          to={section.path}
-          end={section.path === '/app'}
+          key={section.key}
+          to={path(section.suffix)}
+          end={section.key === 'overview'}
           onClick={onNavigate}
           display="flex"
           alignItems="center"
@@ -101,10 +103,11 @@ export function SidebarContent({
   context: string;
   sections?: boolean;
 }) {
+  const path = useRestaurantPath();
   return (
     <Flex direction="column" h="full" px="3" py="4" gap="6">
       <HStack asChild gap="2" px="3" py="1">
-        <RouterLink to="/app" aria-label="Ровный ход — обзор">
+        <RouterLink to={path()} aria-label="Ровный ход — обзор">
           <LogoMark />
           <Text as="span" textStyle="body.strong">
             Ровный ход

@@ -1,5 +1,6 @@
 import { Text, chakra } from '@chakra-ui/react';
 import { Link as RouterLink } from 'react-router';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import arrowIcon from '@/presentation/assets/icons/arrow-right-24.svg';
 import { dishes } from '@/presentation/placeholder-catalog';
 import { SearchInput } from '@/presentation/ui/form';
@@ -19,10 +20,11 @@ const RowLink = chakra(RouterLink, {
 // Figma K12 «Блюда». Only dishes with a sample recipe open a page (206), so
 // only they show the arrow. On 390 a row reads «Борщ… / Код 201».
 export function DishesPage() {
+  const path = useRestaurantPath();
   return (
     <CatalogLayout
       section="Блюда"
-      action={{ to: '/app/catalog/dishes/new', title: 'Новое блюдо' }}
+      action={{ to: path('/catalog/dishes/new'), title: 'Новое блюдо' }}
     >
       <SearchInput label="Найти блюдо по названию или коду" />
       <Text textStyle="caption.default" color="text.secondary">
@@ -52,7 +54,7 @@ export function DishesPage() {
               >
                 <Td gridArea="name">
                   {dish.recipe ? (
-                    <RowLink to={`/app/catalog/dishes/${dish.code}`}>
+                    <RowLink to={path(`/catalog/dishes/${dish.code}`)}>
                       {dish.name}
                     </RowLink>
                   ) : (

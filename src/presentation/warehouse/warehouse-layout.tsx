@@ -1,6 +1,7 @@
 import { Flex, Stack } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/presentation/app-shell/pages';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { placeholderAccount } from '@/presentation/placeholder-account';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { EvaluationStamp } from '@/presentation/ui/evaluation-stamp';
@@ -17,6 +18,7 @@ export function WarehouseLayout({
   stamp: string;
   children: ReactNode;
 }) {
+  const path = useRestaurantPath();
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <PageHeader
@@ -24,7 +26,9 @@ export function WarehouseLayout({
         caption={placeholderAccount.today}
         documentTitle={`${section} · Склад`}
         action={
-          <ButtonLink to="/app/warehouse/delivery">Принять поставку</ButtonLink>
+          <ButtonLink to={path('/warehouse/delivery')}>
+            Принять поставку
+          </ButtonLink>
         }
       />
       <Flex
@@ -37,9 +41,9 @@ export function WarehouseLayout({
         <TabNav
           label="Разделы склада"
           tabs={[
-            { to: '/app/warehouse', title: 'Остатки' },
-            { to: '/app/warehouse/expiry', title: 'Сроки годности' },
-            { to: '/app/warehouse/history', title: 'История' },
+            { to: path('/warehouse'), title: 'Остатки' },
+            { to: path('/warehouse/expiry'), title: 'Сроки годности' },
+            { to: path('/warehouse/history'), title: 'История' },
           ]}
         />
         <EvaluationStamp text={stamp} />

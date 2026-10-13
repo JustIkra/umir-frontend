@@ -1,6 +1,7 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import { useLoaderData } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import {
   catalogStamp,
   findProduct,
@@ -18,6 +19,7 @@ const bareTh = { bg: 'transparent' } as const;
 // Figma K13 «Рецептура»: read-only code and stamp, the recipe of one portion.
 // On 390 the fields, the recipe list and the footer are separate blocks.
 export function DishPage() {
+  const path = useRestaurantPath();
   const dish = useLoaderData<Dish>();
   const recipe = dish.recipe ?? [];
   return (
@@ -25,8 +27,8 @@ export function DishPage() {
       <Stack gap={{ base: '4', sm: '6' }}>
         <Breadcrumbs
           items={[
-            { title: 'Справочники', to: '/app/catalog' },
-            { title: 'Блюда', to: '/app/catalog/dishes' },
+            { title: 'Справочники', to: path('/catalog') },
+            { title: 'Блюда', to: path('/catalog/dishes') },
             { title: dish.name },
           ]}
         />
@@ -151,10 +153,12 @@ export function DishPage() {
             gap="3"
             flexShrink="0"
           >
-            <ButtonLink variant="secondary" to="/app/catalog/dishes">
+            <ButtonLink variant="secondary" to={path('/catalog/dishes')}>
               К списку блюд
             </ButtonLink>
-            <ButtonLink to="/app/catalog/dishes/new">Новое блюдо</ButtonLink>
+            <ButtonLink to={path('/catalog/dishes/new')}>
+              Новое блюдо
+            </ButtonLink>
           </Flex>
         </CardFooter>
       </SplitCard>

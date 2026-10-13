@@ -1,4 +1,5 @@
 import { Text, chakra } from '@chakra-ui/react';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { products, unitNames } from '@/presentation/placeholder-catalog';
 import { SearchInput } from '@/presentation/ui/form';
 import { DataTable, TableCard, Td, Th } from '@/presentation/ui/table';
@@ -8,10 +9,11 @@ import { CatalogLayout } from './catalog-layout';
 // Figma K01 «Продукты». Search is for show. On 390 a row reads
 // «Авокадо / Код 101 · штуки, шт».
 export function ProductsPage() {
+  const path = useRestaurantPath();
   return (
     <CatalogLayout
       section="Продукты"
-      action={{ to: '/app/catalog/products/new', title: 'Новый продукт' }}
+      action={{ to: path('/catalog/products/new'), title: 'Новый продукт' }}
     >
       <SearchInput label="Найти продукт по названию или коду" />
       <TableCard>

@@ -4,18 +4,48 @@ import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import overviewIcon from '@/presentation/assets/icons/overview-24-active.svg';
 import recommendationsIcon from '@/presentation/assets/icons/menu-24.svg';
 import warehouseIcon from '@/presentation/assets/icons/warehouse-24.svg';
+import type { SectionKey } from '@/domain/access';
 
-// Sidebar of Figma 784:77151, Роль=Обе роли. The sections are empty until the
-// business screens are ported.
-export const appSections = [
-  { path: '/app', title: 'Обзор', icon: overviewIcon },
-  { path: '/app/orders', title: 'Заказы', icon: ordersIcon },
-  { path: '/app/warehouse', title: 'Склад', icon: warehouseIcon },
-  { path: '/app/catalog', title: 'Справочники', icon: catalogIcon },
+// Sidebar of Figma 784:77151. Each section lives under /app/r/{restaurantID}
+// at its suffix.
+export const appSections: readonly {
+  readonly key: SectionKey;
+  readonly suffix: string;
+  readonly title: string;
+  readonly icon: string;
+}[] = [
+  { key: 'overview', suffix: '', title: 'Обзор', icon: overviewIcon },
+  { key: 'orders', suffix: '/orders', title: 'Заказы', icon: ordersIcon },
   {
-    path: '/app/menu',
+    key: 'warehouse',
+    suffix: '/warehouse',
+    title: 'Склад',
+    icon: warehouseIcon,
+  },
+  {
+    key: 'catalog',
+    suffix: '/catalog',
+    title: 'Справочники',
+    icon: catalogIcon,
+  },
+  {
+    key: 'menu',
+    suffix: '/menu',
     title: 'Меню и рекомендации',
     icon: recommendationsIcon,
   },
-  { path: '/app/analytics', title: 'Аналитика', icon: analyticsIcon },
-] as const;
+  {
+    key: 'analytics',
+    suffix: '/analytics',
+    title: 'Аналитика',
+    icon: analyticsIcon,
+  },
+];
+
+export function sectionTitle(key: SectionKey): string {
+  return appSections.find((section) => section.key === key)?.title ?? '';
+}
+
+export function sectionSuffix(key: SectionKey): string {
+  return appSections.find((section) => section.key === key)?.suffix ?? '';
+}

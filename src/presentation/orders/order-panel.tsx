@@ -1,5 +1,6 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import type { ReactNode, RefObject } from 'react';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
@@ -126,6 +127,7 @@ export function EmptyOrder() {
 
 // Figma 02: the sample draft. «−», «+» and delete change nothing yet.
 export function DraftOrder() {
+  const path = useRestaurantPath();
   return (
     <Panel
       header={<Heading title="Состав заказа" caption={draftSummary} />}
@@ -135,7 +137,7 @@ export function DraftOrder() {
             Проверка учитывает весь заказ: у блюд бывают общие ингредиенты.
             Продукты не резервируются.
           </Text>
-          <ButtonLink to="/app/orders/proposal" w="full">
+          <ButtonLink to={path('/orders/proposal')} w="full">
             Подготовить заказ
           </ButtonLink>
         </>
@@ -190,6 +192,7 @@ export function ProposalOrder({
   confirmRef: RefObject<HTMLButtonElement | null>;
   onConfirm: () => void;
 }) {
+  const path = useRestaurantPath();
   return (
     <Panel
       header={<Heading title="Предложение заказа" caption={proposal.stamp} />}
@@ -204,7 +207,7 @@ export function ProposalOrder({
           >
             Проверить и подтвердить
           </Button>
-          <ButtonLink variant="secondary" to="/app/orders/draft" w="full">
+          <ButtonLink variant="secondary" to={path('/orders/draft')} w="full">
             Вернуться к изменению заказа
           </ButtonLink>
         </>
@@ -253,6 +256,7 @@ export function ProposalOrder({
 
 // Figma 08 «Заказ оформлен».
 export function PlacedOrder() {
+  const path = useRestaurantPath();
   return (
     <Panel
       header={
@@ -270,11 +274,11 @@ export function PlacedOrder() {
       }
       footer={
         <>
-          <ButtonLink to="/app/orders" w="full">
+          <ButtonLink to={path('/orders')} w="full">
             Новый заказ
           </ButtonLink>
           <TextLink
-            to="/app/warehouse/history"
+            to={path('/warehouse/history')}
             alignSelf="flex-start"
             mx="1"
             my="2"

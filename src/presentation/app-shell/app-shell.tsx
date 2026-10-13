@@ -1,5 +1,5 @@
 import { Box, Flex, Stack } from '@chakra-ui/react';
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Outlet } from 'react-router';
 import { DocumentFooter } from '@/presentation/documents/document-chrome';
 import { placeholderAccount } from '@/presentation/placeholder-account';
@@ -13,7 +13,13 @@ import { SidebarContent } from './sidebar';
 // Figma W03 shell: 240px sidebar from 1024, the App bar and Doc footer on 390.
 // Without a restaurant (W13) the sidebar has no sections and the menu no
 // workplaces.
-export function AppShell({ restaurant = true }: { restaurant?: boolean }) {
+export function AppShell({
+  restaurant = true,
+  children,
+}: {
+  restaurant?: boolean;
+  children?: ReactNode;
+}) {
   const context = restaurant
     ? `${placeholderAccount.restaurant} · ${placeholderAccount.roles}`
     : 'Нет доступных ресторанов';
@@ -73,7 +79,7 @@ export function AppShell({ restaurant = true }: { restaurant?: boolean }) {
             pb={{ base: '12', sm: '16' }}
             _focusVisible={{ outline: 'none' }}
           >
-            <Outlet />
+            {children ?? <Outlet />}
           </Stack>
         </Box>
         <Box display={{ base: 'block', sm: 'none' }}>

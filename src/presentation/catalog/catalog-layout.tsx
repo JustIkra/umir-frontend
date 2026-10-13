@@ -1,6 +1,7 @@
 import { Flex, Stack } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/presentation/app-shell/pages';
+import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { placeholderAccount } from '@/presentation/placeholder-account';
 import {
   catalogStamp,
@@ -22,6 +23,7 @@ export function CatalogLayout({
   action: { to: string; title: string };
   children: ReactNode;
 }) {
+  const path = useRestaurantPath();
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <PageHeader
@@ -41,11 +43,11 @@ export function CatalogLayout({
           label="Справочники"
           tabs={[
             {
-              to: '/app/catalog',
+              to: path('/catalog'),
               title: `Продукты · ${String(products.length)}`,
             },
             {
-              to: '/app/catalog/dishes',
+              to: path('/catalog/dishes'),
               title: `Блюда · ${String(dishes.length)}`,
             },
           ]}
