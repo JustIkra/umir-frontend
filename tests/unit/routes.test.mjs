@@ -401,3 +401,39 @@ test('restaurant links carry the restaurant id', async () => {
     [],
   );
 });
+
+test('a session without an answer shows «Сессия не проверена» instead of the page', async () => {
+  const session = { status: 'unavailable', failure: unverified.failure };
+  for (const path of ['/app', '/app/settings', `/app/r/${R}/orders`]) {
+    assert.equal(
+      h1(await renderRoute(path, { session })),
+      'Сессия не проверена',
+      path,
+    );
+  }
+});
+
+test('/app checks unverified access again', async () => {
+  const accessCalls = { ensure: 0, refresh: 0 };
+  assert.equal(
+    await redirectOf('/app', {
+      access: unverified,
+      refreshed: readyAccess(),
+      accessCalls,
+    }),
+    `/app/r/${R}`,
+  );
+  assert.equal(accessCalls.refresh, 1);
+});
+
+test('pages outside a restaurant read access before render', async () => {
+  const accessCalls = { ensure: 0, refresh: 0 };
+  await renderRoute('/app/settings', { accessCalls });
+  assert.equal(accessCalls.ensure, 1);
+  const guestCalls = { ensure: 0, refresh: 0 };
+  await redirectOf('/app/settings', {
+    session: { status: 'anonymous', expired: false },
+    accessCalls: guestCalls,
+  });
+  assert.equal(guestCalls.ensure, 0);
+});

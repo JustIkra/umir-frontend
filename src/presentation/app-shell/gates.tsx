@@ -7,6 +7,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
+  useRevalidator,
   type LoaderFunctionArgs,
 } from 'react-router';
 import { chooseEntry, findRestaurant } from '@/application/access';
@@ -37,26 +38,30 @@ export function loginPath(
   return `/login?return=${target}${expired ? '&expired=1' : ''}`;
 }
 
-// /app: a guest goes to sign-in with the address to return to.
+// /app: a guest goes to sign-in with the address to return to. Every page
+// of the app reads access before render, also outside a restaurant; the
+// entry and restaurant loaders share the same request.
 export function createAppLoader(services: PresentationServices) {
   return async ({ request }: LoaderFunctionArgs) => {
     const state = await services.session.ensure();
     if (state.status === 'anonymous') {
       return redirect(loginPath(new URL(request.url), state.expired));
     }
+    if (state.status === 'active') await services.access.ensure();
     return null;
   };
 }
 
 // /app itself: open a restaurant, «no restaurants», or W17 (rendered by
-// AppEntry).
+// AppEntry). Each new opening of /app checks unverified access again.
 export function createEntryLoader(services: PresentationServices) {
   return async () => {
     if ((await services.session.ensure()).status !== 'active') return null;
-    const entry = chooseEntry(
-      await services.access.ensure(),
-      services.lastRestaurant.read(),
-    );
+    const access =
+      services.access.getSnapshot().status === 'unverified'
+        ? await services.access.refresh()
+        : await services.access.ensure();
+    const entry = chooseEntry(access, services.lastRestaurant.read());
     if (entry.kind === 'restaurant') {
       return redirect(restaurantPath(entry.restaurantID));
     }
@@ -77,10 +82,13 @@ export function createRestaurantLoader(services: PresentationServices) {
   };
 }
 
+// Loaders do not re-run when a store changes: after the retry they are run
+// again to redirect a guest and to read access.
 export function AppGate() {
   const session = useSession();
   const location = useLocation();
   const services = useServices();
+  const { revalidate } = useRevalidator();
   if (session.status === 'anonymous') {
     return <Navigate to={loginPath(location, session.expired)} replace />;
   }
@@ -89,7 +97,7 @@ export function AppGate() {
       <Flex minH="100dvh" align="center" justify="center" px="4" bg="bg.canvas">
         <SessionUnverified
           onRetry={() => {
-            void services.session.ensure();
+            void services.session.ensure().then(() => revalidate());
           }}
         />
       </Flex>

@@ -67,10 +67,13 @@ export const activeSession = {
   },
 };
 
-// Screens only read these ports during render; nothing is sent.
+// Screens only read these ports during render; nothing is sent. refresh()
+// answers refreshed; accessCalls counts the reads of access.
 export function fakeServices({
   session = activeSession,
   access = readyAccess(),
+  refreshed = access,
+  accessCalls = { ensure: 0, refresh: 0 },
   remembered,
   attempts = [],
 } = {}) {
@@ -87,8 +90,14 @@ export function fakeServices({
     },
     access: {
       ...store(access),
-      ensure: () => Promise.resolve(access),
-      refresh: () => Promise.resolve(access),
+      ensure: () => {
+        accessCalls.ensure += 1;
+        return Promise.resolve(access);
+      },
+      refresh: () => {
+        accessCalls.refresh += 1;
+        return Promise.resolve(refreshed);
+      },
       nameOf: () => undefined,
       clear: () => {},
     },
