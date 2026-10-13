@@ -3,7 +3,6 @@ import { useLoaderData } from 'react-router';
 import { type Organization } from '@/presentation/placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { SearchInput } from '@/presentation/ui/form';
-import { rem } from '@/presentation/ui/units';
 import { organizationPath } from './format';
 import { MemberList } from './member-list';
 import {
@@ -23,8 +22,12 @@ export function MembersPage() {
       }
     >
       <OrganizationTabs organization={organization} />
-      <Flex gap="3" wrap="wrap" align="center">
-        <Box flex="1" minW={rem(240)}>
+      <Flex
+        direction={{ base: 'column', sm: 'row' }}
+        align={{ base: 'stretch', sm: 'center' }}
+        gap="3"
+      >
+        <Box flex="1">
           <SearchInput label="Найти по имени или почте" />
         </Box>
         <ButtonLink to={`${path}/invitations/new`}>

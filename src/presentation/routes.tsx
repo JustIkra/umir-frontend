@@ -23,6 +23,8 @@ import {
   memberLoader,
   organizationLoader,
 } from './organizations/loaders';
+import { InvitationsPage } from './organizations/invitations-page';
+import { InvitePage } from './organizations/invite-page';
 import { MemberPage } from './organizations/member-page';
 import { MembersPage } from './organizations/members-page';
 import { OrganizationPage } from './organizations/organization-page';
@@ -85,6 +87,16 @@ export const routes: RouteObject[] = [
             path: 'organizations/:org/members/:member',
             loader: memberLoader,
             element: <MemberPage />,
+          },
+          {
+            path: 'organizations/:org/invitations',
+            loader: adminOrganizationLoader,
+            element: <InvitationsPage />,
+          },
+          {
+            path: 'organizations/:org/invitations/new',
+            loader: adminOrganizationLoader,
+            element: <InvitePage />,
           },
           ...appSections
             .filter((section) => section.path !== '/app')

@@ -41,6 +41,16 @@ const pages = [
     'Ирина Ковалёва',
     ['Склад', 'Официант'],
   ],
+  [
+    '/app/organizations/yug/invitations',
+    'Сеть ресторанов Южного федерального округа',
+    [],
+  ],
+  [
+    '/app/organizations/yug/invitations/new',
+    'Пригласить участника',
+    ['Почта', 'Склад', 'Официант'],
+  ],
 ];
 
 for (const [path, title, fields] of pages) {
@@ -124,4 +134,11 @@ test('the member page checks the sample roles', async () => {
     html.match(/<input[^>]*type="checkbox"[^>]*checked/g)?.length,
     3,
   );
+});
+
+test('invitation actions follow the status', async () => {
+  const html = await renderRoute('/app/organizations/yug/invitations');
+  // Three pending rows and the submit button of the closed CX01 dialog.
+  assert.equal(html.match(/>Отменить приглашение</g)?.length, 3 + 1);
+  assert.equal(html.match(/>Пригласить повторно</g)?.length, 3);
 });
