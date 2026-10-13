@@ -1,6 +1,9 @@
 // Gateway stand-in for the Nginx checks: records what the proxy forwards and answers on demand.
 import http from 'node:http';
 
+const R = '33333333-3333-4333-8333-333333333333';
+const EPOCH = '44444444-4444-4444-8444-444444444444';
+const live = `/api/v2/r/${R}/live`;
 const requests = [];
 
 const server = http.createServer((request, response) => {
@@ -24,21 +27,23 @@ const server = http.createServer((request, response) => {
       connection: request.headers.connection ?? null,
       length: Buffer.concat(chunks).length,
     });
-    if (url.startsWith('/api/drop') || url === '/api/live?drop') {
+    if (url.startsWith('/api/drop') || url === `${live}?drop`) {
       request.socket.destroy();
       return;
     }
     // No X-Accel-Buffering here: the check proves Nginx's own settings.
-    if (url === '/api/live') {
+    if (url.startsWith(live)) {
       response.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-store',
       });
       response.write(
-        'retry: 3000\n\nevent: upstream\ndata: {"available":true}\n\n',
+        `retry: 3000\n\nevent: refresh-required\ndata: {"type":"refresh-required","tenantID":"${R}","epoch":"${EPOCH}"}\n\n`,
       );
       setTimeout(() => {
-        response.end('event: upstream\ndata: {"available":false}\n\n');
+        response.end(
+          `id: c1\nevent: change\ndata: {"type":"change","tenantID":"${R}","epoch":"${EPOCH}","sequence":"1","topics":["stock"]}\n\n`,
+        );
       }, 1500);
       return;
     }

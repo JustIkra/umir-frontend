@@ -5,6 +5,9 @@ import http from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const port = Number(process.env.FRONTEND_PORT ?? 18090);
+const R = '33333333-3333-4333-8333-333333333333';
+const live = `/api/v2/r/${R}/live`;
+const feedbackPaths = ['/api/v2/feedback/anonymous', `/api/v2/r/${R}/feedback`];
 
 function send(method, path, { headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
@@ -91,8 +94,7 @@ const checks = {
         'Content-Type': 'application/json',
       };
       assert.equal(
-        (await send('POST', '/api/operator/session', { headers, body: '{}' }))
-          .status,
+        (await send('POST', '/api/v2/session', { headers, body: '{}' })).status,
         200,
       );
       const last = (await recorded()).at(-1);
@@ -103,8 +105,7 @@ const checks = {
     },
 
   'passes the raw path and query': async () => {
-    const target =
-      '/api/serving/items/%D0%B0%2Fb?cutoffAt=2026-10-10T12:00:00%2B03:00&x=%zz;y';
+    const target = `/api/v2/r/${R}/warehouse/dish?dishID=%D0%B0%2Fb&x=%zz;y`;
     assert.equal((await send('GET', target)).status, 200);
     assert.equal((await recorded()).at(-1).url, target);
   },
@@ -122,8 +123,8 @@ const checks = {
 
   'sends every request to gateway without caching': async () => {
     const before = (await recorded()).length;
-    await send('GET', '/api/serving/menu');
-    await send('GET', '/api/serving/menu');
+    await send('GET', `/api/v2/r/${R}/serving/menu`);
+    await send('GET', `/api/v2/r/${R}/serving/menu`);
     assert.equal((await recorded()).length, before + 2);
   },
 
@@ -145,6 +146,7 @@ const checks = {
           code: 'UpstreamUnavailable',
           message: 'gateway did not respond',
           outcome,
+          retryable: true,
         });
         const after = (await recorded()).filter(
           (r) => r.url === '/api/drop' && r.method === method,
@@ -156,9 +158,13 @@ const checks = {
   'answers a body over the general limit with the JSON error envelope':
     async () => {
       const before = (await recorded()).length;
-      const response = await send('POST', '/api/serving/orders', {
-        body: 'x'.repeat(1024 * 1024 + 1),
-      });
+      const response = await send(
+        'POST',
+        `/api/v2/r/${R}/serving/order-proposals`,
+        {
+          body: 'x'.repeat(1024 * 1024 + 1),
+        },
+      );
       assert.equal(response.status, 413);
       assert.equal(json(response).code, 'PayloadTooLarge');
       assert.equal(
@@ -168,44 +174,62 @@ const checks = {
       );
     },
 
-  'accepts a 16 KiB feedback post': async () => {
-    const response = await send('POST', '/api/feedback', {
-      body: 'x'.repeat(16 * 1024),
-    });
-    assert.equal(response.status, 200);
-    const last = (await recorded()).at(-1);
-    assert.deepEqual([last.url, last.length], ['/api/feedback', 16 * 1024]);
+  'accepts a 16 KiB feedback post on both feedback routes': async () => {
+    for (const path of feedbackPaths) {
+      const response = await send('POST', path, {
+        body: 'x'.repeat(16 * 1024),
+      });
+      assert.equal(response.status, 200, path);
+      const last = (await recorded()).at(-1);
+      assert.deepEqual([last.url, last.length], [path, 16 * 1024]);
+    }
   },
 
-  'answers a larger feedback post with the JSON error envelope': async () => {
-    const before = (await recorded()).length;
-    const response = await send('POST', '/api/feedback', {
-      body: 'x'.repeat(16 * 1024 + 1),
-    });
-    assert.equal(response.status, 413);
-    assert.equal(response.headers['cache-control'], 'no-store');
-    const problem = json(response);
-    assert.equal(problem.code, 'PayloadTooLarge');
-    assert.match(problem.requestID, /^[0-9a-f]{32}$/);
-    assert.equal((await recorded()).length, before, 'the post reached gateway');
+  'answers a larger feedback post with the contract error': async () => {
+    for (const path of feedbackPaths) {
+      const before = (await recorded()).length;
+      const response = await send('POST', path, {
+        body: 'x'.repeat(16 * 1024 + 1),
+      });
+      assert.equal(response.status, 413, path);
+      assert.equal(response.headers['cache-control'], 'no-store');
+      const problem = json(response);
+      assert.deepEqual(
+        [problem.code, problem.outcome, problem.retryable],
+        ['PayloadTooLarge', 'not_committed', false],
+      );
+      assert.match(problem.requestID, /^[0-9a-f]{32}$/);
+      assert.equal(
+        (await recorded()).length,
+        before,
+        'the post reached gateway',
+      );
+    }
   },
 
   'keeps the general body limit for other API routes': async () => {
-    const response = await send('POST', '/api/serving/orders', {
-      body: 'x'.repeat(20000),
-    });
+    const response = await send(
+      'POST',
+      `/api/v2/r/${R}/serving/order-proposals`,
+      {
+        body: 'x'.repeat(20000),
+      },
+    );
     assert.equal(response.status, 200);
     assert.equal((await recorded()).at(-1).length, 20000);
   },
 
   // Nginx 1.30 already streams small chunks and speaks HTTP/1.1 upstream by
   // default, so the contract's settings are checked in the file as well.
-  'configures /api/live for a long-lived stream': () => {
+  'configures the restaurant stream for a long-lived connection': () => {
     const config = readFileSync(
       new URL('../../nginx.conf', import.meta.url),
       'utf8',
     );
-    const block = /location = \/api\/live \{([^}]*)\}/.exec(config)?.[1] ?? '';
+    const head = 'location ~ ^/api/v2/r/[0-9a-f-]+/live$ {';
+    const start = config.indexOf(head);
+    assert.ok(start >= 0, 'missing the stream location');
+    const block = config.slice(start, config.indexOf('}', start));
     for (const directive of [
       'proxy_http_version 1.1;',
       'proxy_set_header Connection "";',
@@ -216,6 +240,14 @@ const checks = {
     ]) {
       assert.ok(block.includes(directive), `missing ${directive}`);
     }
+    assert.ok(
+      !config.includes('location = /api/live'),
+      'the v1 stream block is still there',
+    );
+    assert.ok(
+      !config.includes('location = /api/feedback'),
+      'the v1 feedback block is still there',
+    );
   },
 
   'passes /api/live over HTTP/1.1 with the browser headers': async () => {
@@ -223,8 +255,8 @@ const checks = {
       Host: 'umir.example.test:8443',
       Cookie: 'umir_operator_session=s',
     };
-    assert.equal((await stream('/api/live', headers)).status, 200);
-    const last = (await recorded()).filter((r) => r.url === '/api/live').at(-1);
+    assert.equal((await stream(live, headers)).status, 200);
+    const last = (await recorded()).filter((r) => r.url === live).at(-1);
     assert.deepEqual(
       [last.httpVersion, last.connection, last.host, last.cookie],
       ['1.1', null, headers.Host, headers.Cookie],
@@ -232,32 +264,39 @@ const checks = {
   },
 
   'passes each /api/live event at once': async () => {
-    const response = await stream('/api/live', { 'Accept-Encoding': 'gzip' });
+    const response = await stream(live, { 'Accept-Encoding': 'gzip' });
     assert.match(response.headers['content-type'], /^text\/event-stream/);
     assert.equal(response.headers['content-encoding'], undefined);
     // The stand-in writes the second event 1.5 s after the first.
     const first = response.chunks.at(0);
     const last = response.chunks.at(-1);
     assert.ok(last.at - first.at >= 1000, 'Nginx held the first event back');
-    assert.match(first.text, /^retry: 3000\n\nevent: upstream\n/);
-    assert.match(last.text, /"available":false/);
+    assert.match(first.text, /^retry: 3000\n\nevent: refresh-required\n/);
+    assert.match(last.text, /"type":"change"/);
   },
 
   'answers a lost /api/live answer with the JSON error envelope': async () => {
     const before = (await recorded()).filter(
-      (r) => r.url === '/api/live?drop',
+      (r) => r.url === `${live}?drop`,
     ).length;
-    const response = await send('GET', '/api/live?drop');
+    const response = await send('GET', `${live}?drop`);
     assert.equal(response.status, 502);
     assert.deepEqual(json(response), {
       code: 'UpstreamUnavailable',
       message: 'gateway did not respond',
       outcome: 'unavailable',
+      retryable: true,
     });
     const after = (await recorded()).filter(
-      (r) => r.url === '/api/live?drop',
+      (r) => r.url === `${live}?drop`,
     ).length;
     assert.equal(after, before + 1, 'the stream request was retried');
+  },
+
+  'passes the stream cursor unchanged': async () => {
+    const path = `${live}?cursor=a%2Fb%2Bc`;
+    assert.equal((await stream(path)).status, 200);
+    assert.equal((await recorded()).filter((r) => r.url === path).length, 1);
   },
 };
 
