@@ -22,9 +22,11 @@ const BarButton = chakra('button', {
 export function AppBar({
   onOpenNav,
   onOpenAccount,
+  title,
 }: {
   onOpenNav: () => void;
   onOpenAccount: () => void;
+  title: string;
 }) {
   return (
     <Flex
@@ -48,7 +50,7 @@ export function AppBar({
       <HStack gap="2" flex="1" minW="0">
         <LogoMark />
         <Text textStyle="body.strong" truncate>
-          {placeholderAccount.restaurant}
+          {title}
         </Text>
       </HStack>
       <BarButton

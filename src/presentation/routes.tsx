@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
+import { NoRestaurantsPage } from './app-shell/no-restaurants-page';
 import { OverviewPage, SectionPage } from './app-shell/pages';
 import { appSections } from './app-shell/sections';
 import {
@@ -113,6 +114,11 @@ export const routes: RouteObject[] = [
               element: <SectionPage title={section.title} />,
             })),
         ],
+      },
+      {
+        path: '/app/no-restaurants',
+        element: <AppShell restaurant={false} />,
+        children: [{ index: true, element: <NoRestaurantsPage /> }],
       },
       { path: '*', element: <NotFoundPage /> },
     ],

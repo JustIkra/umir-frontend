@@ -65,6 +65,7 @@ const pages = [
       'Часовой пояс организации',
     ],
   ],
+  ['/app/no-restaurants', 'Нет доступных ресторанов', []],
 ];
 
 for (const [path, title, fields] of pages) {
@@ -156,4 +157,18 @@ test('invitation actions follow the status', async () => {
   // Three pending rows and the submit button of the closed CX01 dialog.
   assert.equal(html.match(/>Отменить приглашение</g)?.length, 3 + 1);
   assert.equal(html.match(/>Пригласить повторно</g)?.length, 3);
+});
+
+test('the account menu lists workplaces and leads to organizations', async () => {
+  const html = await renderRoute('/app');
+  assert.ok(hrefs(html).includes('/app/organizations'));
+  assert.ok(html.includes('Найти ресторан'));
+  assert.equal(html.match(/aria-current="true"/g)?.length, 1);
+});
+
+test('without restaurants the shell has no sections and no workplaces', async () => {
+  const html = await renderRoute('/app/no-restaurants');
+  assert.ok(!hrefs(html).includes('/app/orders'));
+  assert.ok(!html.includes('Рабочее место'));
+  assert.ok(hrefs(html).includes('/app/organizations/new'));
 });

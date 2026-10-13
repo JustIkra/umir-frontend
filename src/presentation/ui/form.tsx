@@ -347,6 +347,7 @@ export function SearchInput({
   return (
     <Flex
       align="center"
+      flexShrink="0"
       gap="2"
       h="12"
       px="calc({spacing.4} - 1px)"

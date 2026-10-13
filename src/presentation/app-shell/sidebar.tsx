@@ -50,7 +50,15 @@ export function SectionNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function AccountTrigger({ onOpen }: { onOpen: () => void }) {
+// Figma Account trigger: the name and «Ресторан · роли». The chevron points
+// up: the menu opens above the trigger.
+export function AccountTrigger({
+  onOpen,
+  context,
+}: {
+  onOpen: () => void;
+  context: string;
+}) {
   return (
     <chakra.button
       type="button"
@@ -71,21 +79,26 @@ export function AccountTrigger({ onOpen }: { onOpen: () => void }) {
       <Stack gap="0" flex="1" minW="0">
         <Text textStyle="body.strong">{placeholderAccount.displayName}</Text>
         <Text textStyle="caption.default" color="text.secondary">
-          {`${placeholderAccount.restaurant} · ${placeholderAccount.roles}`}
+          {context}
         </Text>
       </Stack>
-      <Icon src={chevronIcon} size={20} />
+      <Icon src={chevronIcon} size={20} transform="rotate(180deg)" />
     </chakra.button>
   );
 }
 
 // Figma Sidebar 784:77151: 240px, logo, sections, the account at the bottom.
+// Without a restaurant (W13) there are no sections.
 export function SidebarContent({
   onOpenAccount,
   onNavigate,
+  context,
+  sections = true,
 }: {
   onOpenAccount: () => void;
   onNavigate?: () => void;
+  context: string;
+  sections?: boolean;
 }) {
   return (
     <Flex direction="column" h="full" px="3" py="4" gap="6">
@@ -97,9 +110,9 @@ export function SidebarContent({
           </Text>
         </RouterLink>
       </HStack>
-      <SectionNav {...(onNavigate ? { onNavigate } : {})} />
+      {sections && <SectionNav {...(onNavigate ? { onNavigate } : {})} />}
       <Box mt="auto" pt="3" borderTopWidth="1px" borderColor="border.default">
-        <AccountTrigger onOpen={onOpenAccount} />
+        <AccountTrigger onOpen={onOpenAccount} context={context} />
       </Box>
     </Flex>
   );
