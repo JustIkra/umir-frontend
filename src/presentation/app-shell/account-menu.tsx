@@ -127,7 +127,9 @@ const menuOrganizations = [...organizations].sort(
 
 function Workplaces({ onLeave }: { onLeave: () => void }) {
   return (
-    <Stack gap="1" py="2" flex="1" minH="0">
+    // Shrinks with the window down to the heading, the search and about two
+    // options; below that the whole panel scrolls (landscape phones, zoom).
+    <Stack gap="1" py="2" flex="1 1 auto" minH={rem(228)}>
       <Text px="3" textStyle="caption.default" color="text.secondary">
         Рабочее место
       </Text>
@@ -208,7 +210,7 @@ export function AccountMenu({
         borderBottomRadius={{ base: '0', sm: 'md' }}
         boxShadow="overlay"
         maxH={{ base: '90dvh', sm: `calc(100dvh - ${rem(78)})` }}
-        overflow="hidden"
+        overflowY="auto"
       >
         {/* Figma W06 on 390: a bottom sheet with a handle, a title and «Закрыть». */}
         <Box display={{ base: 'block', sm: 'none' }}>

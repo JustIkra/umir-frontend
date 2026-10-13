@@ -374,6 +374,11 @@ export function SearchInput({
         _placeholder={{ color: 'text.secondary' }}
         _focusVisible={{ outline: 'none' }}
         {...props}
+        // Search is for show: Enter must not submit an enclosing form, such as
+        // NE01 around the zone list.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.preventDefault();
+        }}
       />
     </Flex>
   );
