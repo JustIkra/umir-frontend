@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import { ApiError, localFailure } from '../../src/application/api.ts';
+import { createAccessStore } from '../../src/application/access.ts';
 import { createCommandRunner } from '../../src/application/commands.ts';
 import { createEpochRegistry } from '../../src/application/epochs.ts';
 import {
@@ -71,7 +72,8 @@ function manualVisibility() {
   return visibility;
 }
 
-function setup(api) {
+// overrides replace session options, as main.tsx wires them.
+function setup(api, overrides = {}) {
   const commands = createCommandRunner({
     newId: () => 'cmd-1',
     now: () => 0,
@@ -80,7 +82,7 @@ function setup(api) {
   });
   const scheduler = manualScheduler();
   const visibility = manualVisibility();
-  const events = { tokens: [], signedOut: 0, expired: 0 };
+  const events = { tokens: [], signedOut: 0, expired: 0, userChanged: 0 };
   const session = createSessionStore({
     api,
     commands,
@@ -95,6 +97,11 @@ function setup(api) {
     onExpired: () => {
       events.expired += 1;
     },
+    onUserChanged: () => {
+      events.userChanged += 1;
+      commands.clear();
+    },
+    ...overrides,
   });
   return { session, commands, scheduler, visibility, events };
 }
@@ -181,6 +188,80 @@ test('the idle deadline schedules a background check; 401 then expires the sessi
     expired: true,
   });
   assert.equal(events.expired, 1);
+});
+
+test('a remember-me session is checked hourly, and the answer does not repeat the check at once', async () => {
+  const hour = 3_600_000;
+  const inThirtyDays = view(30 * 24 * hour);
+  const remembered = {
+    ...inThirtyDays,
+    session: { ...inThirtyDays.session, rememberMe: true },
+  };
+  const calls = [];
+  const { api } = account({
+    me: (options) => {
+      calls.push(options.background);
+      return Promise.resolve(remembered);
+    },
+  });
+  const { session, scheduler } = setup(api);
+  await session.ensure();
+  assert.deepEqual(scheduler.delays(), [hour]);
+  scheduler.runDue();
+  await settled();
+  assert.deepEqual(calls, [false, true]);
+  assert.deepEqual(scheduler.delays(), [hour]);
+});
+
+test('a passed or unchanged idle deadline is checked again after 30 s', async () => {
+  let answer = view(-5_000);
+  const { api } = account({ me: () => Promise.resolve(answer) });
+  const { session, scheduler } = setup(api);
+  await session.ensure();
+  assert.deepEqual(scheduler.delays(), [30_000]);
+  answer = view(10_000);
+  scheduler.runDue();
+  await settled();
+  assert.deepEqual(scheduler.delays(), [10_000 + idleGraceMs]);
+  // The deadline did not move: this clock runs ahead of the server's.
+  scheduler.runDue();
+  await settled();
+  assert.deepEqual(scheduler.delays(), [30_000]);
+});
+
+test('a background check without an answer is repeated after a minute', async () => {
+  let answer = Promise.resolve(view());
+  const { api } = account({ me: () => answer });
+  const { session, scheduler } = setup(api);
+  await session.ensure();
+  answer = Promise.reject(refused(0, 'Transport', 'unavailable'));
+  scheduler.runDue();
+  await settled();
+  assert.equal(session.getSnapshot().status, 'active');
+  assert.deepEqual(scheduler.delays(), [60_000]);
+});
+
+test('an answer that arrives after signing out or expiry keeps the guest', async () => {
+  for (const [name, leave] of [
+    ['sign-out', (session) => session.signOut()],
+    ['expiry', (session) => session.expire()],
+  ]) {
+    let release;
+    let answer = Promise.resolve(view());
+    const { api } = account({ me: () => answer });
+    const { session, scheduler, visibility, events } = setup(api);
+    await session.ensure();
+    answer = new Promise((resolve) => {
+      release = resolve;
+    });
+    visibility.show();
+    await leave(session);
+    release(view());
+    await settled();
+    assert.equal(session.getSnapshot().status, 'anonymous', name);
+    assert.deepEqual(scheduler.delays(), [], name);
+    assert.deepEqual(events.tokens, ['csrf-session'], name);
+  }
 });
 
 test('showing the tab again checks the session in the background', async () => {
@@ -296,6 +377,88 @@ test('an expired session keeps unknown attempts; signing out clears them', async
   assert.equal(commands.getSnapshot().length, 1);
   await session.signOut();
   assert.deepEqual(commands.getSnapshot(), []);
+});
+
+const signedInAs = (userID) => ({
+  ...view(),
+  user: { ...view().user, userID },
+});
+const credentials = {
+  login: 'm.belova',
+  password: 'secret12',
+  rememberMe: false,
+};
+
+test('another user forgets the previous one; the same user keeps attempts (X03)', async () => {
+  let signInUser = 'u';
+  let meUser = 'u';
+  const { api } = account({
+    me: () => Promise.resolve(signedInAs(meUser)),
+    signIn: () => Promise.resolve(signedInAs(signInUser)),
+  });
+  const { session, commands, visibility, events } = setup(api);
+  await session.ensure();
+  await commands.run({
+    key: 'orders.confirm',
+    label: 'оформления заказа',
+    execute: () => Promise.reject(refused(504, 'UpstreamTimeout', 'unknown')),
+  });
+  session.expire();
+  await session.signIn(credentials);
+  assert.equal(events.userChanged, 0);
+  assert.equal(commands.getSnapshot().length, 1);
+  session.expire();
+  signInUser = 'v';
+  await session.signIn(credentials);
+  assert.equal(events.userChanged, 1);
+  assert.deepEqual(commands.getSnapshot(), []);
+  // Another tab signed in as someone else: /me brings that user.
+  meUser = 'w';
+  visibility.show();
+  await settled();
+  assert.equal(events.userChanged, 2);
+  assert.equal(session.getSnapshot().user.userID, 'w');
+});
+
+test('401 on access ends the session instead of W17', async () => {
+  const unauthenticated = () =>
+    Promise.reject(refused(401, 'Unauthenticated', 'not_committed'));
+  let meAnswer = () => Promise.resolve(view());
+  let meCalls = 0;
+  const { api } = account({
+    me: () => {
+      meCalls += 1;
+      return meAnswer();
+    },
+  });
+  const access = createAccessStore(
+    { access: unauthenticated },
+    { onUnauthenticated: () => session.check() },
+  );
+  const { session } = setup(api, {
+    onExpired: () => {
+      access.clear();
+    },
+  });
+  await session.ensure();
+  meAnswer = unauthenticated;
+  const state = await access.ensure();
+  assert.equal(meCalls, 2);
+  assert.notEqual(state.status, 'unverified');
+  assert.equal(access.getSnapshot().status, 'loading');
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: true,
+  });
+  // The session is alive after all: access stays unverified (W17).
+  const alive = setup(account().api);
+  const aliveAccess = createAccessStore(
+    { access: unauthenticated },
+    { onUnauthenticated: () => alive.session.check() },
+  );
+  await alive.session.ensure();
+  assert.equal((await aliveAccess.ensure()).status, 'unverified');
+  assert.equal(alive.session.getSnapshot().status, 'active');
 });
 
 test('returnPath keeps only addresses inside the app', () => {

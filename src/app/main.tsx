@@ -56,7 +56,10 @@ const commands = createCommandRunner({
     if (restaurantID !== undefined) models.reset(restaurantID);
   },
 });
-const access = createAccessStore(createAccessApi(client));
+// 401 on /access: the session check sends an ended session to sign-in.
+const access = createAccessStore(createAccessApi(client), {
+  onUnauthenticated: () => session.check(),
+});
 const live = createLiveSync({
   feed: createEventSourceFeed((url) => new EventSource(url)),
   scheduler,
@@ -66,6 +69,10 @@ const live = createLiveSync({
   onAccessEnded: (_restaurantID, reason) => {
     if (reason === 'session-expired') session.expire();
     else if (reason !== 'auth-unavailable') void access.refresh();
+  },
+  // A refused stream may mean ended access: W15 then stops the stream.
+  onRefused: () => {
+    void access.refresh();
   },
   // ConfirmationPending attempts are resolved in subproject 3.
   resolvePending: () => Promise.resolve(),
@@ -91,6 +98,15 @@ const session = createSessionStore({
     live.stop();
     access.clear();
     client.clearCsrfToken();
+  },
+  // Another user signed in, here or in another tab. The shown restaurant
+  // reads that user's access again.
+  onUserChanged: () => {
+    models.clear();
+    commands.clear();
+    epochs.clear();
+    access.clear();
+    void access.refresh();
   },
 });
 

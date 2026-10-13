@@ -49,12 +49,22 @@ export interface SessionOptions {
   // The server ended the session: stop the stream. Attempts stay, so that
   // after the next sign-in the same attempt is checked (X03).
   readonly onExpired: () => void;
+  // Sign-in or /me brought another user than the last one: forget the
+  // previous user's access, models, epochs and attempts.
+  readonly onUserChanged: () => void;
 }
 
 export const signInKey = 'session.sign-in';
 // The background check runs this long after the idle deadline, when the
 // server has already ended an idle session.
 export const idleGraceMs = 1000;
+// A remember-me session idles for 30 days; it is still checked hourly.
+export const maxIdleCheckMs = 3_600_000;
+// A deadline that has passed or did not move (this clock runs ahead of the
+// server's) is checked again after this long, not at once.
+export const idleRecheckMs = 30_000;
+// A background check without an answer is repeated after this long.
+export const lostCheckRetryMs = 60_000;
 
 // The sign-in page returns only to addresses inside the app.
 export function returnPath(raw: string | null): string {
@@ -73,32 +83,60 @@ export function createSessionStore({
   setCsrfToken,
   onSignedOut,
   onExpired,
+  onUserChanged,
 }: SessionOptions): SessionStore {
   const listeners = new Set<() => void>();
   let state: SessionState = { status: 'unknown' };
   let request: Promise<SessionState> | undefined;
   let cancelIdle: (() => void) | undefined;
+  let lastUserID: string | undefined;
+  let lastIdleDeadline: number | undefined;
+  // Signing in, signing out and expiry start a new generation; /me answers
+  // of an older one are dropped.
+  let generation = 0;
 
   function publish(next: SessionState): void {
     state = next;
     for (const listener of listeners) listener();
   }
 
-  function activate(view: UserView): void {
-    setCsrfToken(view.csrfToken);
+  function scheduleCheck(delayMs: number): void {
     cancelIdle?.();
-    const delay =
-      Math.max(0, view.session.idleExpiresAt.epochMs - now()) + idleGraceMs;
-    cancelIdle = scheduler.schedule(delay, () => {
+    cancelIdle = scheduler.schedule(delayMs, () => {
       cancelIdle = undefined;
       void check();
     });
+  }
+
+  function newGeneration(): void {
+    generation += 1;
+    request = undefined;
+  }
+
+  function activate(view: UserView): void {
+    setCsrfToken(view.csrfToken);
+    if (lastUserID !== undefined && lastUserID !== view.user.userID) {
+      onUserChanged();
+    }
+    lastUserID = view.user.userID;
+    const at = now();
+    const deadline = view.session.idleExpiresAt.epochMs;
+    const untilIdle = deadline - at + idleGraceMs;
+    const stalled = deadline <= at || deadline === lastIdleDeadline;
+    lastIdleDeadline = deadline;
+    scheduleCheck(
+      Math.min(
+        maxIdleCheckMs,
+        stalled ? Math.max(untilIdle, idleRecheckMs) : untilIdle,
+      ),
+    );
     publish({ status: 'active', user: view.user, session: view.session });
   }
 
   function end(expired: boolean): void {
     cancelIdle?.();
     cancelIdle = undefined;
+    newGeneration();
     const wasActive = state.status === 'active';
     publish({ status: 'anonymous', expired });
     if (expired && wasActive) onExpired();
@@ -106,18 +144,21 @@ export function createSessionStore({
 
   function load(background: boolean): Promise<SessionState> {
     if (request !== undefined) return request;
+    const own = generation;
     const pending: Promise<SessionState> = api
       .me({ background })
       .then(
         (view): SessionState => {
-          activate(view);
+          if (own === generation) activate(view);
           return state;
         },
         (error: unknown): SessionState => {
+          if (own !== generation) return state;
           const failure =
             failureOf(error) ?? localFailure('Malformed', 'unavailable');
           if (failure.status === 401) end(state.status === 'active');
           else if (!background) publish({ status: 'unavailable', failure });
+          else if (state.status === 'active') scheduleCheck(lostCheckRetryMs);
           // A lost background answer keeps the session but is reported as
           // unavailable to the caller.
           return background && state.status === 'active'
@@ -126,7 +167,7 @@ export function createSessionStore({
         },
       )
       .finally(() => {
-        request = undefined;
+        if (request === pending) request = undefined;
       });
     request = pending;
     return pending;
@@ -163,6 +204,7 @@ export function createSessionStore({
         execute: (commandID) => api.signIn(input, commandID),
       });
       if (result.kind !== 'committed') return result;
+      newGeneration();
       activate(result.value);
       return { kind: 'committed', value: result.value.user };
     },

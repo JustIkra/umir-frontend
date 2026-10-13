@@ -82,6 +82,7 @@ function setup({ session = 'active' } = {}) {
   const visibility = manualVisibility();
   const marks = [];
   const ended = [];
+  const refused = [];
   let resolves = 0;
   const checks = { count: 0, answer: session };
   const live = createLiveSync({
@@ -99,6 +100,7 @@ function setup({ session = 'active' } = {}) {
       markTime: (restaurantID) => marks.push([restaurantID, 'time']),
     },
     onAccessEnded: (restaurantID, reason) => ended.push([restaurantID, reason]),
+    onRefused: (restaurantID) => refused.push(restaurantID),
     resolvePending: () => {
       resolves += 1;
       return Promise.resolve();
@@ -111,6 +113,7 @@ function setup({ session = 'active' } = {}) {
     visibility,
     marks,
     ended,
+    refused,
     checks,
     resolves: () => resolves,
   };
@@ -247,6 +250,50 @@ test('a refused stream checks the session: ended stops, otherwise reconnect', as
   ended.scheduler.advance(reconnectDelayMs);
   assert.deepEqual(ended.feed.opened, [R]);
   assert.equal(ended.live.getSnapshot().restaurantID, undefined);
+  assert.deepEqual(ended.refused, []);
+});
+
+test('successive refusals wait 3, 6, 12, 24, 48 and then 60 s; an open stream starts again from 3 s', async () => {
+  const { live, feed, scheduler } = setup();
+  live.start(R);
+  const refuseAndWait = async (delayMs) => {
+    const opened = feed.opened.length;
+    feed.status('closed');
+    await settled();
+    scheduler.advance(delayMs - 1);
+    assert.equal(feed.opened.length, opened, `before ${String(delayMs)} ms`);
+    scheduler.advance(1);
+    assert.equal(feed.opened.length, opened + 1, `after ${String(delayMs)} ms`);
+  };
+  for (const delayMs of [3_000, 6_000, 12_000, 24_000, 48_000, 60_000, 60_000])
+    await refuseAndWait(delayMs);
+  feed.status('open');
+  await refuseAndWait(3_000);
+  await refuseAndWait(6_000);
+});
+
+test('each refusal with a live session re-reads access in the background', async () => {
+  const { live, feed, scheduler, refused, checks } = setup();
+  live.start(R);
+  feed.status('closed');
+  await settled();
+  assert.deepEqual(refused, [R]);
+  scheduler.advance(reconnectDelayMs);
+  feed.status('closed');
+  await settled();
+  assert.deepEqual(refused, [R, R]);
+  // Without an answer about the session, access is not re-read.
+  checks.answer = 'unknown';
+  scheduler.advance(reconnectDelayMs * 2);
+  feed.status('closed');
+  await settled();
+  assert.deepEqual(refused, [R, R]);
+  // auth-unavailable is not a refusal of the stream.
+  checks.answer = 'active';
+  scheduler.advance(reconnectDelayMs * 4);
+  feed.emit({ type: 'access-ended', tenantID: R, reason: 'auth-unavailable' });
+  await settled();
+  assert.deepEqual(refused, [R, R]);
 });
 
 test('the data is stale after staleAfterMs without an open stream', () => {

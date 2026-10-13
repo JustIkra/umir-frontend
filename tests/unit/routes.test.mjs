@@ -21,8 +21,10 @@ import {
   text,
 } from './support/render-route.mjs';
 
+const guest = { session: { status: 'anonymous', expired: false } };
+
 const pages = [
-  ['/login', 'Вход', ['Логин', 'Пароль', 'Запомнить меня']],
+  ['/login', 'Вход', ['Логин', 'Пароль', 'Запомнить меня'], guest],
   ['/password-reset', 'Восстановление пароля', ['Логин']],
   ['/password-reset/code', 'Введите код', ['Код из письма']],
   [
@@ -104,9 +106,9 @@ const pages = [
   ['/app/no-restaurants', 'Нет доступных ресторанов', []],
 ];
 
-for (const [path, title, fields] of pages) {
+for (const [path, title, fields, options] of pages) {
   test(`${path} shows «${title}» with its fields`, async () => {
-    const html = await renderRoute(path);
+    const html = await renderRoute(path, options);
     assert.equal(h1(html), title);
     for (const field of fields)
       assert.ok(labels(html).includes(field), `${path}: no label «${field}»`);
@@ -150,7 +152,9 @@ test('internal links lead to existing pages', async () => {
   ];
   const checked = new Set();
   for (const source of sources)
-    for (const href of hrefs(await renderRoute(source))) {
+    for (const href of hrefs(
+      await renderRoute(source, source === '/login' ? guest : {}),
+    )) {
       if (!href.startsWith('/') || href.startsWith('//')) continue;
       const path = href.split('#')[0] || '/';
       if (checked.has(path)) continue;
@@ -167,6 +171,7 @@ test('sign-in has no code step and explains an ended session', async () => {
   assert.equal(h1(await renderRoute('/login/code')), 'Страница не найдена');
   const html = await renderRoute(
     `/login?return=${encodeURIComponent(`/app/r/${R}`)}&expired=1`,
+    { session: { status: 'anonymous', expired: true } },
   );
   assert.match(text(html), /Сессия завершена/);
   assert.match(
@@ -177,6 +182,29 @@ test('sign-in has no code step and explains an ended session', async () => {
 
 test('the account menu signs out through /logout', async () => {
   assert.ok(hrefs(await renderRoute(`/app/r/${R}`)).includes('/logout'));
+});
+
+test('sign-in with an active session opens the app or the safe return address', async () => {
+  assert.equal(await redirectOf('/login'), '/app');
+  const orders = `/app/r/${R}/orders?step=draft`;
+  assert.equal(
+    await redirectOf(`/login?return=${encodeURIComponent(orders)}`),
+    orders,
+  );
+  assert.equal(
+    await redirectOf(
+      `/login?return=${encodeURIComponent('https://evil.example/app')}`,
+    ),
+    '/app',
+  );
+  assert.equal(await redirectOf('/login', guest), undefined);
+  const lost = { status: 0, code: 'Transport', outcome: 'unavailable' };
+  assert.equal(
+    await redirectOf('/login', {
+      session: { status: 'unavailable', failure: lost },
+    }),
+    undefined,
+  );
 });
 
 test('the landing opens the app through sign-in', async () => {
@@ -392,7 +420,6 @@ test('overview tiles lead into the sections', async () => {
 });
 
 test('a guest is sent to sign-in with the return address', async () => {
-  const guest = { session: { status: 'anonymous', expired: false } };
   assert.equal(
     await redirectOf(`/app/r/${R}/orders`, guest),
     `/login?return=${encodeURIComponent(`/app/r/${R}/orders`)}`,

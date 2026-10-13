@@ -11,6 +11,7 @@ import {
   type LoaderFunctionArgs,
 } from 'react-router';
 import { chooseEntry, findRestaurant } from '@/application/access';
+import { returnPath } from '@/application/session';
 import { canOpenSection, type SectionKey } from '@/domain/access';
 import { isEntityId } from '@/domain/ids';
 import { NotFound } from '@/presentation/documents/not-found-page';
@@ -50,6 +51,17 @@ export function createAppLoader(services: PresentationServices) {
     }
     if (state.status === 'active') await services.access.ensure();
     return null;
+  };
+}
+
+// /login: an active session opens the return address at once. Signing in
+// over it would keep the previous user's data.
+export function createSignInLoader(services: PresentationServices) {
+  return async ({ request }: LoaderFunctionArgs) => {
+    if ((await services.session.ensure()).status !== 'active') return null;
+    return redirect(
+      returnPath(new URL(request.url).searchParams.get('return')),
+    );
   };
 }
 

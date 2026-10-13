@@ -193,7 +193,16 @@ export function chooseEntry(
     : { kind: 'none' };
 }
 
-export function createAccessStore(api: AccessApi): AccessStore {
+export interface AccessStoreOptions {
+  // 401 on /access: the session has likely ended. The answer is published
+  // after this check, so an ended session leads to sign-in, not to W17.
+  readonly onUnauthenticated?: () => Promise<unknown>;
+}
+
+export function createAccessStore(
+  api: AccessApi,
+  { onUnauthenticated }: AccessStoreOptions = {},
+): AccessStore {
   const listeners = new Set<() => void>();
   const names = new Map<string, string>();
   let state: AccessState = { status: 'loading' };
@@ -217,10 +226,15 @@ export function createAccessStore(api: AccessApi): AccessStore {
           status: 'ready',
           organizations: organizationsFrom(view),
         }),
-        (error: unknown): AccessState => ({
-          status: 'unverified',
-          failure: failureOf(error) ?? localFailure('Malformed', 'unavailable'),
-        }),
+        async (error: unknown): Promise<AccessState> => {
+          const failure =
+            failureOf(error) ?? localFailure('Malformed', 'unavailable');
+          // A failed check does not lose the answer.
+          if (failure.status === 401) {
+            await onUnauthenticated?.().catch(() => undefined);
+          }
+          return { status: 'unverified', failure };
+        },
       )
       .then((next) => {
         if (own !== generation) return state;

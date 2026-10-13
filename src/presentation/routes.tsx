@@ -10,6 +10,7 @@ import {
   createAppLoader,
   createEntryLoader,
   createRestaurantLoader,
+  createSignInLoader,
 } from './app-shell/gates';
 import { NoRestaurantsPage } from './app-shell/no-restaurants-page';
 import { SectionPage } from './app-shell/pages';
@@ -137,7 +138,11 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
         { path: '/privacy', element: <PrivacyPolicyPage /> },
         { path: '/cookies', element: <CookiePolicyPage /> },
         { path: '/consent', element: <PersonalDataConsentPage /> },
-        { path: '/login', element: <SignInPage /> },
+        {
+          path: '/login',
+          loader: createSignInLoader(services),
+          element: <SignInPage />,
+        },
         { path: '/logout', element: <LogoutPage /> },
         { path: '/password-reset', element: <PasswordResetRequestPage /> },
         { path: '/password-reset/code', element: <PasswordResetCodePage /> },

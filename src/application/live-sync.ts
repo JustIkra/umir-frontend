@@ -65,13 +65,18 @@ export interface LiveSyncOptions {
     restaurantID: string,
     reason: AccessEndReason,
   ) => void;
+  // The stream was refused while the session is alive: access may have
+  // ended, so the app re-reads it in the background (W15).
+  readonly onRefused: (restaurantID: string) => void;
   // Re-checks ConfirmationPending attempts with their original commandID.
   readonly resolvePending: () => Promise<void>;
 }
 
 export const staleAfterMs = 10_000;
-// Matches the stream's retry: 3000 for a feed that gave up.
+// The first reconnect waits as the stream's retry: 3000. Each next one
+// waits twice as long, up to maxReconnectDelayMs; an open stream resets it.
 export const reconnectDelayMs = 3_000;
+export const maxReconnectDelayMs = 60_000;
 // v2 has no tick event: time-dependent models are re-read every minute.
 export const timeRefreshMs = 60_000;
 
@@ -82,6 +87,7 @@ export function createLiveSync({
   sessionCheck,
   models,
   onAccessEnded,
+  onRefused,
   resolvePending,
 }: LiveSyncOptions): LiveSync {
   const listeners = new Set<() => void>();
@@ -97,7 +103,8 @@ export function createLiveSync({
   let resolveAgain = false;
   let unsubscribeFeed: (() => void) | undefined;
   let cancelReconnect: (() => void) | undefined;
-  let pendingCheck: object | undefined;
+  let reconnectDelay = reconnectDelayMs;
+  let pendingCheck: { readonly refused: boolean } | undefined;
   let cancelStaleTimer: (() => void) | undefined;
   let cancelTimeTick: (() => void) | undefined;
   let stopVisibility: (() => void) | undefined;
@@ -118,6 +125,7 @@ export function createLiveSync({
       cancelStaleTimer = undefined;
       disconnectedTooLong = false;
       firstChangeOfConnection = true;
+      reconnectDelay = reconnectDelayMs;
     } else if (!cancelStaleTimer && !disconnectedTooLong) {
       cancelStaleTimer = scheduler.schedule(staleAfterMs, () => {
         cancelStaleTimer = undefined;
@@ -145,15 +153,15 @@ export function createLiveSync({
     setConnection(status);
     if (status !== 'closed') return;
     disconnect();
-    checkSession();
+    checkSession(true);
   }
 
   // An ended session stops the stream for good; otherwise the feed is
   // subscribed again. One check runs per refused stream, and halt() discards
   // its answer.
-  function checkSession(): void {
+  function checkSession(refused: boolean): void {
     if (pendingCheck) return;
-    const token = {};
+    const token = { refused };
     pendingCheck = token;
     sessionCheck.check().then(
       (status) => {
@@ -165,7 +173,10 @@ export function createLiveSync({
     );
   }
 
-  function checked(token: object, status: SessionStatus): void {
+  function checked(
+    token: { readonly refused: boolean },
+    status: SessionStatus,
+  ): void {
     if (pendingCheck !== token) return;
     pendingCheck = undefined;
     if (status === 'ended') {
@@ -173,10 +184,15 @@ export function createLiveSync({
       publish();
       return;
     }
-    cancelReconnect = scheduler.schedule(reconnectDelayMs, () => {
+    cancelReconnect = scheduler.schedule(reconnectDelay, () => {
       cancelReconnect = undefined;
       connect();
     });
+    reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelayMs);
+    // Last: the app may stop the stream from here.
+    if (token.refused && status === 'active' && restaurantID !== undefined) {
+      onRefused(restaurantID);
+    }
   }
 
   function onEvent(event: LiveEvent): void {
@@ -228,7 +244,7 @@ export function createLiveSync({
     if (reason === 'auth-unavailable') {
       disconnect();
       setConnection('closed');
-      checkSession();
+      checkSession(false);
     } else {
       halt();
       publish();
@@ -303,6 +319,7 @@ export function createLiveSync({
     deferredTime = false;
     connection = 'closed';
     disconnectedTooLong = false;
+    reconnectDelay = reconnectDelayMs;
     restaurantID = undefined;
   }
 

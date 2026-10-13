@@ -46,3 +46,17 @@ test('the scheduler cancels the timer it started', () => {
   cancel();
   assert.deepEqual(cleared, [41]);
 });
+
+test('the scheduler keeps a long delay within the browser timer limit', () => {
+  const started = [];
+  const scheduler = createTimerScheduler({
+    setTimeout: (_callback, delay) => {
+      started.push(delay);
+      return 1;
+    },
+    clearTimeout: () => undefined,
+  });
+  // A longer delay would make setTimeout fire at once.
+  scheduler.schedule(30 * 24 * 3_600_000, () => undefined);
+  assert.deepEqual(started, [2 ** 31 - 1]);
+});
