@@ -18,7 +18,7 @@ import {
   PasswordResetNewPage,
   PasswordResetRequestPage,
 } from './auth/password-reset-pages';
-import { SignInCodePage } from './auth/sign-in-code-page';
+import { LogoutPage } from './auth/logout-page';
 import { SignInPage } from './auth/sign-in-page';
 import { DishPage } from './catalog/dish-page';
 import { DishesPage } from './catalog/dishes-page';
@@ -138,7 +138,7 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
         { path: '/cookies', element: <CookiePolicyPage /> },
         { path: '/consent', element: <PersonalDataConsentPage /> },
         { path: '/login', element: <SignInPage /> },
-        { path: '/login/code', element: <SignInCodePage /> },
+        { path: '/logout', element: <LogoutPage /> },
         { path: '/password-reset', element: <PasswordResetRequestPage /> },
         { path: '/password-reset/code', element: <PasswordResetCodePage /> },
         { path: '/password-reset/new', element: <PasswordResetNewPage /> },

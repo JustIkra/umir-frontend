@@ -303,7 +303,7 @@ export function AccountMenu({
           <Icon src={organizationIcon} size={20} />
           Организации и рестораны
         </MenuItem>
-        <MenuItem to="/login" onClick={onLeave}>
+        <MenuItem to="/logout" onClick={onLeave}>
           <Icon src={signOutIcon} size={20} />
           Выйти
         </MenuItem>

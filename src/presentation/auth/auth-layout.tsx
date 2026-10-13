@@ -16,7 +16,7 @@ export function AuthLayout({
   children,
 }: {
   title: string;
-  help: string;
+  help?: string;
   children: ReactNode;
 }) {
   return (
@@ -59,9 +59,11 @@ export function AuthLayout({
           </RouterLink>
         </HStack>
         {children}
-        <Text textStyle="caption.default" color="text.secondary">
-          {help}
-        </Text>
+        {help !== undefined && (
+          <Text textStyle="caption.default" color="text.secondary">
+            {help}
+          </Text>
+        )}
         <Flex
           as="nav"
           aria-label="Документы"

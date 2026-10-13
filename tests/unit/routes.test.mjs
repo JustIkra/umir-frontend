@@ -23,7 +23,6 @@ import {
 
 const pages = [
   ['/login', 'Вход', ['Логин', 'Пароль', 'Запомнить меня']],
-  ['/login/code', 'Введите код', ['Код из письма']],
   ['/password-reset', 'Восстановление пароля', ['Логин']],
   ['/password-reset/code', 'Введите код', ['Код из письма']],
   [
@@ -119,7 +118,6 @@ test('internal links lead to existing pages', async () => {
     '/',
     '/privacy',
     '/login',
-    '/login/code',
     '/password-reset',
     '/password-reset/code',
     '/password-reset/new',
@@ -163,6 +161,22 @@ test('internal links lead to existing pages', async () => {
         `${source} → ${href}`,
       );
     }
+});
+
+test('sign-in has no code step and explains an ended session', async () => {
+  assert.equal(h1(await renderRoute('/login/code')), 'Страница не найдена');
+  const html = await renderRoute(
+    `/login?return=${encodeURIComponent(`/app/r/${R}`)}&expired=1`,
+  );
+  assert.match(text(html), /Сессия завершена/);
+  assert.match(
+    text(html),
+    /Войдите снова — после входа откроется та же страница\./,
+  );
+});
+
+test('the account menu signs out through /logout', async () => {
+  assert.ok(hrefs(await renderRoute(`/app/r/${R}`)).includes('/logout'));
 });
 
 test('the landing opens the app through sign-in', async () => {
