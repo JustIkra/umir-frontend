@@ -116,6 +116,19 @@ test('internal links lead to existing pages', async () => {
     '/app/organizations/yug/profile',
     '/app/organizations/new',
     '/app/no-restaurants',
+    '/app/orders',
+    '/app/orders/draft',
+    '/app/orders/proposal',
+    '/app/orders/placed',
+    '/app/warehouse',
+    '/app/warehouse/expiry',
+    '/app/warehouse/history',
+    '/app/warehouse/delivery',
+    '/app/catalog',
+    '/app/catalog/dishes',
+    '/app/catalog/dishes/206',
+    '/app/catalog/products/new',
+    '/app/catalog/dishes/new',
   ];
   const checked = new Set();
   for (const source of sources)
