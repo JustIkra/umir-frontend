@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
+import { ChakraProvider } from '@chakra-ui/react';
+import { createElement as h } from 'react';
+import { renderToString } from 'react-dom/server';
+import { MemoryRouter, Route, Routes } from 'react-router';
+import { OverviewPage } from '../../src/presentation/overview/overview-page.tsx';
+import { ServicesProvider } from '../../src/presentation/services.tsx';
+import { system } from '../../src/presentation/theme/system.ts';
 import {
   R,
   activeSession,
+  fakeServices,
   h1,
   hrefs,
   labels,
@@ -271,6 +279,31 @@ test('without restaurants the shell has no sections and no workplaces', async ()
   assert.ok(!hrefs(html).includes(`/app/r/${R}/orders`));
   assert.ok(!html.includes('Рабочее место'));
   assert.ok(hrefs(html).includes('/app/organizations/new'));
+});
+
+test('an organization without restaurants adds no workplaces (W13)', async () => {
+  const memberOnly = {
+    status: 'ready',
+    organizations: readyAccess().organizations.map((organization) => ({
+      ...organization,
+      restaurants: [],
+    })),
+  };
+  assert.equal(
+    await redirectOf('/app', { access: memberOnly }),
+    '/app/no-restaurants',
+  );
+  const html = await renderRoute('/app/no-restaurants', { access: memberOnly });
+  assert.ok(!html.includes('Рабочее место'));
+  assert.ok(!html.includes('Найти ресторан'));
+});
+
+test('outside a restaurant the menu marks no restaurant current', async () => {
+  for (const path of ['/app/settings', '/app/organizations']) {
+    const menu = accountMenu(await renderRoute(path));
+    assert.ok(menu.includes('Найти ресторан'), path);
+    assert.equal(menu.match(/aria-current="true"/g)?.length ?? 0, 0, path);
+  }
 });
 
 test('the catalog lists the sample products and dishes', async () => {
@@ -558,4 +591,50 @@ test('«Данные обновились» shows in the restaurant it belongs t
     notice: { restaurantID: OTHER },
   });
   assert.doesNotMatch(text(revoked), /Данные обновились/);
+});
+
+test('W12: the overview names the missing section between the header and the tiles', () => {
+  const html = renderToString(
+    h(
+      ChakraProvider,
+      { value: system },
+      h(
+        ServicesProvider,
+        { services: fakeServices() },
+        h(
+          MemoryRouter,
+          {
+            initialEntries: [
+              {
+                pathname: `/app/r/${R}`,
+                state: { missingSection: 'warehouse' },
+              },
+            ],
+          },
+          h(
+            Routes,
+            null,
+            h(Route, {
+              path: '/app/r/:restaurantID',
+              element: h(OverviewPage),
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+  const page = text(html);
+  const notice = page.indexOf(
+    'Раздел «Склад» недоступен в ресторане «На Пушкинской»',
+  );
+  // «Собрать заказ» is the header action; the warehouse tile follows.
+  assert.ok(
+    notice > page.indexOf('Собрать заказ'),
+    'the notice follows the header',
+  );
+  assert.ok(
+    html.indexOf('недоступен в ресторане') <
+      html.indexOf(`href="/app/r/${R}/warehouse"`),
+    'the notice precedes the tiles',
+  );
 });

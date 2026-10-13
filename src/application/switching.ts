@@ -20,7 +20,8 @@ export type SwitchDecision =
 
 // The restaurant switcher (W09–W12). An attempt of the current restaurant
 // with an unknown outcome blocks the switch until it is checked; an unsent
-// form asks first.
+// form asks first. Outside a restaurant (currentID undefined) no attempt
+// blocks: account attempts have no restaurant either.
 export function decideSwitch({
   target,
   section,
@@ -35,7 +36,7 @@ export function decideSwitch({
   readonly unsavedForm: string | undefined;
 }): SwitchDecision {
   const unknown = attempts.find(
-    (attempt) => attempt.restaurantID === currentID,
+    (attempt) => currentID !== undefined && attempt.restaurantID === currentID,
   );
   if (unknown) return { kind: 'blocked-unknown', attempt: unknown };
   const allowed = canOpenSection(section, target.permissions);

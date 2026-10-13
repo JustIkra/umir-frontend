@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
-import { missingSectionOf } from '../../src/presentation/app-shell/paths.ts';
+import {
+  missingSectionOf,
+  sectionOfPath,
+} from '../../src/presentation/app-shell/paths.ts';
 import {
   rolesCaption,
   shellContext,
@@ -68,4 +71,11 @@ test('the navigation state names a missing section only if it is a section', () 
   assert.equal(missingSectionOf({ missingSection: 'warehouse' }), 'warehouse');
   assert.equal(missingSectionOf({ missingSection: 'weather' }), undefined);
   assert.equal(missingSectionOf(null), undefined);
+});
+
+test('the switcher keeps the section of a restaurant address; elsewhere it opens the overview', () => {
+  assert.equal(sectionOfPath(`/app/r/${R}/warehouse/expiry`), 'warehouse');
+  assert.equal(sectionOfPath(`/app/r/${R}`), 'overview');
+  assert.equal(sectionOfPath('/app/settings'), 'overview');
+  assert.equal(sectionOfPath('/app/organizations/yug'), 'overview');
 });

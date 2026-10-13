@@ -1,6 +1,6 @@
 import { Box, Flex, Stack } from '@chakra-ui/react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import type { RestaurantAccess } from '@/application/access';
 import {
   decideSwitch,
@@ -46,12 +46,23 @@ export function AppShell({
   const notice = useRefreshNotice();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // The restaurant in the address: the one the switcher leaves. Outside a
+  // restaurant the shell still links to the one /app would open.
+  const { restaurantID: currentID } = useParams();
   const context = shellContext(access, mode, useCurrentRestaurantID());
+  const currentName =
+    currentID === undefined
+      ? ''
+      : (context.restaurant?.name ?? services.access.nameOf(currentID) ?? '');
   const user = session.status === 'active' ? session.user : undefined;
-  const organizations =
-    access.status === 'ready' && access.organizations.length > 0
-      ? access.organizations
-      : undefined;
+  // An organization of an active membership may have no restaurants (W13).
+  const workplaces =
+    access.status === 'ready'
+      ? access.organizations.filter(
+          (organization) => organization.restaurants.length > 0,
+        )
+      : [];
+  const organizations = workplaces.length > 0 ? workplaces : undefined;
   const menu = useRef<HTMLDialogElement>(null);
   const drawer = useRef<HTMLDialogElement>(null);
   const unsavedDialog = useRef<HTMLDialogElement>(null);
@@ -80,13 +91,14 @@ export function AppShell({
       to.missing === undefined ? {} : { state: { missingSection: to.missing } },
     );
   };
+  // Outside a restaurant the path has no section: the overview opens.
   const onSwitch = (target: RestaurantAccess) => {
     leave();
-    if (target.restaurantID === context.restaurantID) return;
+    if (target.restaurantID === currentID) return;
     const decision = decideSwitch({
       target,
       section: sectionOfPath(pathname),
-      currentID: context.restaurantID,
+      currentID,
       attempts,
       unsavedForm,
     });
@@ -165,7 +177,7 @@ export function AppShell({
         onLeave={leave}
         user={user}
         organizations={organizations}
-        currentID={context.restaurantID}
+        currentID={currentID}
         onSwitch={onSwitch}
       />
       <NavigationDrawer
@@ -179,7 +191,7 @@ export function AppShell({
         <UnsavedFormDialog
           dialogRef={unsavedDialog}
           form={pending.form}
-          restaurantName={context.restaurant?.name ?? ''}
+          restaurantName={currentName}
           onLeave={() => {
             go(pending.to);
           }}
@@ -189,7 +201,7 @@ export function AppShell({
         <UnknownAttemptDialog
           dialogRef={unknownDialog}
           attempt={pending.attempt}
-          restaurantName={context.restaurant?.name ?? ''}
+          restaurantName={currentName}
           timeZone={context.restaurant?.timeZone ?? 'Europe/Moscow'}
           onCheck={() => {
             void services.commands.retry(pending.attempt.key);

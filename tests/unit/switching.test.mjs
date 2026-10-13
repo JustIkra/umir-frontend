@@ -100,6 +100,31 @@ test('an unsent form asks first (W10); an unknown attempt blocks the switch (W11
   );
 });
 
+test('outside a restaurant an attempt without a restaurant does not block; the overview opens', () => {
+  const account = {
+    ...attempt,
+    key: 'account.password',
+    restaurantID: undefined,
+  };
+  assert.deepEqual(
+    decideSwitch({
+      target: other,
+      section: 'overview',
+      currentID: undefined,
+      attempts: [account],
+      unsavedForm: undefined,
+    }),
+    {
+      kind: 'go',
+      to: {
+        restaurantID: other.restaurantID,
+        section: 'overview',
+        missing: undefined,
+      },
+    },
+  );
+});
+
 test('W10 names the unsent form and the restaurant; «Остаться» comes first', () => {
   const html = renderElement(
     h(UnsavedFormDialog, {
