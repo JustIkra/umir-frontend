@@ -199,7 +199,7 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
             },
             {
               path: 'no-restaurants',
-              element: <AppShell restaurant={false} />,
+              element: <AppShell mode="none" />,
               children: [{ index: true, element: <NoRestaurantsPage /> }],
             },
           ],

@@ -68,7 +68,8 @@ export const activeSession = {
 };
 
 // Screens only read these ports during render; nothing is sent. refresh()
-// answers refreshed; accessCalls counts the reads of access.
+// answers refreshed; accessCalls counts the reads of access; notice is the
+// «Данные обновились» notice of models.
 export function fakeServices({
   session = activeSession,
   access = readyAccess(),
@@ -76,6 +77,7 @@ export function fakeServices({
   accessCalls = { ensure: 0, refresh: 0 },
   remembered,
   attempts = [],
+  notice,
 } = {}) {
   return {
     cookieNotice: { isClosed: () => true, close: () => {} },
@@ -109,7 +111,7 @@ export function fakeServices({
     },
     models: {
       subscribeNotice: () => () => {},
-      getNotice: () => undefined,
+      getNotice: () => notice,
       dismissNotice: () => {},
     },
     commands: {

@@ -1,36 +1,100 @@
 import { Box, Flex, Stack } from '@chakra-ui/react';
-import { useRef, type ReactNode } from 'react';
-import { Outlet } from 'react-router';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router';
+import type { RestaurantAccess } from '@/application/access';
+import {
+  decideSwitch,
+  type SwitchDecision,
+  type SwitchTarget,
+} from '@/application/switching';
 import { DocumentFooter } from '@/presentation/documents/document-chrome';
-import { placeholderAccount } from '@/presentation/placeholder-account';
+import { useServices } from '@/presentation/services';
+import {
+  useAccess,
+  useAttempts,
+  useRefreshNotice,
+  useSession,
+} from '@/presentation/session/hooks';
 import { SkipLink, mainContentId } from '@/presentation/site/skip-link';
+import { InfoNotice } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
 import { AccountMenu, NavigationDrawer } from './account-menu';
 import { AppBackground } from './app-background';
 import { AppBar } from './app-bar';
+import { useUnsavedForm } from './leave-guard';
+import { restaurantPath, sectionOfPath, useCurrentRestaurantID } from './paths';
+import { sectionSuffix } from './sections';
+import { shellContext, type ShellMode } from './shell-context';
 import { SidebarContent } from './sidebar';
+import { UnknownAttemptDialog, UnsavedFormDialog } from './switch-dialogs';
 
 // Figma W03 shell: 240px sidebar from 1024, the App bar and Doc footer on 390.
-// Without a restaurant (W13) the sidebar has no sections and the menu no
-// workplaces.
+// The mode follows the access state (W13, W15–W17); the restaurant mode shows
+// the sections its roles open.
 export function AppShell({
-  restaurant = true,
+  mode = 'restaurant',
   children,
 }: {
-  restaurant?: boolean;
+  mode?: ShellMode;
   children?: ReactNode;
 }) {
-  const context = restaurant
-    ? `${placeholderAccount.restaurant} · ${placeholderAccount.roles}`
-    : 'Нет доступных ресторанов';
+  const services = useServices();
+  const session = useSession();
+  const access = useAccess();
+  const attempts = useAttempts();
+  const unsavedForm = useUnsavedForm();
+  const notice = useRefreshNotice();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const context = shellContext(access, mode, useCurrentRestaurantID());
+  const user = session.status === 'active' ? session.user : undefined;
+  const organizations =
+    access.status === 'ready' && access.organizations.length > 0
+      ? access.organizations
+      : undefined;
   const menu = useRef<HTMLDialogElement>(null);
   const drawer = useRef<HTMLDialogElement>(null);
+  const unsavedDialog = useRef<HTMLDialogElement>(null);
+  const unknownDialog = useRef<HTMLDialogElement>(null);
+  const [pending, setPending] = useState<SwitchDecision | undefined>();
+
+  // A notice belongs to the page it appeared on.
+  useEffect(() => {
+    services.models.dismissNotice();
+  }, [pathname, services.models]);
+  // A dialog exists only while its decision is pending; it opens once rendered.
+  useEffect(() => {
+    if (pending?.kind === 'confirm-unsaved') unsavedDialog.current?.showModal();
+    if (pending?.kind === 'blocked-unknown') unknownDialog.current?.showModal();
+  }, [pending]);
+
   const openAccount = () => menu.current?.showModal();
   const openNav = () => drawer.current?.showModal();
   const leave = () => {
     menu.current?.close();
     drawer.current?.close();
   };
+  const go = (to: SwitchTarget) => {
+    void navigate(
+      restaurantPath(to.restaurantID, sectionSuffix(to.section)),
+      to.missing === undefined ? {} : { state: { missingSection: to.missing } },
+    );
+  };
+  const onSwitch = (target: RestaurantAccess) => {
+    leave();
+    if (target.restaurantID === context.restaurantID) return;
+    const decision = decideSwitch({
+      target,
+      section: sectionOfPath(pathname),
+      currentID: context.restaurantID,
+      attempts,
+      unsavedForm,
+    });
+    if (decision.kind === 'go') go(decision.to);
+    else setPending(decision);
+  };
+  const name = user?.displayName ?? '';
+
   return (
     <Flex minH="100dvh" bg="bg.canvas">
       <SkipLink />
@@ -48,15 +112,17 @@ export function AppShell({
       >
         <SidebarContent
           onOpenAccount={openAccount}
-          context={context}
-          sections={restaurant}
+          name={name}
+          context={context.caption}
+          sections={context.sections}
         />
       </Box>
       <Flex direction="column" flex="1" minW="0">
         <AppBar
           onOpenNav={openNav}
           onOpenAccount={openAccount}
-          title={restaurant ? placeholderAccount.restaurant : 'Ровный ход'}
+          title={context.title}
+          name={name}
         />
         <Box
           position="relative"
@@ -79,6 +145,14 @@ export function AppShell({
             pb={{ base: '12', sm: '16' }}
             _focusVisible={{ outline: 'none' }}
           >
+            {mode === 'restaurant' &&
+              notice !== undefined &&
+              notice.restaurantID === context.restaurantID && (
+                <InfoNotice title="Данные обновились">
+                  Сервис перезапускался. Если вы отправляли действие до этого,
+                  проверьте результат.
+                </InfoNotice>
+              )}
             {children ?? <Outlet />}
           </Stack>
         </Box>
@@ -86,13 +160,42 @@ export function AppShell({
           <DocumentFooter />
         </Box>
       </Flex>
-      <AccountMenu dialogRef={menu} onLeave={leave} workplaces={restaurant} />
+      <AccountMenu
+        dialogRef={menu}
+        onLeave={leave}
+        user={user}
+        organizations={organizations}
+        currentID={context.restaurantID}
+        onSwitch={onSwitch}
+      />
       <NavigationDrawer
         dialogRef={drawer}
         onOpenAccount={openAccount}
-        context={context}
-        sections={restaurant}
+        name={name}
+        context={context.caption}
+        sections={context.sections}
       />
+      {pending?.kind === 'confirm-unsaved' && (
+        <UnsavedFormDialog
+          dialogRef={unsavedDialog}
+          form={pending.form}
+          restaurantName={context.restaurant?.name ?? ''}
+          onLeave={() => {
+            go(pending.to);
+          }}
+        />
+      )}
+      {pending?.kind === 'blocked-unknown' && (
+        <UnknownAttemptDialog
+          dialogRef={unknownDialog}
+          attempt={pending.attempt}
+          restaurantName={context.restaurant?.name ?? ''}
+          timeZone={context.restaurant?.timeZone ?? 'Europe/Moscow'}
+          onCheck={() => {
+            void services.commands.retry(pending.attempt.key);
+          }}
+        />
+      )}
     </Flex>
   );
 }

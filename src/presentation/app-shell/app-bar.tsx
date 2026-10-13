@@ -1,7 +1,6 @@
 import { Flex, HStack, Text, chakra } from '@chakra-ui/react';
 import hamburgerIcon from '@/presentation/assets/icons/hamburger-24.svg';
 import userIcon from '@/presentation/assets/icons/user-24.svg';
-import { placeholderAccount } from '@/presentation/placeholder-account';
 import { Icon } from '@/presentation/ui/icon';
 import { LogoMark } from '@/presentation/ui/logo';
 
@@ -18,15 +17,18 @@ const BarButton = chakra('button', {
   },
 });
 
-// Figma App bar 38:181 on 390: menu, restaurant name, account.
+// Figma App bar 38:181 on 390: menu, restaurant name, account; name is the
+// signed-in user.
 export function AppBar({
   onOpenNav,
   onOpenAccount,
   title,
+  name,
 }: {
   onOpenNav: () => void;
   onOpenAccount: () => void;
   title: string;
+  name: string;
 }) {
   return (
     <Flex
@@ -55,7 +57,7 @@ export function AppBar({
       </HStack>
       <BarButton
         type="button"
-        aria-label={`Учётная запись: ${placeholderAccount.displayName}`}
+        aria-label={name ? `Учётная запись: ${name}` : 'Учётная запись'}
         aria-haspopup="dialog"
         onClick={onOpenAccount}
       >

@@ -27,6 +27,7 @@ import {
   SessionUnverified,
 } from './access-states';
 import { AppShell } from './app-shell';
+import { LeaveGuardProvider } from './leave-guard';
 import { restaurantPath } from './paths';
 import { sectionTitle } from './sections';
 
@@ -83,7 +84,8 @@ export function createRestaurantLoader(services: PresentationServices) {
 }
 
 // Loaders do not re-run when a store changes: after the retry they are run
-// again to redirect a guest and to read access.
+// again to redirect a guest and to read access. Forms with unsent input
+// register under the gate, so the switcher of any shell sees them.
 export function AppGate() {
   const session = useSession();
   const location = useLocation();
@@ -103,7 +105,11 @@ export function AppGate() {
       </Flex>
     );
   }
-  return <Outlet />;
+  return (
+    <LeaveGuardProvider>
+      <Outlet />
+    </LeaveGuardProvider>
+  );
 }
 
 // Rendered only when the entry loader did not redirect: W17.
@@ -123,7 +129,7 @@ export function AppEntry() {
     });
   };
   return (
-    <AppShell restaurant={false}>
+    <AppShell mode="unverified">
       <AccessUnverified
         details={`${String(access.failure.status)} ${access.failure.code}`}
         onRetry={retry}
@@ -150,14 +156,14 @@ export function RestaurantScope() {
   }, [open, restaurantID, services]);
   if (revoked) {
     return (
-      <AppShell restaurant={false}>
+      <AppShell mode="revoked">
         <AccessRevoked restaurantName={services.access.nameOf(restaurantID)} />
       </AppShell>
     );
   }
   if (restaurant && preparing) {
     return (
-      <AppShell restaurant={false}>
+      <AppShell mode="preparing">
         <RestaurantPreparing
           restaurantName={restaurant.name}
           onRetry={() => {

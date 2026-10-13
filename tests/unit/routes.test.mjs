@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import {
   R,
+  activeSession,
   h1,
   hrefs,
   labels,
@@ -9,6 +10,7 @@ import {
   redirectOf,
   renderRoute,
   sampleRestaurant,
+  text,
 } from './support/render-route.mjs';
 
 const pages = [
@@ -210,15 +212,62 @@ test('invitation actions follow the status', async () => {
   assert.equal(html.match(/>Пригласить повторно</g)?.length, 3);
 });
 
+const OTHER = '55555555-5555-4555-8555-555555555555';
+const ASIA = '66666666-6666-4666-8666-666666666666';
+
+// Access sorts organizations by name: «Азия Групп» comes before «Восток Фуд».
+const twoOrganizations = {
+  status: 'ready',
+  organizations: [
+    {
+      orgID: ASIA,
+      name: 'Азия Групп',
+      settings: { timeZone: 'Asia/Yekaterinburg', settingsVersion: '1' },
+      admin: false,
+      restaurants: [
+        sampleRestaurant({
+          restaurantID: OTHER,
+          orgID: ASIA,
+          orgName: 'Азия Групп',
+          name: 'На Тургеневской',
+          roles: ['Waiter'],
+          timeZone: 'Asia/Yekaterinburg',
+        }),
+      ],
+    },
+    ...readyAccess().organizations,
+  ],
+};
+
+// The account menu dialog, and the first «Разделы» navigation (the sidebar).
+const accountMenu = (html) =>
+  /<dialog[^>]*aria-label="Учётная запись"[^>]*>([\s\S]*?)<\/dialog>/.exec(
+    html,
+  )?.[1] ?? '';
+const sectionLinks = (html) =>
+  hrefs(
+    /<nav[^>]*aria-label="Разделы"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ??
+      '',
+  );
+
 test('the account menu lists workplaces and leads to organizations', async () => {
-  const html = await renderRoute('/app');
-  assert.ok(hrefs(html).includes('/app/organizations'));
-  assert.ok(html.includes('Найти ресторан'));
-  assert.equal(html.match(/aria-current="true"/g)?.length, 1);
+  const html = await renderRoute(`/app/r/${R}`, { access: twoOrganizations });
+  const menu = accountMenu(html);
+  assert.ok(hrefs(menu).includes('/app/organizations'));
+  assert.ok(menu.includes('Найти ресторан'));
+  assert.equal(menu.match(/aria-current="true"/g)?.length, 1);
+  assert.match(text(menu), /Марина Белова/);
+  assert.match(text(menu), /m\.belova/);
+  // The organization of the current restaurant goes first (W08).
+  const order = text(menu);
+  assert.ok(order.indexOf('Восток Фуд') < order.indexOf('Азия Групп'));
+  assert.match(order, /На Тургеневской/);
 });
 
 test('without restaurants the shell has no sections and no workplaces', async () => {
-  const html = await renderRoute('/app/no-restaurants');
+  const html = await renderRoute('/app/no-restaurants', {
+    access: readyAccess([]),
+  });
   assert.ok(!hrefs(html).includes(`/app/r/${R}/orders`));
   assert.ok(!html.includes('Рабочее место'));
   assert.ok(hrefs(html).includes('/app/organizations/new'));
@@ -436,4 +485,77 @@ test('pages outside a restaurant read access before render', async () => {
     accessCalls: guestCalls,
   });
   assert.equal(guestCalls.ensure, 0);
+});
+
+test('the shell shows the signed-in user and the restaurant from access', async () => {
+  const html = await renderRoute(`/app/r/${R}`);
+  assert.match(text(html), /Марина Белова/);
+  assert.match(text(html), /На Пушкинской · Склад, Официант/);
+});
+
+test('the shell follows another user and the roles of the restaurant', async () => {
+  const session = {
+    ...activeSession,
+    user: {
+      ...activeSession.user,
+      login: 'i.kovaleva',
+      displayName: 'Ирина Ковалёва',
+    },
+  };
+  const access = readyAccess([
+    sampleRestaurant({ name: 'На Тургеневской', roles: ['Waiter'] }),
+  ]);
+  const html = await renderRoute(`/app/r/${R}`, { session, access });
+  assert.match(text(html), /Ирина Ковалёва/);
+  assert.match(text(accountMenu(html)), /i\.kovaleva/);
+  assert.match(text(html), /На Тургеневской · Официант/);
+  assert.ok(html.includes('aria-label="Учётная запись: Ирина Ковалёва"'));
+  assert.deepEqual(sectionLinks(html), [
+    `/app/r/${R}`,
+    `/app/r/${R}/orders`,
+    `/app/r/${R}/menu`,
+  ]);
+});
+
+test('pages outside a restaurant without restaurants mark no section current', async () => {
+  const html = await renderRoute('/app/settings', { access: readyAccess([]) });
+  assert.ok((html.match(/aria-current="page"/g)?.length ?? 0) <= 1);
+  assert.deepEqual(sectionLinks(html), []);
+  assert.match(text(html), /Нет доступных ресторанов/);
+});
+
+test('access states leave the shell without sections', async () => {
+  const preparing = readyAccess([
+    sampleRestaurant({ lifecycle: 'registering', roles: [] }),
+  ]);
+  for (const [path, options, caption] of [
+    [
+      '/app/no-restaurants',
+      { access: readyAccess([]) },
+      'Нет доступных ресторанов',
+    ],
+    [`/app/r/${OTHER}`, {}, 'Доступ к ресторану отозван'],
+    [`/app/r/${R}`, { access: preparing }, 'На Пушкинской · подготавливается'],
+    ['/app', { access: unverified }, 'Доступ не проверен'],
+  ]) {
+    const html = await renderRoute(path, options);
+    assert.deepEqual(sectionLinks(html), [], path);
+    assert.ok(text(html).includes(caption), `${path}: no «${caption}»`);
+  }
+});
+
+test('«Данные обновились» shows in the restaurant it belongs to', async () => {
+  const shown = await renderRoute(`/app/r/${R}`, {
+    notice: { restaurantID: R },
+  });
+  assert.match(text(shown), /Данные обновились/);
+  const elsewhere = await renderRoute(`/app/r/${R}`, {
+    notice: { restaurantID: OTHER },
+  });
+  assert.doesNotMatch(text(elsewhere), /Данные обновились/);
+  // W15: the restaurant is out of access, its data is not shown.
+  const revoked = await renderRoute(`/app/r/${OTHER}`, {
+    notice: { restaurantID: OTHER },
+  });
+  assert.doesNotMatch(text(revoked), /Данные обновились/);
 });
