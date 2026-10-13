@@ -36,8 +36,10 @@ export async function renderRoute(path) {
   );
 }
 
+// Emotion inlines <style> elements next to the markup during server rendering.
 const plain = (fragment) =>
   fragment
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/g, '')
     .replace(/<[^>]+>/g, '')
     .replace(/\s+/g, ' ')
     .trim();

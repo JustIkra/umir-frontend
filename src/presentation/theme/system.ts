@@ -201,6 +201,16 @@ const textStyles = defineTextStyles({
         lineHeight: '1.5rem',
       },
     },
+    // Figma Code field value: the six digits of an email code.
+    code: {
+      value: {
+        fontFamily: 'mono',
+        fontWeight: 'regular',
+        fontSize: '1.5rem',
+        lineHeight: '2rem',
+        letterSpacing: '0.08em',
+      },
+    },
   },
 });
 

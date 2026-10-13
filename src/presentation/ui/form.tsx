@@ -5,10 +5,12 @@ import {
   chakra,
   type HTMLChakraProps,
 } from '@chakra-ui/react';
-import type { ReactNode, Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import alertIcon from '@/presentation/assets/icons/alert-16.svg';
 import checkDisabledIcon from '@/presentation/assets/icons/check-disabled-16.svg';
 import checkIcon from '@/presentation/assets/icons/check-on-action-16.svg';
+import eyeOffIcon from '@/presentation/assets/icons/eye-off-24.svg';
+import eyeIcon from '@/presentation/assets/icons/eye-24.svg';
 import { Icon } from './icon';
 
 // Figma Field 117:1418: label, control, then a hint or an error that says what
@@ -194,6 +196,96 @@ export function CheckboxField({
         {label}
       </Text>
     </chakra.label>
+  );
+}
+
+// Figma Password input: 44px high, a 40px toggle inside the right edge. The
+// toggle only switches visibility; the value never leaves the field.
+export function PasswordInput({
+  id,
+  ...props
+}: { id: string; ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <Flex
+      align="center"
+      gap="1"
+      h="2.75rem"
+      pl="3"
+      pr="0.5"
+      bg="bg.surface"
+      borderWidth="1px"
+      borderColor="border.strong"
+      borderRadius="md"
+      _focusWithin={{
+        outline: '2px solid {colors.border.focus}',
+        outlineOffset: '2px',
+      }}
+    >
+      <chakra.input
+        id={id}
+        type={shown ? 'text' : 'password'}
+        flex="1"
+        minW="0"
+        h="full"
+        bg="transparent"
+        textStyle="body.default"
+        color="text.primary"
+        _focusVisible={{ outline: 'none' }}
+        {...props}
+      />
+      <chakra.button
+        type="button"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize="10"
+        borderRadius="sm"
+        cursor="pointer"
+        aria-label="Показать пароль"
+        aria-controls={id}
+        aria-pressed={shown}
+        onClick={() => {
+          setShown((value) => !value);
+        }}
+      >
+        <Icon src={shown ? eyeOffIcon : eyeIcon} size={24} />
+      </chakra.button>
+    </Flex>
+  );
+}
+
+// Figma Code field 444:3520: one 56px box for the six digits, pasted whole;
+// the digits are monospaced, the «6 цифр» placeholder uses the body font.
+export function CodeInput({
+  id,
+  ...props
+}: { id: string; ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>) {
+  return (
+    <chakra.input
+      id={id}
+      type="text"
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      pattern="[0-9]*"
+      maxLength={6}
+      placeholder="6 цифр"
+      w="full"
+      h="3.5rem"
+      px="4"
+      bg="bg.surface"
+      borderWidth="1px"
+      borderColor="border.strong"
+      borderRadius="md"
+      color="text.primary"
+      textStyle="mono.code"
+      _placeholder={{
+        textStyle: 'body.default',
+        letterSpacing: '0',
+        color: 'text.secondary',
+      }}
+      {...props}
+    />
   );
 }
 

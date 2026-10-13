@@ -18,7 +18,17 @@ type Shape =
       height: number;
       shadow?: string;
     }
-  | { kind: 'plus'; color: string; size: number; thickness: number };
+  | { kind: 'plus'; color: string; size: number; thickness: number }
+  | { kind: 'circle'; color: string; size: number }
+  | { kind: 'ring'; color: string; size: number; thickness: number }
+  // Figma layer blur: CSS blur takes half the Figma radius.
+  | {
+      kind: 'glow';
+      color: string;
+      width: number;
+      height: number;
+      blur: number;
+    };
 
 export type DecorPiece = Shape &
   Horizontal &
@@ -73,6 +83,37 @@ function Piece({ piece }: { piece: DecorPiece }) {
           bg={piece.color}
           borderRadius="full"
           boxShadow={piece.shadow}
+        />
+      );
+    case 'circle':
+      return (
+        <Box
+          {...box}
+          boxSize={rem(piece.size)}
+          bg={piece.color}
+          borderRadius="full"
+        />
+      );
+    case 'ring':
+      return (
+        <Box
+          {...box}
+          boxSize={rem(piece.size)}
+          borderWidth={rem(piece.thickness)}
+          borderStyle="solid"
+          borderColor={piece.color}
+          borderRadius="full"
+        />
+      );
+    case 'glow':
+      return (
+        <Box
+          {...box}
+          w={rem(piece.width)}
+          h={rem(piece.height)}
+          bg={piece.color}
+          borderRadius="full"
+          filter={`blur(${rem(piece.blur / 2)})`}
         />
       );
     case 'plus': {

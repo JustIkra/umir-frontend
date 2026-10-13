@@ -1,5 +1,12 @@
 import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
+import {
+  PasswordResetCodePage,
+  PasswordResetNewPage,
+  PasswordResetRequestPage,
+} from './auth/password-reset-pages';
+import { SignInCodePage } from './auth/sign-in-code-page';
+import { SignInPage } from './auth/sign-in-page';
 import { NotFoundPage } from './documents/not-found-page';
 import {
   CookiePolicyPage,
@@ -38,6 +45,11 @@ export const routes: RouteObject[] = [
       { path: '/privacy', element: <PrivacyPolicyPage /> },
       { path: '/cookies', element: <CookiePolicyPage /> },
       { path: '/consent', element: <PersonalDataConsentPage /> },
+      { path: '/login', element: <SignInPage /> },
+      { path: '/login/code', element: <SignInCodePage /> },
+      { path: '/password-reset', element: <PasswordResetRequestPage /> },
+      { path: '/password-reset/code', element: <PasswordResetCodePage /> },
+      { path: '/password-reset/new', element: <PasswordResetNewPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
