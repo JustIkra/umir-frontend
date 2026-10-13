@@ -57,13 +57,15 @@ export function FieldMessage({
 
 export function FieldLabel({
   htmlFor,
+  id,
   children,
 }: {
   htmlFor: string;
+  id?: string | undefined;
   children: ReactNode;
 }) {
   return (
-    <chakra.label htmlFor={htmlFor} textStyle="caption.strong">
+    <chakra.label htmlFor={htmlFor} id={id} textStyle="caption.strong">
       {children}
     </chakra.label>
   );

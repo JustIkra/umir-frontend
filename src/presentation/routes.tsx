@@ -26,6 +26,8 @@ import {
 import { InvitationsPage } from './organizations/invitations-page';
 import { InvitePage } from './organizations/invite-page';
 import { MemberPage } from './organizations/member-page';
+import { NewOrganizationPage } from './organizations/new-organization-page';
+import { OrganizationProfilePage } from './organizations/organization-profile-page';
 import { MembersPage } from './organizations/members-page';
 import { OrganizationPage } from './organizations/organization-page';
 import { OrganizationsPage } from './organizations/organizations-page';
@@ -73,6 +75,7 @@ export const routes: RouteObject[] = [
           { index: true, element: <OverviewPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'organizations', element: <OrganizationsPage /> },
+          { path: 'organizations/new', element: <NewOrganizationPage /> },
           {
             path: 'organizations/:org',
             loader: organizationLoader,
@@ -97,6 +100,11 @@ export const routes: RouteObject[] = [
             path: 'organizations/:org/invitations/new',
             loader: adminOrganizationLoader,
             element: <InvitePage />,
+          },
+          {
+            path: 'organizations/:org/profile',
+            loader: adminOrganizationLoader,
+            element: <OrganizationProfilePage />,
           },
           ...appSections
             .filter((section) => section.path !== '/app')

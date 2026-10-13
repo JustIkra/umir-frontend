@@ -51,6 +51,20 @@ const pages = [
     'Пригласить участника',
     ['Почта', 'Склад', 'Официант'],
   ],
+  [
+    '/app/organizations/yug/profile',
+    'Сеть ресторанов Южного федерального округа',
+    ['Часовой пояс организации'],
+  ],
+  [
+    '/app/organizations/new',
+    'Создать предприятие',
+    [
+      'Название организации',
+      'Название первого ресторана',
+      'Часовой пояс организации',
+    ],
+  ],
 ];
 
 for (const [path, title, fields] of pages) {
@@ -124,6 +138,7 @@ test('staff and admin ids outside the sample show 404', async () => {
     '/app/organizations/vostok-food/members',
     '/app/organizations/yug/members/m-belova',
     '/app/organizations/yug/members/nobody',
+    '/app/organizations/vostok-food/profile',
   ])
     assert.equal(h1(await renderRoute(path)), notFound, path);
 });
