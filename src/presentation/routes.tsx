@@ -12,6 +12,12 @@ import {
 } from './auth/password-reset-pages';
 import { SignInCodePage } from './auth/sign-in-code-page';
 import { SignInPage } from './auth/sign-in-page';
+import { DishPage } from './catalog/dish-page';
+import { DishesPage } from './catalog/dishes-page';
+import { dishLoader } from './catalog/loaders';
+import { NewDishPage } from './catalog/new-dish-page';
+import { NewProductPage } from './catalog/new-product-page';
+import { ProductsPage } from './catalog/products-page';
 import { NotFoundBoundary, NotFoundPage } from './documents/not-found-page';
 import {
   CookiePolicyPage,
@@ -75,6 +81,15 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <OverviewPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'catalog', element: <ProductsPage /> },
+          { path: 'catalog/dishes', element: <DishesPage /> },
+          { path: 'catalog/dishes/new', element: <NewDishPage /> },
+          {
+            path: 'catalog/dishes/:dish',
+            loader: dishLoader,
+            element: <DishPage />,
+          },
+          { path: 'catalog/products/new', element: <NewProductPage /> },
           { path: 'organizations', element: <OrganizationsPage /> },
           { path: 'organizations/new', element: <NewOrganizationPage /> },
           {
@@ -108,7 +123,9 @@ export const routes: RouteObject[] = [
             element: <OrganizationProfilePage />,
           },
           ...appSections
-            .filter((section) => section.path !== '/app')
+            .filter(
+              (section) => !['/app', '/app/catalog'].includes(section.path),
+            )
             .map((section) => ({
               path: section.path.replace('/app/', ''),
               element: <SectionPage title={section.title} />,

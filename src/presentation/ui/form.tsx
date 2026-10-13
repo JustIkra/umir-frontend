@@ -431,7 +431,8 @@ export function SelectField({
   );
 }
 
-// Figma Radio 641:4290 in a fieldset whose legend names the group (K05).
+// Figma Radio 641:4290 in a fieldset whose legend names the group (K05):
+// options in a row from 768, one under another with 44px rows on 390.
 export function RadioGroupField({
   legend,
   name,
@@ -447,16 +448,17 @@ export function RadioGroupField({
 }) {
   return (
     <chakra.fieldset border="0" p="0" m="0" aria-describedby={hintId}>
-      <chakra.legend textStyle="caption.strong" mb="2">
+      <chakra.legend textStyle="caption.strong" mb={{ base: '1', sm: '3' }}>
         {legend}
       </chakra.legend>
-      <Flex wrap="wrap" columnGap="6" rowGap="3">
+      <Flex direction={{ base: 'column', sm: 'row' }} wrap="wrap" columnGap="6">
         {options.map((option) => (
           <chakra.label
             key={option.value}
             display="flex"
             alignItems="center"
-            gap="2"
+            gap="2.5"
+            py={{ base: '2.5', sm: '0.5' }}
             cursor="pointer"
             textStyle="body.default"
           >
@@ -479,7 +481,11 @@ export function RadioGroupField({
           </chakra.label>
         ))}
       </Flex>
-      {hint && hintId && <FieldMessage id={hintId} hint={hint} />}
+      {hint && hintId && (
+        <Box mt={{ base: '1', sm: '3' }}>
+          <FieldMessage id={hintId} hint={hint} />
+        </Box>
+      )}
     </chakra.fieldset>
   );
 }

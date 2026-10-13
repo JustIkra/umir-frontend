@@ -7,12 +7,14 @@ export function PageHeader({
   eyebrow,
   caption,
   documentTitle = title,
+  description,
   action,
 }: {
   title: string;
   eyebrow?: string | undefined;
   caption?: string | undefined;
   documentTitle?: string;
+  description?: string;
   action?: ReactNode;
 }) {
   const heading = (
@@ -29,6 +31,11 @@ export function PageHeader({
           {caption}
         </Text>
       )}
+      {description && (
+        <Text textStyle="body.default" color="text.secondary">
+          {description}
+        </Text>
+      )}
     </Stack>
   );
   if (!action) return heading;
@@ -36,7 +43,7 @@ export function PageHeader({
     <Flex
       direction={{ base: 'column', sm: 'row' }}
       justify="space-between"
-      align={{ base: 'stretch', sm: 'flex-start' }}
+      align={{ base: 'stretch', sm: 'flex-end' }}
       gap="4"
     >
       {heading}

@@ -2,12 +2,14 @@ import { Flex, Text, chakra } from '@chakra-ui/react';
 import { TextLink } from './actions';
 
 // Figma breadcrumbs (P1, K05, K13, K14). Items without a page are plain text;
-// the last item is the current page.
+// the last item is the current page. On 390 only the parent link stays, as a
+// way back.
 export function Breadcrumbs({
   items,
 }: {
   items: readonly { title: string; to?: string }[];
 }) {
+  const parent = items.findLastIndex((item) => item.to !== undefined);
   return (
     <chakra.nav aria-label="Навигационная цепочка">
       <Flex
@@ -20,10 +22,24 @@ export function Breadcrumbs({
         color="text.secondary"
       >
         {items.map((item, index) => (
-          <Flex as="li" key={item.title} align="center" gap="2">
-            {index > 0 && <span aria-hidden="true">/</span>}
+          <Flex
+            as="li"
+            key={item.title}
+            display={{ base: index === parent ? 'flex' : 'none', sm: 'flex' }}
+            color={{ base: 'text.action', sm: 'text.secondary' }}
+            align="center"
+            gap="2"
+          >
+            {index > 0 && (
+              <chakra.span
+                aria-hidden="true"
+                display={{ base: 'none', sm: 'inline' }}
+              >
+                /
+              </chakra.span>
+            )}
             {item.to ? (
-              <TextLink to={item.to} size="caption" color="text.secondary">
+              <TextLink to={item.to} size="caption" color="inherit">
                 {item.title}
               </TextLink>
             ) : (

@@ -23,7 +23,12 @@ const breakpoints = {
 // Media queries for CSS that Chakra props cannot reach (dialog backdrops,
 // :modal states) and for matchMedia.
 export const atLeast = { sm: `(min-width: ${breakpoints.sm})` } as const;
-export const media = { sm: `@media ${atLeast.sm}` } as const;
+// belowSm styles only the 390 layout, where the 768 rules must not see it
+// (cards built from table rows).
+export const media = {
+  sm: `@media ${atLeast.sm}`,
+  belowSm: '@media (max-width: 767.98px)',
+} as const;
 
 // Figma Overlay scrim under modal dialogs and sheets.
 export const scrim = 'rgba(23, 43, 77, 0.32)';

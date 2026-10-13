@@ -10,7 +10,8 @@ import { appSections } from './sections';
 const NavAnchor = chakra(NavLink);
 
 // Figma Nav item: 40px rows (two lines wrap), 8/12 padding, 12px gap; the
-// current page is teal on bg.actionSubtle.
+// current page is teal on bg.actionSubtle. Subpages keep their section item
+// current; only «Обзор» matches its address exactly.
 export function SectionNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Stack as="nav" aria-label="Разделы" gap="1">
@@ -18,7 +19,7 @@ export function SectionNav({ onNavigate }: { onNavigate?: () => void }) {
         <NavAnchor
           key={section.path}
           to={section.path}
-          end
+          end={section.path === '/app'}
           onClick={onNavigate}
           display="flex"
           alignItems="center"

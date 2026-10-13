@@ -14,11 +14,7 @@ export function TabNav({
   tabs: readonly { to: string; title: string }[];
 }) {
   return (
-    <SegmentBar
-      as="nav"
-      aria-label={label}
-      alignSelf={{ base: 'stretch', sm: 'flex-start' }}
-    >
+    <SegmentBar as="nav" aria-label={label} w={{ sm: 'fit-content' }}>
       {tabs.map((tab) => (
         <Tab key={tab.to} to={tab.to} end>
           {tab.title}

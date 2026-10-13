@@ -16,6 +16,14 @@ const pages = [
   ['/app/orders', 'Заказы', []],
   ['/app/warehouse', 'Склад', []],
   ['/app/catalog', 'Справочники', []],
+  ['/app/catalog/dishes', 'Справочники', []],
+  ['/app/catalog/dishes/206', 'Паста с лососем и шпинатом', []],
+  [
+    '/app/catalog/products/new',
+    'Новый продукт',
+    ['Название', 'Код продукта', 'граммы, г', 'миллилитры, мл', 'штуки, шт'],
+  ],
+  ['/app/catalog/dishes/new', 'Новое блюдо', ['Название', 'Код блюда']],
   ['/app/menu', 'Меню и рекомендации', []],
   ['/app/analytics', 'Аналитика', []],
   [
@@ -181,4 +189,23 @@ test('without restaurants the shell has no sections and no workplaces', async ()
   assert.ok(!hrefs(html).includes('/app/orders'));
   assert.ok(!html.includes('Рабочее место'));
   assert.ok(hrefs(html).includes('/app/organizations/new'));
+});
+
+test('the catalog lists the sample products and dishes', async () => {
+  const productsHtml = await renderRoute('/app/catalog');
+  assert.ok(productsHtml.includes('Яйцо куриное'));
+  assert.ok(hrefs(productsHtml).includes('/app/catalog/products/new'));
+  const dishesHtml = await renderRoute('/app/catalog/dishes');
+  assert.ok(hrefs(dishesHtml).includes('/app/catalog/dishes/206'));
+  assert.ok(!hrefs(dishesHtml).includes('/app/catalog/dishes/201'));
+});
+
+test('dish pages exist only for sample recipes', async () => {
+  for (const path of ['/app/catalog/dishes/201', '/app/catalog/dishes/999'])
+    assert.equal(h1(await renderRoute(path)), notFound, path);
+});
+
+test('section pages keep their sidebar item current', async () => {
+  const html = await renderRoute('/app/catalog/dishes');
+  assert.match(html, /<a[^>]*aria-current="page"[^>]*href="\/app\/catalog"/);
 });
