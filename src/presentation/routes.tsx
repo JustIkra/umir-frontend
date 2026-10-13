@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
+import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
 import { OverviewPage, SectionPage } from './app-shell/pages';
 import { appSections } from './app-shell/sections';
@@ -58,6 +59,7 @@ export const routes: RouteObject[] = [
         element: <AppShell />,
         children: [
           { index: true, element: <OverviewPage /> },
+          { path: 'settings', element: <AccountSettingsPage /> },
           ...appSections
             .filter((section) => section.path !== '/app')
             .map((section) => ({
