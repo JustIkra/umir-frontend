@@ -1,5 +1,5 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
@@ -183,14 +183,25 @@ export function DraftOrder() {
 }
 
 // Figma 04 under the dialog: the proposal with reductions.
-export function ProposalOrder({ onConfirm }: { onConfirm: () => void }) {
+export function ProposalOrder({
+  confirmRef,
+  onConfirm,
+}: {
+  confirmRef: RefObject<HTMLButtonElement | null>;
+  onConfirm: () => void;
+}) {
   return (
     <Panel
       header={<Heading title="Предложение заказа" caption={proposal.stamp} />}
       footer={
         <>
           <Text textStyle="caption.strong">{proposal.summary}</Text>
-          <Button w="full" aria-haspopup="dialog" onClick={onConfirm}>
+          <Button
+            ref={confirmRef}
+            w="full"
+            aria-haspopup="dialog"
+            onClick={onConfirm}
+          >
             Проверить и подтвердить
           </Button>
           <ButtonLink variant="secondary" to="/app/orders/draft" w="full">

@@ -79,6 +79,7 @@ export function OrdersPage({ step }: { step: OrderStep }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const openButton = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
+  const confirmButton = useRef<HTMLButtonElement>(null);
   // On 390 the pressed button disappears with its view, so focus moves to
   // the control that leads back.
   const showOrder = (show: boolean) => {
@@ -95,6 +96,7 @@ export function OrdersPage({ step }: { step: OrderStep }) {
     draft: <DraftOrder />,
     proposal: (
       <ProposalOrder
+        confirmRef={confirmButton}
         onConfirm={() => {
           dialog.current?.showModal();
         }}
@@ -168,7 +170,9 @@ export function OrdersPage({ step }: { step: OrderStep }) {
           {panel}
         </Stack>
       </Grid>
-      {step === 'proposal' && <ShortageDialog dialogRef={dialog} />}
+      {step === 'proposal' && (
+        <ShortageDialog dialogRef={dialog} returnFocusRef={confirmButton} />
+      )}
     </Stack>
   );
 }

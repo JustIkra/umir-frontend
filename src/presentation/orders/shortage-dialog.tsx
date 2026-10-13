@@ -169,17 +169,34 @@ function MissingTable() {
 // actions stay at the bottom; on 390 it is a bottom sheet (05).
 export function ShortageDialog({
   dialogRef,
+  returnFocusRef,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
+  returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
   const navigate = useNavigate();
   const titleId = useId();
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-    title.current?.focus();
-  }, [dialogRef]);
+    if (!dialog) return;
+    // The native autofocus puts every opening, from the page or from «Проверить
+    // и подтвердить», on the heading (React does not render the attribute).
+    title.current?.setAttribute('autofocus', '');
+    // Opened with the page, the dialog has no opener to return to: focus goes
+    // to «Проверить и подтвердить» instead of the start of the page.
+    // Focus is then still on the closed heading or already on the body.
+    const onClose = () => {
+      const active = document.activeElement;
+      if (!active || active === document.body || dialog.contains(active))
+        returnFocusRef.current?.focus();
+    };
+    dialog.addEventListener('close', onClose);
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      dialog.removeEventListener('close', onClose);
+    };
+  }, [dialogRef, returnFocusRef]);
   return (
     <Dialog
       dialogRef={dialogRef}

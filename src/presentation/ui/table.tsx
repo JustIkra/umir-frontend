@@ -41,6 +41,10 @@ export const DataTable = chakra('table', {
       table: {},
       cards: {
         [media.belowSm]: {
+          // Block boxes take the rows out of the table layout, so column
+          // widths set for 768 (K12 colgroup) cannot squeeze the cards.
+          display: 'block',
+          '& tbody': { display: 'block' },
           '& thead': visuallyHidden,
           '& tbody tr': {
             display: 'grid',
