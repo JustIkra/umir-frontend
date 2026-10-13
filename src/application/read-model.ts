@@ -14,6 +14,9 @@ export interface ReadModelSnapshot<T> {
   readonly loadedAt: number | undefined;
   readonly loading: boolean;
   readonly failed: boolean;
+  // The rejection of the latest failed read, for choosing the screen state;
+  // undefined after a success.
+  readonly failure: unknown;
 }
 
 export interface ReadModel<T> extends StaleTarget {
@@ -44,6 +47,7 @@ export function createReadModel<T>(
     loadedAt: undefined,
     loading: false,
     failed: false,
+    failure: undefined,
   };
   let latest = 0;
   let stale = true;
@@ -65,10 +69,16 @@ export function createReadModel<T>(
           loadedAt: now(),
           loading: false,
           failed: false,
+          failure: undefined,
         });
       },
-      () => {
-        settle(request, { ...snapshot, loading: false, failed: true });
+      (error: unknown) => {
+        settle(request, {
+          ...snapshot,
+          loading: false,
+          failed: true,
+          failure: error,
+        });
       },
     );
   }

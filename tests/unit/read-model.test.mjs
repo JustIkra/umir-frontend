@@ -35,6 +35,7 @@ test('the first subscriber reads once in the foreground', async () => {
     loadedAt: 5000,
     loading: false,
     failed: false,
+    failure: undefined,
   });
 });
 
@@ -108,6 +109,7 @@ test('a superseded response does not end the loading state', async () => {
     loadedAt: undefined,
     loading: true,
     failed: false,
+    failure: undefined,
   });
 });
 
@@ -120,13 +122,15 @@ test('a failed read keeps the last value and its time', async () => {
   await settled();
   clock = 7000;
   readModel.refresh();
-  loader.calls[1].reject(new Error('UpstreamUnavailable'));
+  const error = new Error('UpstreamUnavailable');
+  loader.calls[1].reject(error);
   await settled();
   assert.deepEqual(readModel.getSnapshot(), {
     value: 'v1',
     loadedAt: 1000,
     loading: false,
     failed: true,
+    failure: error,
   });
 });
 
@@ -156,4 +160,19 @@ test('subscribers hear every snapshot change', async () => {
   loader.calls[0].resolve('v1');
   await settled();
   assert.deepEqual(seen, [true, false]);
+});
+
+test('a success after a failure clears the failure', async () => {
+  const loader = controlledLoader();
+  const readModel = model(loader);
+  readModel.subscribe(() => undefined);
+  const error = new Error('Transport');
+  loader.calls[0].reject(error);
+  await settled();
+  assert.equal(readModel.getSnapshot().failure, error);
+  readModel.refresh();
+  loader.calls[1].resolve('v');
+  await settled();
+  assert.equal(readModel.getSnapshot().failure, undefined);
+  assert.equal(readModel.getSnapshot().failed, false);
 });
