@@ -38,6 +38,10 @@ import { OrganizationProfilePage } from './organizations/organization-profile-pa
 import { MembersPage } from './organizations/members-page';
 import { OrganizationPage } from './organizations/organization-page';
 import { OrganizationsPage } from './organizations/organizations-page';
+import { DeliveryPage } from './warehouse/delivery-page';
+import { ExpiryPage } from './warehouse/expiry-page';
+import { HistoryPage } from './warehouse/history-page';
+import { StockPage } from './warehouse/stock-page';
 
 // Opens every page at its top or at the linked section. React Router's
 // ScrollRestoration is not used: it keeps positions in sessionStorage, which
@@ -90,6 +94,10 @@ export const routes: RouteObject[] = [
             element: <DishPage />,
           },
           { path: 'catalog/products/new', element: <NewProductPage /> },
+          { path: 'warehouse', element: <StockPage /> },
+          { path: 'warehouse/expiry', element: <ExpiryPage /> },
+          { path: 'warehouse/history', element: <HistoryPage /> },
+          { path: 'warehouse/delivery', element: <DeliveryPage /> },
           { path: 'organizations', element: <OrganizationsPage /> },
           { path: 'organizations/new', element: <NewOrganizationPage /> },
           {
@@ -124,7 +132,10 @@ export const routes: RouteObject[] = [
           },
           ...appSections
             .filter(
-              (section) => !['/app', '/app/catalog'].includes(section.path),
+              (section) =>
+                !['/app', '/app/catalog', '/app/warehouse'].includes(
+                  section.path,
+                ),
             )
             .map((section) => ({
               path: section.path.replace('/app/', ''),

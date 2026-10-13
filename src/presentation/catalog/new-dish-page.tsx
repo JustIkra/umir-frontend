@@ -241,7 +241,7 @@ export function NewDishPage() {
           <Button
             variant="secondary"
             alignSelf={{ base: 'stretch', sm: 'flex-start' }}
-            px="calc({spacing.4} - 1px)"
+            px="calc({spacing.3} - 1px)"
             py="calc({spacing.2} - 1px)"
             onClick={() => {
               setRows((list) => [...list, { key: next, product: '' }]);

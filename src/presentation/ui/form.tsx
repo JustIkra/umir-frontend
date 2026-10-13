@@ -388,13 +388,14 @@ export function SearchInput({
 }
 
 // Figma Select (P1, K14): a native <select> styled as Input 117:1393 with a
-// chevron; the placeholder is a disabled first option.
+// chevron. The placeholder is a disabled first option; without one the first
+// option is chosen («дней» in P1).
 export function SelectField({
   placeholder,
   options,
   ...props
 }: {
-  placeholder: string;
+  placeholder?: string;
   options: readonly { value: string; label: string }[];
 } & HTMLChakraProps<'select'>) {
   return (
@@ -406,12 +407,14 @@ export function SelectField({
         pl="3"
         pr="10"
         cursor="pointer"
-        defaultValue=""
+        defaultValue={placeholder === undefined ? undefined : ''}
         {...props}
       >
-        <option value="" disabled>
-          {placeholder}
-        </option>
+        {placeholder !== undefined && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

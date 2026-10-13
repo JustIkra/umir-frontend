@@ -16,12 +16,15 @@ export function EvaluationStamp({
     <Flex
       align="center"
       columnGap="2"
+      rowGap="1"
       wrap="wrap"
       textStyle="caption.default"
       color="text.secondary"
     >
-      {icon && <Icon src={clockIcon} size={16} />}
-      <Text as="span">{text}</Text>
+      <Flex align="flex-start" gap="2" minW="0">
+        {icon && <Icon src={clockIcon} size={16} mt="0.5" />}
+        <Text as="span">{text}</Text>
+      </Flex>
       <Button variant="link">Обновить</Button>
     </Flex>
   );

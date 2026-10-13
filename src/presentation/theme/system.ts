@@ -28,6 +28,8 @@ export const atLeast = { sm: `(min-width: ${breakpoints.sm})` } as const;
 export const media = {
   sm: `@media ${atLeast.sm}`,
   belowSm: '@media (max-width: 767.98px)',
+  // P1: the delivery lines become a table from 2xl.
+  wide: `@media (min-width: ${breakpoints['2xl']})`,
 } as const;
 
 // Figma Overlay scrim under modal dialogs and sheets.

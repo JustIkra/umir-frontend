@@ -52,6 +52,7 @@ export const DataTable = chakra('table', {
             borderColor: 'border.default',
           },
           '& tbody tr:last-child': { borderBottomWidth: '0' },
+          '& tbody tr[hidden]': { display: 'none' },
           '& tbody td': { display: 'block', p: '0', borderBottomWidth: '0' },
         },
       },

@@ -15,6 +15,13 @@ const pages = [
   ['/app', 'Обзор', []],
   ['/app/orders', 'Заказы', []],
   ['/app/warehouse', 'Склад', []],
+  ['/app/warehouse/expiry', 'Склад', []],
+  ['/app/warehouse/history', 'Склад', []],
+  [
+    '/app/warehouse/delivery',
+    'Приём поставки',
+    ['Номер поставки', 'Дата и время создания поставки (Москва, UTC+3)'],
+  ],
   ['/app/catalog', 'Справочники', []],
   ['/app/catalog/dishes', 'Справочники', []],
   ['/app/catalog/dishes/206', 'Паста с лососем и шпинатом', []],
@@ -208,4 +215,14 @@ test('dish pages exist only for sample recipes', async () => {
 test('section pages keep their sidebar item current', async () => {
   const html = await renderRoute('/app/catalog/dishes');
   assert.match(html, /<a[^>]*aria-current="page"[^>]*href="\/app\/catalog"/);
+});
+
+test('the warehouse shows the sample stock, expiry and history', async () => {
+  const stockHtml = await renderRoute('/app/warehouse');
+  assert.ok(stockHtml.includes('P-0158'));
+  assert.ok(hrefs(stockHtml).includes('/app/warehouse/delivery'));
+  assert.ok(
+    (await renderRoute('/app/warehouse/expiry')).includes('через 20 ч 38 мин'),
+  );
+  assert.ok((await renderRoute('/app/warehouse/history')).includes('#1057'));
 });
