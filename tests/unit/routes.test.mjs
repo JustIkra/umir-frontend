@@ -243,3 +243,19 @@ test('the order flow goes from the menu to the placed order', async () => {
   assert.ok(placed.includes('ord-20261010-0042'));
   assert.ok(hrefs(placed).includes('/app/warehouse/history'));
 });
+
+test('overview tiles lead into the sections', async () => {
+  const links = hrefs(await renderRoute('/app'));
+  for (const path of [
+    '/app/orders',
+    '/app/warehouse',
+    '/app/warehouse/delivery',
+    '/app/warehouse/history',
+    '/app/warehouse/expiry',
+    '/app/catalog/products/new',
+    '/app/catalog/dishes/new',
+    '/app/menu',
+    '/app/analytics',
+  ])
+    assert.ok(links.includes(path), path);
+});

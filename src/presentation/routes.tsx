@@ -3,7 +3,7 @@ import { Outlet, useLocation, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
 import { NoRestaurantsPage } from './app-shell/no-restaurants-page';
-import { OverviewPage, SectionPage } from './app-shell/pages';
+import { SectionPage } from './app-shell/pages';
 import { appSections } from './app-shell/sections';
 import {
   PasswordResetCodePage,
@@ -39,6 +39,7 @@ import { OrganizationProfilePage } from './organizations/organization-profile-pa
 import { MembersPage } from './organizations/members-page';
 import { OrganizationPage } from './organizations/organization-page';
 import { OrganizationsPage } from './organizations/organizations-page';
+import { OverviewPage } from './overview/overview-page';
 import { DeliveryPage } from './warehouse/delivery-page';
 import { ExpiryPage } from './warehouse/expiry-page';
 import { HistoryPage } from './warehouse/history-page';

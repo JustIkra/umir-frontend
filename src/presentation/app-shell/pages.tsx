@@ -1,6 +1,5 @@
 import { Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import { type ReactNode } from 'react';
-import { placeholderAccount } from '@/presentation/placeholder-account';
 
 export function PageHeader({
   title,
@@ -49,16 +48,6 @@ export function PageHeader({
       {heading}
       {action}
     </Flex>
-  );
-}
-
-// Figma W03 without its tiles: the context line and the title.
-export function OverviewPage() {
-  return (
-    <PageHeader
-      title="Обзор"
-      eyebrow={`${placeholderAccount.organization} · ${placeholderAccount.restaurant}`}
-    />
   );
 }
 
