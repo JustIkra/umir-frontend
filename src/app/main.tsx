@@ -8,20 +8,24 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { createAccessApi } from '@/adapters/api/access-api';
+import { createRecoveryApi } from '@/adapters/api/recovery-api';
 import { createAccountApi } from '@/adapters/api/account-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
+import { createPasswordResetStore } from '@/adapters/browser-storage/password-reset-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
 import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender';
 import { createGatewayClient } from '@/adapters/http/gateway-client';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
+import { createAccountSettings } from '@/application/account-settings';
 import { createAccessStore } from '@/application/access';
 import { createCommandRunner } from '@/application/commands';
 import { createEpochRegistry } from '@/application/epochs';
 import { createFeedbackSubmitter } from '@/application/feedback';
 import { createLiveSync } from '@/application/live-sync';
 import { createModelRegistry } from '@/application/models';
+import { createPasswordResetFlow } from '@/application/password-reset';
 import { createSessionStore } from '@/application/session';
 import { createRoutes } from '@/presentation/routes';
 import {
@@ -34,6 +38,15 @@ import { system } from '@/presentation/theme/system';
 function browserLocalStorage(): Storage | undefined {
   try {
     return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+// Reading window.sessionStorage itself throws when site data is blocked.
+function browserSessionStorage(): Storage | undefined {
+  try {
+    return window.sessionStorage;
   } catch {
     return undefined;
   }
@@ -77,8 +90,9 @@ const live = createLiveSync({
   // ConfirmationPending attempts are resolved in subproject 3.
   resolvePending: () => Promise.resolve(),
 });
+const accountApi = createAccountApi(client);
 const session = createSessionStore({
-  api: createAccountApi(client),
+  api: accountApi,
   commands,
   scheduler,
   visibility,
@@ -109,6 +123,18 @@ const session = createSessionStore({
     void access.refresh();
   },
 });
+const passwordReset = createPasswordResetFlow({
+  api: createRecoveryApi(client),
+  commands,
+  session,
+  storage: createPasswordResetStore(browserSessionStorage()),
+  now,
+});
+const accountSettings = createAccountSettings({
+  api: accountApi,
+  commands,
+  session,
+});
 
 const services: PresentationServices = {
   cookieNotice: createCookieNoticeStore(browserLocalStorage()),
@@ -121,6 +147,9 @@ const services: PresentationServices = {
   live,
   models,
   commands,
+  now,
+  passwordReset,
+  accountSettings,
 };
 const router = createBrowserRouter(createRoutes(services));
 

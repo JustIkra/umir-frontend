@@ -67,6 +67,19 @@ export const activeSession = {
   },
 };
 
+// The fixed clock of render tests.
+export const NOW = Date.parse('2026-10-14T07:00:00Z');
+
+export const resetSnapshot = (overrides = {}) => ({
+  step: 'email',
+  email: '',
+  expiresAtMs: undefined,
+  resendAtMs: undefined,
+  busy: false,
+  notice: undefined,
+  ...overrides,
+});
+
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
 // «Данные обновились» notice of models.
@@ -78,8 +91,30 @@ export function fakeServices({
   remembered,
   attempts = [],
   notice,
+  reset = resetSnapshot(),
 } = {}) {
   return {
+    now: () => NOW,
+    passwordReset: {
+      ...store(reset),
+      request: () => Promise.resolve('stay'),
+      renew: () => Promise.resolve('stay'),
+      verify: () => Promise.resolve('stay'),
+      resend: () => Promise.resolve('stay'),
+      complete: () => Promise.resolve('stay'),
+      check: () => Promise.resolve('stay'),
+      restart: () => {},
+    },
+    accountSettings: {
+      rename: () => Promise.reject(new Error('no rename in render tests')),
+      checkRename: () => Promise.reject(new Error('no rename in render tests')),
+      changePassword: () =>
+        Promise.reject(new Error('no password in render tests')),
+      checkPassword: () =>
+        Promise.reject(new Error('no password in render tests')),
+      refreshProfile: () => Promise.resolve(true),
+      signInToCheck: () => Promise.resolve('done'),
+    },
     cookieNotice: { isClosed: () => true, close: () => {} },
     feedback: {},
     session: {

@@ -17,6 +17,7 @@ import { SectionPage } from './app-shell/pages';
 import {
   PasswordResetCodePage,
   PasswordResetNewPage,
+  createResetStepLoader,
   PasswordResetRequestPage,
 } from './auth/password-reset-pages';
 import { LogoutPage } from './auth/logout-page';
@@ -145,8 +146,16 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
         },
         { path: '/logout', element: <LogoutPage /> },
         { path: '/password-reset', element: <PasswordResetRequestPage /> },
-        { path: '/password-reset/code', element: <PasswordResetCodePage /> },
-        { path: '/password-reset/new', element: <PasswordResetNewPage /> },
+        {
+          path: '/password-reset/code',
+          loader: createResetStepLoader(services, 'code'),
+          element: <PasswordResetCodePage />,
+        },
+        {
+          path: '/password-reset/new',
+          loader: createResetStepLoader(services, 'password'),
+          element: <PasswordResetNewPage />,
+        },
         {
           path: '/app',
           loader: createAppLoader(services),

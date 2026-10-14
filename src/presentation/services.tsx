@@ -1,10 +1,12 @@
 import { createContext, useContext, type ReactNode } from 'react';
+import type { AccountSettings } from '@/application/account-settings';
 import type { AccessStore, LastRestaurantStore } from '@/application/access';
 import type { CommandRunner } from '@/application/commands';
 import type { CookieNoticeStore } from '@/application/cookie-notice';
 import type { FeedbackSubmitter } from '@/application/feedback';
 import type { LiveSync } from '@/application/live-sync';
 import type { ModelRegistry } from '@/application/models';
+import type { PasswordResetFlow } from '@/application/password-reset';
 import type { SessionStore } from '@/application/session';
 
 // Application ports the screens use; the app layer assembles the adapters.
@@ -18,6 +20,10 @@ export interface PresentationServices {
   live: LiveSync;
   models: ModelRegistry;
   commands: CommandRunner;
+  // The clock of countdowns; render tests pass a fixed one.
+  now: () => number;
+  passwordReset: PasswordResetFlow;
+  accountSettings: AccountSettings;
 }
 
 const ServicesContext = createContext<PresentationServices | null>(null);

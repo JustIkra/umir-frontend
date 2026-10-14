@@ -8,6 +8,7 @@ import { OverviewPage } from '../../src/presentation/overview/overview-page.tsx'
 import { ServicesProvider } from '../../src/presentation/services.tsx';
 import { system } from '../../src/presentation/theme/system.ts';
 import {
+  NOW,
   R,
   activeSession,
   fakeServices,
@@ -17,6 +18,7 @@ import {
   readyAccess,
   redirectOf,
   renderRoute,
+  resetSnapshot,
   sampleRestaurant,
   text,
 } from './support/render-route.mjs';
@@ -25,12 +27,25 @@ const guest = { session: { status: 'anonymous', expired: false } };
 
 const pages = [
   ['/login', 'Вход', ['Логин', 'Пароль', 'Запомнить меня'], guest],
-  ['/password-reset', 'Восстановление пароля', ['Логин']],
-  ['/password-reset/code', 'Введите код', ['Код из письма']],
+  ['/password-reset', 'Восстановление пароля', ['Почта']],
+  [
+    '/password-reset/code',
+    'Введите код',
+    ['Код из письма'],
+    {
+      reset: resetSnapshot({
+        step: 'code',
+        email: 'a@b.ru',
+        expiresAtMs: NOW + 600_000,
+        resendAtMs: NOW,
+      }),
+    },
+  ],
   [
     '/password-reset/new',
     'Новый пароль',
     ['Новый пароль', 'Повторите новый пароль'],
+    { reset: resetSnapshot({ step: 'password', email: 'a@b.ru' }) },
   ],
   [`/app/r/${R}`, 'Обзор', []],
   [`/app/r/${R}/orders`, 'Новый заказ', []],
