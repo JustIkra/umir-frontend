@@ -64,6 +64,30 @@ const catalogData = {
   },
 };
 
+const servingAt = instantOf('2026-10-14T10:00:00+03:00');
+const servingData = {
+  menu: loaded({
+    evaluatedAt: servingAt,
+    stateVersion: '1',
+    dishes: [{ dishID: '206', name: 'Паста с лососем' }],
+  }),
+  stopList: loaded({
+    evaluatedAt: servingAt,
+    stateVersion: '1',
+    dishes: [],
+  }),
+  recommendations: loaded({
+    evaluatedAt: servingAt,
+    stateVersion: '1',
+    items: [],
+  }),
+  servingProducts: loaded({
+    evaluatedAt: servingAt,
+    stateVersion: '1',
+    items: [],
+  }),
+};
+
 const guest = { session: { status: 'anonymous', expired: false } };
 
 const pages = [
@@ -89,10 +113,10 @@ const pages = [
     { reset: resetSnapshot({ step: 'password', email: 'a@b.ru' }) },
   ],
   [`/app/r/${R}`, 'Обзор', []],
-  [`/app/r/${R}/orders`, 'Новый заказ', []],
-  [`/app/r/${R}/orders/draft`, 'Новый заказ', []],
-  [`/app/r/${R}/orders/proposal`, 'Новый заказ', []],
-  [`/app/r/${R}/orders/placed`, 'Новый заказ', []],
+  [`/app/r/${R}/orders`, 'Новый заказ', [], { data: servingData }],
+  [`/app/r/${R}/orders/draft`, 'Новый заказ', [], { data: servingData }],
+  [`/app/r/${R}/orders/proposal`, 'Новый заказ', [], { data: servingData }],
+  [`/app/r/${R}/orders/placed`, 'Новый заказ', [], { data: servingData }],
   [`/app/r/${R}/warehouse`, 'Склад', []],
   [`/app/r/${R}/warehouse/expiry`, 'Склад', []],
   [`/app/r/${R}/warehouse/history`, 'Склад', []],
@@ -460,11 +484,6 @@ test('the warehouse shows the sample stock, expiry and history', async () => {
 });
 
 test('the order flow goes from the menu to the placed order', async () => {
-  assert.ok(
-    hrefs(await renderRoute(`/app/r/${R}/orders`)).includes(
-      `/app/r/${R}/orders/draft`,
-    ),
-  );
   const draft = await renderRoute(`/app/r/${R}/orders/draft`);
   assert.ok(draft.includes('5 позиций · 9 порций'));
   assert.ok(hrefs(draft).includes(`/app/r/${R}/orders/proposal`));

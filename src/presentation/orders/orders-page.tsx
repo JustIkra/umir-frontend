@@ -1,9 +1,19 @@
 import { Box, Flex, Grid, Stack, Text } from '@chakra-ui/react';
 import { useRef, useState, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
+import { useParams } from 'react-router';
+import { findRestaurant } from '@/application/access';
+import type { OrderFlow } from '@/application/order-flow';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
-import { placeholderAccount } from '@/presentation/placeholder-account';
+import { useSectionDate } from '@/presentation/app-shell/section-date';
+import { useServices } from '@/presentation/services';
+import {
+  useAccess,
+  useReadModel,
+  useRestaurantData,
+  useStore,
+} from '@/presentation/session/hooks';
 import { draftOrder } from '@/presentation/placeholder-orders';
 import { media } from '@/presentation/theme/system';
 import { Button, TextLink } from '@/presentation/ui/actions';
@@ -77,6 +87,25 @@ function OrderBar({
 // (320px as in 02 1024, 400px from 1201); on 390 the menu and the order are
 // separate views (01/02/03-390, 05-390, 09-390).
 export function OrdersPage({ step }: { step: OrderStep }) {
+  const { restaurantID } = useParams();
+  const { orderFlow } = useServices();
+  const flow = restaurantID === undefined ? undefined : orderFlow(restaurantID);
+  return flow === undefined ? null : <OrdersView flow={flow} step={step} />;
+}
+
+function OrdersView({ flow, step }: { flow: OrderFlow; step: OrderStep }) {
+  const { restaurantID } = useParams();
+  const caption = useSectionDate();
+  const snapshot = useStore(flow);
+  const [query, setQuery] = useState('');
+  const access = useAccess();
+  const restaurant =
+    restaurantID === undefined
+      ? undefined
+      : findRestaurant(access, restaurantID);
+  const menuRead = useReadModel(useRestaurantData().menu());
+  const timeZone =
+    restaurant?.timeZone ?? menuRead.value?.context.settings.timeZone ?? 'UTC';
   const path = useRestaurantPath();
   const dialog = useRef<HTMLDialogElement>(null);
   const openButton = useRef<HTMLButtonElement>(null);
@@ -132,7 +161,7 @@ export function OrdersPage({ step }: { step: OrderStep }) {
       {/* On 390 the order view hides the title from sight, not from the
           page outline. */}
       <Box css={orderView ? { [media.belowSm]: visuallyHidden } : undefined}>
-        <PageHeader title="Новый заказ" caption={placeholderAccount.today} />
+        <PageHeader title="Новый заказ" caption={caption} />
       </Box>
       <Grid
         templateColumns={{
@@ -148,8 +177,22 @@ export function OrdersPage({ step }: { step: OrderStep }) {
           display={{ base: orderView ? 'none' : 'flex', sm: 'flex' }}
           minW="0"
         >
-          <SearchInput label="Найти блюдо" />
-          <MenuTabs draft={step === 'draft'} />
+          <SearchInput
+            label="Найти блюдо"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+            }}
+          />
+          <MenuTabs
+            draft={snapshot.draft}
+            query={query}
+            canAdd={snapshot.phase.kind === 'compose'}
+            onAdd={(dishID) => {
+              flow.add(dishID);
+            }}
+            timeZone={timeZone}
+          />
           {(step === 'empty' || step === 'draft') && (
             <OrderBar
               empty={step === 'empty'}

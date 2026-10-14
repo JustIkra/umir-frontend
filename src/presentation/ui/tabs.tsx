@@ -14,13 +14,23 @@ export function Tabs({
   label,
   tabs,
   extra,
+  value,
+  onValueChange,
 }: {
   label: string;
   tabs: readonly { id: string; title: string; content: ReactNode }[];
   extra?: ReactNode;
+  // A controlled tab: without value the tabs keep their own selection.
+  value?: number;
+  onValueChange?: (index: number) => void;
 }) {
   const base = useId();
-  const [selected, setSelected] = useState(0);
+  const [own, setOwn] = useState(0);
+  const selected = value ?? own;
+  const setSelected = (index: number) => {
+    if (value === undefined) setOwn(index);
+    onValueChange?.(index);
+  };
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const last = tabs.length - 1;
   const keys: Record<string, (index: number) => number> = {
