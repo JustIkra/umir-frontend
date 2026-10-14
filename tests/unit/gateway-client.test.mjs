@@ -53,6 +53,21 @@ test('a background read sends X-Umir-Activity: background', async () => {
   assert.equal(calls[0].init.headers['X-Umir-Activity'], 'background');
 });
 
+test('a read sends X-Umir-Runtime-Epoch only when it names an epoch', async () => {
+  const epoch = '44444444-4444-4444-8444-444444444444';
+  const { fetch, calls } = fakeFetch(json(200, {}), json(200, {}));
+  const client = createGatewayClient(fetch);
+  await client.read('/api/v2/r/x/warehouse/writeoffs/commands', {
+    background: false,
+    epoch,
+  });
+  await client.read('/api/v2/r/x/warehouse/inventory', { background: false });
+  assert.equal(calls[0].init.method, 'GET');
+  assert.equal(calls[0].init.headers['X-Umir-Runtime-Epoch'], epoch);
+  assert.equal(calls[0].init.headers['X-CSRF-Token'], undefined);
+  assert.equal(calls[1].init.headers['X-Umir-Runtime-Epoch'], undefined);
+});
+
 test('a refused read rejects with the decoded contract failure', async () => {
   const { fetch } = fakeFetch(
     refusal(503, 'RuntimeNotReady', 'unavailable', { retryable: true }),

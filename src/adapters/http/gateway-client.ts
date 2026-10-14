@@ -16,14 +16,18 @@ export interface SendOptions {
   readonly epoch?: string | undefined;
 }
 
+export interface ReadOptions {
+  readonly background: boolean;
+  // A passive command lookup (warehouse writeoffs/commands) names the original
+  // runtime epoch.
+  readonly epoch?: string | undefined;
+}
+
 // Browser access to gateway. Reads resolve to the parsed JSON body; writes
 // carry the CSRF token and, for warehouse and serving, the runtime epoch.
 // Every refusal or loss rejects with ApiError.
 export interface GatewayClient {
-  read(
-    path: string,
-    options: { readonly background: boolean },
-  ): Promise<unknown>;
+  read(path: string, options: ReadOptions): Promise<unknown>;
   send(method: Method, path: string, options?: SendOptions): Promise<unknown>;
   setCsrfToken(token: string): void;
   clearCsrfToken(): void;
@@ -113,11 +117,12 @@ export function createGatewayClient(fetch: FetchLike): GatewayClient {
   }
 
   return {
-    read(path, { background }) {
+    read(path, { background, epoch }) {
       return exchange('GET', path, {
         headers: {
           Accept: 'application/json',
           ...(background ? { [activityHeader]: 'background' } : {}),
+          ...(epoch === undefined ? {} : { [epochHeader]: epoch }),
         },
       });
     },
