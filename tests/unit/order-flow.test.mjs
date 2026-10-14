@@ -457,3 +457,37 @@ test('a 401 on the check keeps the attempt for after the sign-in', async () => {
   assert.equal(storage.box.record.attempt.commandID, 'cmd-1');
   assert.equal(commands.getSnapshot()[0].commandID, 'cmd-1');
 });
+
+for (const [status, code] of [
+  [429, 'RateLimited'],
+  [403, 'Forbidden'],
+]) {
+  test(`a ${String(status)} on the check keeps the attempt`, async () => {
+    const proposal = proposalOf('prp-1');
+    const stored = {
+      userID: 'u1',
+      restaurantID: R,
+      lines: [{ lineNo: 1, dishID: '206', portions: '1' }],
+      attempt: {
+        commandID: 'saved-cmd',
+        proposalID: 'prp-1',
+        runtimeEpoch: EPOCH,
+        proposal,
+        startedAt: 7,
+        state: 'sent',
+      },
+    };
+    const { flow, answers, calls, storage, commands } = setup({ stored });
+    answers.confirm.push(refused(status, code, 'not_committed'));
+    await flow.check();
+    assert.equal(phase(flow).kind, 'unknown');
+    assert.equal(phase(flow).checking, false);
+    assert.deepEqual(flow.getSnapshot().notice, { kind: 'check-failed' });
+    assert.equal(storage.box.record.attempt.commandID, 'saved-cmd');
+    assert.equal(commands.getSnapshot()[0].commandID, 'saved-cmd');
+    answers.confirm.push(envelope({ kind: 'OrderConfirmed', order }));
+    await flow.check();
+    assert.deepEqual(calls.at(-1), ['confirm', R, 'prp-1', 'saved-cmd', EPOCH]);
+    assert.equal(phase(flow).kind, 'confirmed');
+  });
+}

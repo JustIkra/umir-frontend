@@ -306,6 +306,16 @@ export function createOrderFlow({
       show({ kind: 'conflict', attempt: kept, checking: false });
       return;
     }
+    if (checking && attempt !== undefined) {
+      // Only the owner of the command can refuse it; any other refusal of the
+      // check says nothing about the original attempt, so it stays unresolved.
+      restorePending(attempt);
+      show(
+        { kind: 'unknown', attempt, checking: false },
+        { kind: 'check-failed' },
+      );
+      return;
+    }
     clearAttempt();
     show({ kind: 'refused', code: failure.code, proposal });
   }
