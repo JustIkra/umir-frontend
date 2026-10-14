@@ -10,15 +10,13 @@ const files = (dir) =>
     const path = join(dir, name);
     return statSync(path).isDirectory() ? files(path) : [path];
   });
+// Names, codes and the fixed date of the Figma sample. The warehouse, the
+// directories, the orders and the overview read backend v2 now.
 const sample =
-  /Марина Белова|m\.belova|Восток Фуд|На Пушкинской|Южного федерального|Ковалёва|restoran\.example|Уральская кухня|Тальятелле|Яйцо куриное|ord-20261010-0042|P-0158|Масло трюфельное/;
+  /Марина Белова|m\.belova|Восток Фуд|На Пушкинской|Южного федерального|Ковалёва|restoran\.example|Уральская кухня|Тальятелле|Яйцо куриное|ord-20261010-0042|P-0158|Масло трюфельное|Суббота, 10 октября/;
 // The landing illustration shows its own sample screen.
 const allowed = [
-  'src/presentation/placeholder-account.ts',
   'src/presentation/placeholder-organizations.ts',
-  'src/presentation/placeholder-catalog.ts',
-  'src/presentation/placeholder-warehouse.ts',
-  'src/presentation/placeholder-orders.ts',
   'src/presentation/landing/product-preview.tsx',
 ];
 
@@ -36,4 +34,13 @@ test('placeholder data lives in marked modules', () => {
         sample.test(readFileSync(join(root, path), 'utf8')),
     );
   assert.deepEqual(offenders, []);
+});
+
+test('only the organization screens keep sample modules', () => {
+  assert.deepEqual(
+    readdirSync(join(root, 'src/presentation')).filter((name) =>
+      name.startsWith('placeholder-'),
+    ),
+    ['placeholder-organizations.ts'],
+  );
 });
