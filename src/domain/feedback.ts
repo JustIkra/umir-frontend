@@ -36,6 +36,10 @@ export const feedbackFieldOrder: readonly FeedbackField[] = [
 ];
 
 export const feedbackMessageLimit = 2000;
+
+// The edition of the consent text the visitor accepts (Figma Templates
+// 218:350); the service stores it with the request.
+export const feedbackConsentVersion = '2026-10-11';
 const nameLimit = 100;
 const emailLimit = 254;
 const phoneLimit = 32;

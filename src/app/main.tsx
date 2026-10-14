@@ -13,7 +13,7 @@ import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
-import { notConnectedFeedbackSender } from '@/adapters/feedback/not-connected-sender';
+import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender';
 import { createGatewayClient } from '@/adapters/http/gateway-client';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createAccessStore } from '@/application/access';
@@ -112,7 +112,7 @@ const session = createSessionStore({
 
 const services: PresentationServices = {
   cookieNotice: createCookieNoticeStore(browserLocalStorage()),
-  feedback: createFeedbackSubmitter(notConnectedFeedbackSender, () =>
+  feedback: createFeedbackSubmitter(createFeedbackApiSender(client), () =>
     crypto.randomUUID(),
   ),
   session,
