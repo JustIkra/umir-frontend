@@ -4,6 +4,7 @@ import { useBlocker, useNavigate } from 'react-router';
 import type { User } from '@/application/account';
 import type {
   PasswordField,
+  PendingChanges,
   PasswordFieldError,
   RenameCheck,
 } from '@/application/account-settings';
@@ -235,6 +236,46 @@ export function passwordMessage(
   }
 }
 
+export function nameLocked(status: NameStatus): boolean {
+  return (
+    status.kind === 'checking' ||
+    status.kind === 'unconfirmed' ||
+    status.kind === 'recovering'
+  );
+}
+
+export function passwordLocked(status: PasswordStatus): boolean {
+  return (
+    status.kind === 'storage' ||
+    status.kind === 'unknown' ||
+    status.kind === 'recovering' ||
+    status.kind === 'checking'
+  );
+}
+
+// A name whose save is still unknown reopens the editor on the S09 message.
+export function initialName(pending: PendingChanges): {
+  editing: boolean;
+  draft: string;
+  status: NameStatus;
+} {
+  return pending.name === undefined
+    ? { editing: false, draft: '', status: { kind: 'idle' } }
+    : {
+        editing: true,
+        draft: pending.name,
+        status: { kind: 'unconfirmed', code: 'AttemptPending' },
+      };
+}
+
+export function initialPassword(pending: PendingChanges): PasswordStatus {
+  if (pending.password === 'unknown') return { kind: 'unknown' };
+  if (pending.password === 'recovering') {
+    return { kind: 'recovering', code: 'AuthUpdateOutcomeUnknown' };
+  }
+  return { kind: 'idle' };
+}
+
 const field = (value: FormDataEntryValue | null) =>
   typeof value === 'string' ? value : '';
 
@@ -334,15 +375,12 @@ function LeaveNameDialog({
 // Figma S01–S12, S23.
 function NameEditor({ user }: { user: User }) {
   const { accountSettings } = useServices();
-  const [editing, setEditing] = useState(false);
+  const [initial] = useState(() => initialName(accountSettings.pending()));
+  const [editing, setEditing] = useState(initial.editing);
   const [saved, setSaved] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [status, setStatus] = useState<NameStatus>({ kind: 'idle' });
-  const locked =
-    status.kind === 'checking' ||
-    status.kind === 'unconfirmed' ||
-    status.kind === 'recovering';
-  const busy = locked || status.kind === 'saving';
+  const [draft, setDraft] = useState(initial.draft);
+  const [status, setStatus] = useState<NameStatus>(initial.status);
+  const busy = nameLocked(status) || status.kind === 'saving';
   const message = nameMessage(status, user.displayName);
 
   const finish = () => {
@@ -486,15 +524,12 @@ function NameEditor({ user }: { user: User }) {
 function PasswordForm() {
   const { accountSettings, now: clock } = useServices();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<PasswordStatus>({ kind: 'idle' });
+  const [status, setStatus] = useState<PasswordStatus>(() =>
+    initialPassword(accountSettings.pending()),
+  );
   const now = useNow(status.kind === 'limited');
   const message = passwordMessage(status, now);
-  const locked =
-    status.kind === 'storage' ||
-    status.kind === 'unknown' ||
-    status.kind === 'recovering' ||
-    status.kind === 'checking';
-  const busy = locked || status.kind === 'saving';
+  const busy = passwordLocked(status) || status.kind === 'saving';
   const waiting = status.kind === 'limited' && message !== undefined;
   const errorOf = (name: PasswordField): string | undefined => {
     const code = status.kind === 'invalid' ? status.errors[name] : undefined;

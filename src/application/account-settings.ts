@@ -67,6 +67,14 @@ export interface AccountSettings {
   checkPassword(): Promise<PasswordCheck>;
   refreshProfile(): Promise<boolean>;
   signInToCheck(): Promise<'done' | 'failed'>;
+  // Changes whose outcome is still unknown: the page keeps their fields
+  // closed after a visit elsewhere, as the command runner holds the attempt.
+  pending(): PendingChanges;
+}
+
+export interface PendingChanges {
+  readonly name: string | undefined;
+  readonly password: 'unknown' | 'recovering' | undefined;
 }
 
 // Auth could not tell whether it stored the change; it answers again after
@@ -110,6 +118,9 @@ export function createAccountSettings({
     return state.status === 'active' ? state.user.login : '';
   };
 
+  let lostName: string | undefined;
+  let lostPassword: 'unknown' | 'recovering' | undefined;
+
   async function readProfile(): Promise<ProfileRead> {
     try {
       const { user } = await api.me({ background: false });
@@ -136,6 +147,7 @@ export function createAccountSettings({
       return { kind: 'saved', user: result.value };
     }
     if (result.kind === 'unknown') {
+      lostName = name;
       return result.failure.code === recoveringCode
         ? { kind: 'recovering', code: result.failure.code }
         : { kind: 'lost' };
@@ -190,6 +202,8 @@ export function createAccountSettings({
       return { kind: 'changed' };
     }
     if (result.kind === 'unknown') {
+      lostPassword =
+        result.failure.code === recoveringCode ? 'recovering' : 'unknown';
       return result.failure.code === recoveringCode
         ? { kind: 'recovering', code: result.failure.code }
         : { kind: 'unknown' };
@@ -248,7 +262,16 @@ export function createAccountSettings({
     return false;
   }
 
+  function pending(): PendingChanges {
+    const keys = commands.getSnapshot().map((attempt) => attempt.key);
+    return {
+      name: keys.includes(renameKey) ? lostName : undefined,
+      password: keys.includes(passwordKey) ? lostPassword : undefined,
+    };
+  }
+
   return {
+    pending,
     rename,
     checkRename,
     changePassword,

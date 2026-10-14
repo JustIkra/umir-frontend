@@ -270,3 +270,42 @@ test('refreshProfile() updates the user; 401 asks the session', async () => {
   assert.equal(await settings.refreshProfile(), false);
   assert.deepEqual(events, [['updateUser', 'С сервера'], ['check']]);
 });
+
+test('pending() reports a lost rename until the profile read settles it', async () => {
+  const { settings, answers, commands } = setup();
+  assert.deepEqual(settings.pending(), {
+    name: undefined,
+    password: undefined,
+  });
+  answers.changeDisplayName.push(lost());
+  await settings.rename(' Новое имя ');
+  assert.equal(settings.pending().name, 'Новое имя');
+  answers.me.push({ user: named('Новое имя') });
+  await settings.checkRename('Новое имя');
+  assert.equal(settings.pending().name, undefined);
+  answers.changeDisplayName.push(recovering());
+  await settings.rename('Другое имя');
+  assert.equal(settings.pending().name, 'Другое имя');
+  answers.me.push({ user: named('Марина Белова') });
+  assert.equal((await settings.checkRename('Другое имя')).kind, 'unchanged');
+  assert.equal(settings.pending().name, undefined);
+  answers.changeDisplayName.push(lost());
+  await settings.rename('Третье имя');
+  commands.clear();
+  assert.equal(settings.pending().name, undefined);
+});
+
+test('pending() reports an unknown or recovering password change', async () => {
+  const { settings, answers, commands } = setup();
+  answers.changePassword.push(lost());
+  await settings.changePassword(input);
+  assert.equal(settings.pending().password, 'unknown');
+  commands.clear();
+  assert.equal(settings.pending().password, undefined);
+  answers.changePassword.push(recovering());
+  await settings.changePassword(input);
+  assert.equal(settings.pending().password, 'recovering');
+  answers.me.push({ user });
+  assert.equal(await settings.checkPassword(), 'unchanged');
+  assert.equal(settings.pending().password, undefined);
+});

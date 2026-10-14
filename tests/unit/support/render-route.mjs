@@ -92,6 +92,7 @@ export function fakeServices({
   attempts = [],
   notice,
   reset = resetSnapshot(),
+  pending = { name: undefined, password: undefined },
 } = {}) {
   return {
     now: () => NOW,
@@ -106,6 +107,7 @@ export function fakeServices({
       restart: () => {},
     },
     accountSettings: {
+      pending: () => pending,
       rename: () => Promise.reject(new Error('no rename in render tests')),
       checkRename: () => Promise.reject(new Error('no rename in render tests')),
       changePassword: () =>

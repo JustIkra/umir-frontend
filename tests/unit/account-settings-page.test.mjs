@@ -2,9 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import {
   emailNote,
+  initialName,
+  initialPassword,
+  nameLocked,
   nameAfterCheck,
   nameMessage,
   passwordFieldText,
+  passwordLocked,
   passwordMessage,
 } from '../../src/presentation/app-shell/account-settings-page.tsx';
 import {
@@ -154,4 +158,96 @@ test('the password messages follow S18–S22 and the field texts S14–S17', () 
     'new-rejected': 'Пароль должен содержать от 8 до 32 символов.',
     mismatch: 'Пароли не совпадают.',
   });
+});
+
+const nameKinds = [
+  { kind: 'idle' },
+  { kind: 'invalid' },
+  { kind: 'saving' },
+  { kind: 'storage', code: 'X' },
+  { kind: 'checking' },
+  { kind: 'unchanged', serverName: 'A' },
+  { kind: 'unconfirmed', code: 'X' },
+  { kind: 'recovering', code: 'X' },
+];
+
+test('the name is locked while the outcome is unknown or being read', () => {
+  assert.deepEqual(
+    nameKinds.map((status) => [status.kind, nameLocked(status)]),
+    [
+      ['idle', false],
+      ['invalid', false],
+      ['saving', false],
+      ['storage', false],
+      ['checking', true],
+      ['unchanged', false],
+      ['unconfirmed', true],
+      ['recovering', true],
+    ],
+  );
+});
+
+test('the password fields are locked while the outcome is unknown or refused by storage', () => {
+  const kinds = [
+    ['idle', false],
+    ['saving', false],
+    ['invalid', false],
+    ['limited', false],
+    ['storage', true],
+    ['unknown', true],
+    ['recovering', true],
+    ['checking', true],
+    ['unchanged', false],
+  ];
+  for (const [kind, locked] of kinds) {
+    assert.equal(passwordLocked({ kind }), locked, kind);
+  }
+});
+
+test('a pending change opens the page in its unknown state', () => {
+  assert.deepEqual(initialName({ name: undefined, password: undefined }), {
+    editing: false,
+    draft: '',
+    status: { kind: 'idle' },
+  });
+  assert.deepEqual(initialName({ name: 'Новое имя', password: undefined }), {
+    editing: true,
+    draft: 'Новое имя',
+    status: { kind: 'unconfirmed', code: 'AttemptPending' },
+  });
+  assert.deepEqual(initialPassword({ name: undefined, password: undefined }), {
+    kind: 'idle',
+  });
+  assert.deepEqual(initialPassword({ name: undefined, password: 'unknown' }), {
+    kind: 'unknown',
+  });
+  assert.deepEqual(
+    initialPassword({ name: undefined, password: 'recovering' }),
+    {
+      kind: 'recovering',
+      code: 'AuthUpdateOutcomeUnknown',
+    },
+  );
+});
+
+test('the page keeps a pending name closed', async () => {
+  const plain = text(
+    await renderRoute('/app/settings', {
+      pending: { name: 'Новое имя', password: undefined },
+    }),
+  );
+  assert.ok(plain.includes('Результат сохранения неизвестен'));
+  const html = await renderRoute('/app/settings', {
+    pending: { name: 'Новое имя', password: undefined },
+  });
+  assert.match(html, /<input[^>]*id="settings-name"[^>]*disabled/);
+});
+
+test('the page keeps a pending password closed', async () => {
+  const plain = text(
+    await renderRoute('/app/settings', {
+      pending: { name: undefined, password: 'unknown' },
+    }),
+  );
+  assert.ok(plain.includes('Результат изменения пароля неизвестен'));
 });
