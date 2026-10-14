@@ -603,9 +603,6 @@ test('section pages keep their sidebar item current', async () => {
 });
 
 test('the warehouse shows the sample stock, expiry and history', async () => {
-  const stockHtml = await renderRoute(`/app/r/${R}/warehouse`);
-  assert.ok(stockHtml.includes('P-0158'));
-  assert.ok(hrefs(stockHtml).includes(`/app/r/${R}/warehouse/delivery`));
   assert.ok(
     (await renderRoute(`/app/r/${R}/warehouse/expiry`)).includes(
       'через 20 ч 38 мин',

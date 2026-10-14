@@ -2,33 +2,42 @@ import { Flex, Stack } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
-import { placeholderAccount } from '@/presentation/placeholder-account';
+import { useSectionDate } from '@/presentation/app-shell/section-date';
+import { usePermissions } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { EvaluationStamp } from '@/presentation/ui/evaluation-stamp';
 import { TabNav } from '@/presentation/ui/tab-nav';
 
-// Figma S1/S3/H1: «Склад» with «Принять поставку», the tabs and the stamp;
-// the controls and the list below sit 16px apart.
+// Figma S1/S3/H1: «Склад» with the date and zone of the organization,
+// «Принять поставку» for delivery.create, the tabs and the stamp of the shown
+// read; the controls and the list below sit 16px apart.
 export function WarehouseLayout({
   section,
   stamp,
+  onRefresh,
   children,
 }: {
   section: string;
   stamp: string;
+  // «Обновить» next to the stamp re-reads the shown data.
+  onRefresh?: () => void;
   children: ReactNode;
 }) {
   const path = useRestaurantPath();
+  const caption = useSectionDate();
+  const canDeliver = usePermissions().has('delivery.create');
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <PageHeader
         title="Склад"
-        caption={placeholderAccount.today}
+        caption={caption}
         documentTitle={`${section} · Склад`}
         action={
-          <ButtonLink to={path('/warehouse/delivery')}>
-            Принять поставку
-          </ButtonLink>
+          canDeliver ? (
+            <ButtonLink to={path('/warehouse/delivery')}>
+              Принять поставку
+            </ButtonLink>
+          ) : undefined
         }
       />
       <Flex
@@ -46,7 +55,10 @@ export function WarehouseLayout({
             { to: path('/warehouse/history'), title: 'История' },
           ]}
         />
-        <EvaluationStamp text={stamp} />
+        <EvaluationStamp
+          text={stamp}
+          {...(onRefresh === undefined ? {} : { onRefresh })}
+        />
       </Flex>
       <Stack gap="4">{children}</Stack>
     </Stack>
