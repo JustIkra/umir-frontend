@@ -1,12 +1,15 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { AccountSettings } from '@/application/account-settings';
 import type { AccessStore, LastRestaurantStore } from '@/application/access';
+import type { CatalogCommands } from '@/application/catalog-commands';
 import type { CommandRunner } from '@/application/commands';
 import type { CookieNoticeStore } from '@/application/cookie-notice';
 import type { FeedbackSubmitter } from '@/application/feedback';
 import type { LiveSync } from '@/application/live-sync';
 import type { ModelRegistry } from '@/application/models';
+import type { OrderFlow } from '@/application/order-flow';
 import type { PasswordResetFlow } from '@/application/password-reset';
+import type { RestaurantData } from '@/application/restaurant-data';
 import type { SessionStore } from '@/application/session';
 
 // Application ports the screens use; the app layer assembles the adapters.
@@ -24,6 +27,10 @@ export interface PresentationServices {
   now: () => number;
   passwordReset: PasswordResetFlow;
   accountSettings: AccountSettings;
+  restaurantData: (restaurantID: string) => RestaurantData;
+  catalogCommands: (restaurantID: string) => CatalogCommands;
+  // undefined without a signed-in user.
+  orderFlow: (restaurantID: string) => OrderFlow | undefined;
 }
 
 const ServicesContext = createContext<PresentationServices | null>(null);

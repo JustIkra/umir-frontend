@@ -8,11 +8,17 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { createAccessApi } from '@/adapters/api/access-api';
+import {
+  createCatalogApi,
+  createOrderApi,
+  createRestaurantReads,
+} from '@/adapters/api/restaurant-api';
 import { createRecoveryApi } from '@/adapters/api/recovery-api';
 import { createAccountApi } from '@/adapters/api/account-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
+import { createOrderStore } from '@/adapters/browser-storage/order-store';
 import { createPasswordResetStore } from '@/adapters/browser-storage/password-reset-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
 import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender';
@@ -20,12 +26,22 @@ import { createGatewayClient } from '@/adapters/http/gateway-client';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createAccountSettings } from '@/application/account-settings';
 import { createAccessStore } from '@/application/access';
+import {
+  createCatalogCommands,
+  type CatalogCommands,
+} from '@/application/catalog-commands';
 import { createCommandRunner } from '@/application/commands';
 import { createEpochRegistry } from '@/application/epochs';
 import { createFeedbackSubmitter } from '@/application/feedback';
 import { createLiveSync } from '@/application/live-sync';
 import { createModelRegistry } from '@/application/models';
+import { createOrderFlow } from '@/application/order-flow';
+import { createOrderFlowRegistry } from '@/application/order-flows';
 import { createPasswordResetFlow } from '@/application/password-reset';
+import {
+  createRestaurantData,
+  type RestaurantData,
+} from '@/application/restaurant-data';
 import { createSessionStore } from '@/application/session';
 import { createRoutes } from '@/presentation/routes';
 import {
@@ -87,9 +103,40 @@ const live = createLiveSync({
   onRefused: () => {
     void access.refresh();
   },
-  // ConfirmationPending attempts are resolved in subproject 3.
+  // ConfirmationPending attempts are checked by the order flow (once after
+  // 3 s, then by «Проверить результат»); live signals do not resolve them
+  // (spec 3, section 6).
   resolvePending: () => Promise.resolve(),
 });
+const restaurantReads = createRestaurantReads(client);
+const catalogApi = createCatalogApi(client);
+const orderApi = createOrderApi(client);
+const orderStore = createOrderStore(browserSessionStorage());
+const restaurantData = new Map<string, RestaurantData>();
+const catalogCommands = new Map<string, CatalogCommands>();
+const orderFlows = createOrderFlowRegistry(
+  (userID, restaurantID) =>
+    createOrderFlow({
+      api: orderApi,
+      commands,
+      epochs,
+      storage: orderStore,
+      scheduler,
+      now,
+      restaurantID,
+      userID,
+      onReset: () => {
+        models.reset(restaurantID);
+      },
+      onOrdered: () => {
+        models.markStale(restaurantID, ['orders', 'stock', 'menu']);
+      },
+      onUnauthenticated: () => {
+        void session.check();
+      },
+    }),
+  orderStore,
+);
 const accountApi = createAccountApi(client);
 const session = createSessionStore({
   api: accountApi,
@@ -106,6 +153,8 @@ const session = createSessionStore({
     commands.clear();
     epochs.clear();
     access.clear();
+    orderFlows.forget();
+    catalogCommands.clear();
     client.clearCsrfToken();
   },
   onExpired: () => {
@@ -120,6 +169,8 @@ const session = createSessionStore({
     commands.clear();
     epochs.clear();
     access.clear();
+    orderFlows.forget();
+    catalogCommands.clear();
     void access.refresh();
   },
   // L13: the server ended the session while a password change is pending,
@@ -160,6 +211,38 @@ const services: PresentationServices = {
   now,
   passwordReset,
   accountSettings,
+  restaurantData: (restaurantID) => {
+    let data = restaurantData.get(restaurantID);
+    if (data === undefined) {
+      data = createRestaurantData(models, restaurantReads, restaurantID);
+      restaurantData.set(restaurantID, data);
+    }
+    return data;
+  },
+  catalogCommands: (restaurantID) => {
+    let catalog = catalogCommands.get(restaurantID);
+    if (catalog === undefined) {
+      catalog = createCatalogCommands({
+        api: catalogApi,
+        commands,
+        restaurantID,
+        markStale: (topics) => {
+          models.markStale(restaurantID, topics);
+        },
+        onUnauthenticated: () => {
+          void session.check();
+        },
+      });
+      catalogCommands.set(restaurantID, catalog);
+    }
+    return catalog;
+  },
+  orderFlow: (restaurantID) => {
+    const state = session.getSnapshot();
+    return state.status === 'active'
+      ? orderFlows.get(state.user.userID, restaurantID)
+      : undefined;
+  },
 };
 const router = createBrowserRouter(createRoutes(services));
 

@@ -1,9 +1,12 @@
 import { useSyncExternalStore } from 'react';
+import { useParams } from 'react-router';
 import type { AccessState } from '@/application/access';
 import type { Attempt } from '@/application/commands';
+import { screenFailure, type ScreenFailure } from '@/application/failure';
 import type { LiveState } from '@/application/live-sync';
 import type { RefreshNotice } from '@/application/models';
 import type { ReadModel, ReadModelSnapshot } from '@/application/read-model';
+import type { RestaurantData } from '@/application/restaurant-data';
 import type { SessionState } from '@/application/session';
 import { useServices } from '@/presentation/services';
 
@@ -62,4 +65,39 @@ export function useReadModel<T>(model: ReadModel<T>): ReadModelSnapshot<T> {
     model.getSnapshot,
     model.getSnapshot,
   );
+}
+
+export function useStore<T>(store: {
+  readonly subscribe: (listener: () => void) => () => void;
+  readonly getSnapshot: () => T;
+}): T {
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
+}
+
+// A restaurant read with the screen state of its failure (spec section 7 of
+// the foundation): the previous value stays shown when a re-read fails.
+export function useRestaurantRead<T>(model: ReadModel<T>): {
+  readonly snapshot: ReadModelSnapshot<T>;
+  readonly failure: ScreenFailure | undefined;
+} {
+  const snapshot = useReadModel(model);
+  return {
+    snapshot,
+    failure: snapshot.failed ? screenFailure(snapshot.failure) : undefined,
+  };
+}
+
+// The read models of the restaurant in the address. Rendered only inside
+// /app/r/:restaurantID.
+export function useRestaurantData(): RestaurantData {
+  const { restaurantID } = useParams();
+  const { restaurantData } = useServices();
+  if (restaurantID === undefined) {
+    throw new Error('useRestaurantData outside a restaurant');
+  }
+  return restaurantData(restaurantID);
 }

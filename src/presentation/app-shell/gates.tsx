@@ -84,12 +84,16 @@ export function createEntryLoader(services: PresentationServices) {
 }
 
 // /app/r/:restaurantID: a malformed id is a missing page; access is read
-// before the first render so the shell does not flash.
+// before the first render so the shell does not flash; the order flow of the
+// address is created there too, so a stored attempt is restored before it.
 export function createRestaurantLoader(services: PresentationServices) {
   return async ({ params }: LoaderFunctionArgs) => {
     if (!isEntityId(params.restaurantID)) throw new NotFound();
     if ((await services.session.ensure()).status === 'active') {
       await services.access.ensure();
+      // Not during render: a restored order attempt publishes to its
+      // subscribers, and W11 must see it on any page of the restaurant.
+      services.orderFlow(params.restaurantID);
     }
     return null;
   };

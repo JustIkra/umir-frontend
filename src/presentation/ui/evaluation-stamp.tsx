@@ -3,15 +3,17 @@ import clockIcon from '@/presentation/assets/icons/clock-24.svg';
 import { Button } from './actions';
 import { Icon } from './icon';
 
-// Figma Evaluation stamp: when the shown data was computed. «Обновить» does
-// nothing until the API is connected. icon="narrow" hides the clock from 1201
+// Figma Evaluation stamp: when the shown data was computed. «Обновить» re-reads
+// the shown data. icon="narrow" hides the clock from 1201
 // (the order menu draws it at 390 and 1024, not at 1440).
 export function EvaluationStamp({
   text,
   icon = true,
+  onRefresh,
 }: {
   text: string;
   icon?: boolean | 'narrow';
+  onRefresh?: () => void;
 }) {
   return (
     <Flex
@@ -33,7 +35,9 @@ export function EvaluationStamp({
         )}
         <Text as="span">{text}</Text>
       </Flex>
-      <Button variant="link">Обновить</Button>
+      <Button type="button" variant="link" onClick={onRefresh}>
+        Обновить
+      </Button>
     </Flex>
   );
 }

@@ -7,6 +7,7 @@ import {
   createStaticHandler,
   createStaticRouter,
 } from 'react-router';
+import { ApiError, localFailure } from '../../../src/application/api.ts';
 import { permissionsFor } from '../../../src/domain/access.ts';
 import { createRoutes } from '../../../src/presentation/routes.tsx';
 import { ServicesProvider } from '../../../src/presentation/services.tsx';
@@ -70,6 +71,60 @@ export const activeSession = {
 // The fixed clock of render tests.
 export const NOW = Date.parse('2026-10-14T07:00:00Z');
 
+export const instantOf = (iso) => ({ iso, epochMs: Date.parse(iso) });
+
+export const readContext = {
+  orgID: ORG,
+  tenantID: R,
+  runtimeEpoch: '44444444-4444-4444-8444-444444444444',
+  warehouseEpoch: undefined,
+  settings: { timeZone: 'Europe/Moscow', settingsVersion: '1' },
+  evaluatedAt: instantOf('2026-10-14T10:00:00+03:00'),
+  stateVersion: '1',
+};
+
+export const loaded = (result, context = readContext) => ({
+  value: { context, result },
+  loadedAt: NOW,
+  loading: false,
+  failed: false,
+  failure: undefined,
+});
+
+export const loadingRead = {
+  value: undefined,
+  loadedAt: undefined,
+  loading: true,
+  failed: false,
+  failure: undefined,
+};
+
+export const failedRead = (code, status, outcome = 'unavailable') => ({
+  value: undefined,
+  loadedAt: undefined,
+  loading: false,
+  failed: true,
+  failure: new ApiError({
+    ...localFailure(code, outcome, status),
+    retryable: true,
+  }),
+});
+
+export const orderSnapshot = (overrides = {}) => ({
+  draft: [],
+  phase: { kind: 'compose' },
+  notice: undefined,
+  locked: false,
+  ...overrides,
+});
+
+const staticModel = (snapshot) => ({
+  subscribe: () => () => {},
+  getSnapshot: () => snapshot,
+  refresh: () => {},
+  markStale: () => {},
+});
+
 export const resetSnapshot = (overrides = {}) => ({
   step: 'email',
   email: '',
@@ -93,6 +148,10 @@ export function fakeServices({
   notice,
   reset = resetSnapshot(),
   pending = { name: undefined, password: undefined },
+  data = {},
+  pendingProduct,
+  pendingDish,
+  order = orderSnapshot(),
 } = {}) {
   return {
     now: () => NOW,
@@ -161,6 +220,43 @@ export function fakeServices({
       discard: () => {},
       clear: () => {},
     },
+    restaurantData: (restaurantID) => ({
+      restaurantID,
+      products: () => staticModel(data.products ?? loadingRead),
+      dishCatalog: () => staticModel(data.dishCatalog ?? loadingRead),
+      dish: () => staticModel(data.dish ?? loadingRead),
+      suggestion: (kind) =>
+        staticModel(
+          (kind === 'product' ? data.productSuggestion : data.dishSuggestion) ??
+            loadingRead,
+        ),
+      servingProducts: () => staticModel(data.servingProducts ?? loadingRead),
+      menu: () => staticModel(data.menu ?? loadingRead),
+      stopList: () => staticModel(data.stopList ?? loadingRead),
+      recommendations: () => staticModel(data.recommendations ?? loadingRead),
+    }),
+    catalogCommands: () => ({
+      registerProduct: () =>
+        Promise.reject(new Error('no commands in render tests')),
+      defineDish: () =>
+        Promise.reject(new Error('no commands in render tests')),
+      pendingProduct: () => pendingProduct,
+      pendingDish: () => pendingDish,
+    }),
+    orderFlow: () => ({
+      subscribe: () => () => {},
+      getSnapshot: () => order,
+      add() {},
+      setPortions() {},
+      remove() {},
+      prepare: () => Promise.resolve(),
+      confirm: () => Promise.resolve(),
+      check: () => Promise.resolve(),
+      openReplacement() {},
+      editAgain() {},
+      restart: () => Promise.resolve(),
+      dispose() {},
+    }),
   };
 }
 
