@@ -14,6 +14,7 @@ import {
   createRestaurantReads,
 } from '@/adapters/api/restaurant-api';
 import { createRecoveryApi } from '@/adapters/api/recovery-api';
+import { createWarehouseReads } from '@/adapters/api/warehouse-api';
 import { createAccountApi } from '@/adapters/api/account-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
@@ -109,6 +110,7 @@ const live = createLiveSync({
   resolvePending: () => Promise.resolve(),
 });
 const restaurantReads = createRestaurantReads(client);
+const warehouseReads = createWarehouseReads(client);
 const catalogApi = createCatalogApi(client);
 const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
@@ -214,7 +216,13 @@ const services: PresentationServices = {
   restaurantData: (restaurantID) => {
     let data = restaurantData.get(restaurantID);
     if (data === undefined) {
-      data = createRestaurantData(models, restaurantReads, restaurantID);
+      data = createRestaurantData(
+        models,
+        restaurantReads,
+        warehouseReads,
+        restaurantID,
+        () => undefined,
+      );
       restaurantData.set(restaurantID, data);
     }
     return data;
