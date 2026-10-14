@@ -18,7 +18,8 @@ import { Button } from '@/presentation/ui/actions';
 import { SearchInput } from '@/presentation/ui/form';
 import { rem } from '@/presentation/ui/units';
 import { MenuTabs } from './menu-tabs';
-import { draftSummary } from './order-messages';
+import { draftTotals } from '@/domain/order-draft';
+import { portionsText, positionsText } from './order-messages';
 import {
   AttemptOrder,
   DraftOrder,
@@ -46,7 +47,7 @@ function OrderBar({
   openRef,
   onOpen,
 }: {
-  summary: string | undefined;
+  summary: { positions: number; portions: string } | undefined;
   openRef: RefObject<HTMLButtonElement | null>;
   onOpen: () => void;
 }) {
@@ -67,9 +68,15 @@ function OrderBar({
       borderColor="border.default"
     >
       <Stack gap="0">
-        <Text textStyle="body.strong">{summary ?? 'Заказ пуст'}</Text>
+        <Text textStyle="body.strong">
+          {summary === undefined
+            ? 'Заказ пуст'
+            : `Заказ · ${positionsText(summary.positions)}`}
+        </Text>
         <Text textStyle="caption.default" color="text.secondary">
-          {summary === undefined ? 'Добавьте блюда из меню' : 'не проверен'}
+          {summary === undefined
+            ? 'Добавьте блюда из меню'
+            : `${portionsText(summary.portions)} · не проверен`}
         </Text>
       </Stack>
       <Button ref={openRef} disabled={summary === undefined} onClick={onOpen}>
@@ -135,7 +142,7 @@ function OrdersView({ flow }: { flow: OrderFlow }) {
   if (phase.kind !== 'compose' && !orderView) setOrderView(true);
   const composing = phase.kind === 'compose';
   const summary =
-    snapshot.draft.length === 0 ? undefined : draftSummary(snapshot.draft);
+    snapshot.draft.length === 0 ? undefined : draftTotals(snapshot.draft);
   const edit = () => {
     flow.editAgain();
   };

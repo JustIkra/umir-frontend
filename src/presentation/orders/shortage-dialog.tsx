@@ -87,11 +87,6 @@ function ChangeItem({ row }: { row: ChangeRow }) {
           </Flex>
         }
       />
-      {row.deficits.map((deficit) => (
-        <Text key={deficit} textStyle="caption.default" color="text.secondary">
-          {deficit}
-        </Text>
-      ))}
     </Stack>
   );
 }
@@ -123,6 +118,9 @@ export function ShortageDialog({
   onEdit: () => void;
 }) {
   const rows = changeRows(proposal, names, products);
+  const reduced = rows.filter((row) => !row.excluded);
+  const excluded = rows.filter((row) => row.excluded);
+  const missing = rows.filter((row) => row.deficits.length > 0);
   const before =
     previous === undefined ? [] : previousRows(proposal, previous, names);
   const empty = proposal.acceptedPositions.length === 0;
@@ -226,18 +224,35 @@ export function ShortageDialog({
               {evaluationText(at, timeZone)}
             </Flex>
           </Stack>
-          {before.length > 0 && (
-            <Group title="Что было в прошлом предложении" first>
-              {before.map((row) => (
+          <Group title="Что изменилось" first>
+            {[...reduced, ...before].map((row) => (
+              <ChangeItem key={`${row.lineNo}${row.text}`} row={row} />
+            ))}
+          </Group>
+          {excluded.length > 0 && (
+            <Group title="Исключённые позиции">
+              {excluded.map((row) => (
                 <ChangeItem key={row.lineNo} row={row} />
               ))}
             </Group>
           )}
-          <Group title="Что изменилось" first={before.length === 0}>
-            {rows.map((row) => (
-              <ChangeItem key={row.lineNo} row={row} />
-            ))}
-          </Group>
+          {missing.length > 0 && (
+            <Group title="Не хватает ингредиентов">
+              {missing.map((row) => (
+                <Stack key={row.lineNo} gap="0.5">
+                  <Text textStyle="caption.strong">{row.title}</Text>
+                  {row.deficits.map((deficit) => (
+                    <Text key={deficit} textStyle="body.default">
+                      {deficit}
+                    </Text>
+                  ))}
+                </Stack>
+              ))}
+              <Text textStyle="caption.default" color="text.secondary">
+                Доступное количество учитывает позиции выше по порядку заказа.
+              </Text>
+            </Group>
+          )}
           <Group title={finalText(proposal)}>
             <Text textStyle="caption.default" color="text.secondary">
               При оформлении склад проверит состав ещё раз.

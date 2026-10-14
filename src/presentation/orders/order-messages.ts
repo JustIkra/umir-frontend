@@ -63,7 +63,7 @@ export function changeRows(
   return proposal.changes.map((change) => ({
     lineNo: change.lineNo,
     title: `Поз. ${change.lineNo} · ${names.get(change.dishID) ?? change.dishID}`,
-    text: `Запрошено ${portionsText(change.requestedPortions)}, ${available(change.acceptedPortions)}`,
+    text: `${plural(change.requestedPortions, 'Запрошена', 'Запрошено', 'Запрошено')} ${portionsText(change.requestedPortions)}, ${available(change.acceptedPortions)}`,
     change: `${change.requestedPortions} → ${change.acceptedPortions}`,
     excluded: change.acceptedPortions === '0',
     deficits: change.deficits.map((deficit) => {

@@ -492,6 +492,9 @@ test('the order flow goes from the menu to the placed order', async () => {
   });
   assert.ok(text(draft).includes('2 позиции · 9 порций'));
   assert.ok(text(draft).includes('Подготовить заказ'));
+  assert.ok(text(draft).includes('Повтор блюда из поз. 1 — отдельная позиция'));
+  assert.ok(text(draft).includes('Заказ · 2 позиции'));
+  assert.ok(text(draft).includes('9 порций · не проверен'));
   const proposed = await renderRoute(route, {
     ...dishes,
     order: orderSnapshot({

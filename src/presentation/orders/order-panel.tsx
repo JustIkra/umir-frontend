@@ -2,7 +2,11 @@ import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import type { ReactNode, RefObject } from 'react';
 import type { OrderPhase, OrderSnapshot } from '@/application/order-flow';
 import type { Order, OrderProposal, Position } from '@/application/restaurant';
-import { portionsValid } from '@/domain/order-draft';
+import {
+  portionsValid,
+  type Draft,
+  type DraftLine,
+} from '@/domain/order-draft';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
@@ -141,6 +145,13 @@ export function EmptyOrder() {
   );
 }
 
+// The first earlier line with the same dish: «Повтор блюда из поз. N».
+function repeatOf(draft: Draft, line: DraftLine): number | undefined {
+  return draft.find(
+    (other) => other.lineNo < line.lineNo && other.dishID === line.dishID,
+  )?.lineNo;
+}
+
 type Names = ReadonlyMap<string, string>;
 
 const nameOf = (names: Names, dishID: string) => names.get(dishID) ?? dishID;
@@ -234,6 +245,12 @@ export function DraftOrder({
                 <Text textStyle="body.default">
                   {nameOf(names, line.dishID)}
                 </Text>
+                {repeatOf(snapshot.draft, line) !== undefined && (
+                  <Text textStyle="caption.default" color="text.secondary">
+                    Повтор блюда из поз. {repeatOf(snapshot.draft, line)} —
+                    отдельная позиция
+                  </Text>
+                )}
               </Stack>
               <chakra.button
                 type="button"

@@ -111,7 +111,7 @@ test('the shortage dialog: cut and excluded positions with their deficits', () =
     {
       lineNo: '3',
       title: 'Поз. 3 · Салат с лососем',
-      text: 'Запрошено 1 порция, доступно 0 — позиция исключена',
+      text: 'Запрошена 1 порция, доступно 0 — позиция исключена',
       change: '1 → 0',
       excluded: true,
       deficits: [
@@ -127,6 +127,64 @@ test('the shortage dialog: cut and excluded positions with their deficits', () =
     acceptanceText(proposal, true),
     'Принято 2 из 3 позиций, 3 из 6 порций. Нужно новое подтверждение.',
   );
+});
+
+test('the requested participle agrees with the number', () => {
+  const rows = (requested) =>
+    changeRows(
+      {
+        ...proposal,
+        changes: [
+          {
+            lineNo: '2',
+            dishID: '206',
+            requestedPortions: requested,
+            acceptedPortions: '1',
+            deficits: [],
+          },
+        ],
+      },
+      names,
+      products,
+    )[0].text;
+  assert.equal(rows('1'), 'Запрошена 1 порция, доступна 1');
+  assert.equal(rows('21'), 'Запрошена 21 порция, доступна 1');
+  assert.equal(rows('5'), 'Запрошено 5 порций, доступна 1');
+});
+
+test('the shortage dialog follows frame 04: reduced, excluded, missing, final', async () => {
+  const html = text(
+    await renderRoute(`/app/r/${R}/orders`, {
+      order: orderSnapshot({
+        phase: { kind: 'proposal', proposal, previous: undefined },
+      }),
+    }),
+  );
+  for (const part of [
+    'Что изменилось',
+    'Исключённые позиции',
+    'Не хватает ингредиентов',
+    'Доступное количество учитывает позиции выше по порядку заказа.',
+    'Итоговый состав · 2 позиции, 3 порции',
+  ])
+    assert.ok(html.includes(part), part);
+  const again = text(
+    await renderRoute(`/app/r/${R}/orders`, {
+      order: orderSnapshot({
+        phase: {
+          kind: 'proposal',
+          proposal,
+          previous: {
+            ...proposal,
+            proposalID: 'prp-0',
+            acceptedPositions: proposal.requestedPositions,
+          },
+        },
+      }),
+    }),
+  );
+  assert.ok(!again.includes('Что было в прошлом предложении'));
+  assert.ok(again.includes('В прошлом предложении 3 порции'));
 });
 
 test('a new proposal is compared with the previous one', () => {
