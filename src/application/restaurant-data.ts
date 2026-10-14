@@ -232,8 +232,11 @@ export function createRestaurantData(
         true,
       ),
     inventory: () =>
-      warehouse('warehouse/inventory', stockTopics, (options) =>
-        warehouseReads.inventory(restaurantID, options),
+      warehouse(
+        'warehouse/inventory',
+        stockTopics,
+        (options) => warehouseReads.inventory(restaurantID, options),
+        true,
       ),
     expiringBatches: () =>
       warehouse(
@@ -243,8 +246,11 @@ export function createRestaurantData(
         true,
       ),
     pendingWriteoffs: () =>
-      warehouse('warehouse/pending-writeoffs', stockTopics, (options) =>
-        warehouseReads.pendingWriteoffs(restaurantID, options),
+      warehouse(
+        'warehouse/pending-writeoffs',
+        stockTopics,
+        (options) => warehouseReads.pendingWriteoffs(restaurantID, options),
+        true,
       ),
     stockReport: (riskHours) =>
       warehouse(

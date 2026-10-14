@@ -230,6 +230,17 @@ test('the first hundred rows are shown; «Показать ещё 100» opens th
   assert.ok(!exact.includes('Показать ещё 100'));
 });
 
+test('the header offers «Обновить» with the journal and without it', async () => {
+  const shown = text(await renderRoute(page, historyData(history)));
+  assert.ok(shown.includes('Обновить'));
+  const failed = text(
+    await renderRoute(page, {
+      data: { history: failedRead('UpstreamUnavailable', 503) },
+    }),
+  );
+  assert.ok(failed.includes('Обновить'));
+});
+
 test('H6: the journal is being read', async () => {
   const plain = text(
     await renderRoute(page, { data: { history: loadingRead } }),

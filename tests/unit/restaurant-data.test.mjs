@@ -230,7 +230,7 @@ test('stock changes re-read the warehouse; analytics the report; sales and the c
   }
 });
 
-test('the expiring batches and the first report page re-read on a tick', async () => {
+test('the stock reads and the first report page re-read on a tick', async () => {
   const { data, models, calls } = setup();
   for (const model of [
     data.inventory(),
@@ -246,7 +246,9 @@ test('the expiring batches and the first report page re-read on a tick', async (
   models.markTime(R);
   await settled();
   assert.deepEqual(calls, [
+    ['inventory', R, { background: true }],
     ['expiringBatches', R, { background: true }],
+    ['pendingWriteoffs', R, { background: true }],
     [
       'stockReport',
       R,

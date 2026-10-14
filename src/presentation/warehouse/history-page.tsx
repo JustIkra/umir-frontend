@@ -143,7 +143,7 @@ export function HistoryPage() {
   // failure stands.
   if (failure !== undefined && (value === undefined || unreadable(failure))) {
     return (
-      <WarehouseLayout section="История" stamp={stamp}>
+      <WarehouseLayout section="История" stamp={stamp} onRefresh={retry}>
         <HistoryFailure failure={failure} onRetry={retry} />
       </WarehouseLayout>
     );
@@ -158,7 +158,7 @@ export function HistoryPage() {
           timeZone,
         );
   return (
-    <WarehouseLayout section="История" stamp={stamp}>
+    <WarehouseLayout section="История" stamp={stamp} onRefresh={retry}>
       {failure !== undefined && (
         <HistoryFailure failure={failure} onRetry={retry} />
       )}

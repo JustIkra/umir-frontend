@@ -35,9 +35,11 @@ export function EvaluationStamp({
         )}
         <Text as="span">{text}</Text>
       </Flex>
-      <Button type="button" variant="link" onClick={onRefresh}>
-        Обновить
-      </Button>
+      {onRefresh !== undefined && (
+        <Button type="button" variant="link" onClick={onRefresh}>
+          Обновить
+        </Button>
+      )}
     </Flex>
   );
 }
