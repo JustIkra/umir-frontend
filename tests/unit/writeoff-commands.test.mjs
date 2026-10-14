@@ -307,3 +307,81 @@ test('a check with nothing pending confirms anew', async () => {
   assert.deepEqual(await writeoffs.check(B), { kind: 'already' });
   assert.deepEqual(calls, [sentConfirm('cmd-1')]);
 });
+
+test('a definite refusal with an unknown outcome settles the attempt', async () => {
+  const cases = [
+    [
+      refused(409, 'AlreadyWrittenOff', 'unknown'),
+      { kind: 'already' },
+      true,
+      false,
+    ],
+    [
+      refused(409, 'NotPendingWriteoff', 'unknown'),
+      { kind: 'not-pending' },
+      true,
+      false,
+    ],
+    [
+      refused(404, 'BatchNotFound', 'unknown'),
+      { kind: 'not-found' },
+      true,
+      false,
+    ],
+    [refused(404, 'NotFound', 'unknown'), { kind: 'not-found' }, true, false],
+    [
+      refused(401, 'Unauthenticated', 'unknown'),
+      { kind: 'ended' },
+      false,
+      true,
+    ],
+  ];
+  for (const [answer, outcome, stale, check] of cases) {
+    const { writeoffs, answers, events } = setup();
+    answers.confirmWriteoff.push(answer);
+    assert.deepEqual(await writeoffs.confirm(B), outcome, answer.message);
+    assert.equal(
+      events.some(([name]) => name === 'stale'),
+      stale,
+      answer.message,
+    );
+    assert.equal(
+      events.some(([name]) => name === 'check'),
+      check,
+      answer.message,
+    );
+    assert.equal(writeoffs.pending(B), false, answer.message);
+  }
+});
+
+test('a transport loss with an unknown outcome keeps the attempt', async () => {
+  const { writeoffs, answers } = setup();
+  answers.confirmWriteoff.push(refused(0, 'Transport', 'unknown'));
+  assert.deepEqual(await writeoffs.confirm(B), { kind: 'unknown' });
+  assert.equal(writeoffs.pending(B), true);
+});
+
+test('the warehouse answers a missing batch with NotFound', async () => {
+  const { writeoffs, answers, events } = setup();
+  answers.confirmWriteoff.push(refused(404, 'NotFound', 'not_committed'));
+  assert.deepEqual(await writeoffs.confirm(B), { kind: 'not-found' });
+  assert.deepEqual(events, [['stale', ['stock']]]);
+  assert.equal(writeoffs.pending(B), false);
+});
+
+test('a rejected observation maps NotFound, Unauthenticated and RuntimeReset', async () => {
+  const cases = [
+    ['NotFound', { kind: 'not-found' }, [['stale', ['stock']]], false],
+    ['Unauthenticated', { kind: 'ended' }, [['check']], false],
+    ['RuntimeReset', { kind: 'reset' }, [['stale', ['stock']]], false],
+  ];
+  for (const [code, outcome, events_, pending] of cases) {
+    const context = setup();
+    const { writeoffs, answers, events } = context;
+    await unknownAttempt(context);
+    answers.lookupWriteoff.push({ state: 'rejected', code });
+    assert.deepEqual(await writeoffs.check(B), outcome, code);
+    assert.deepEqual(events, events_, code);
+    assert.equal(writeoffs.pending(B), pending, code);
+  }
+});

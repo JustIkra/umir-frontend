@@ -47,11 +47,13 @@ export const writeoffKey = (restaurantID: string, batchID: string) =>
 const label = 'списания партии';
 const stockTopics: readonly Topic[] = ['stock'];
 
-// Refusals after which the list of pending batches is outdated.
+// Refusals after which the list of pending batches is outdated. The warehouse
+// answers a missing batch with NotFound; BatchNotFound is kept for the contract.
 const listRefusals = new Map<string, WriteoffOutcome>([
   ['AlreadyWrittenOff', { kind: 'already' }],
   ['NotPendingWriteoff', { kind: 'not-pending' }],
   ['BatchNotFound', { kind: 'not-found' }],
+  ['NotFound', { kind: 'not-found' }],
 ]);
 
 const ended = (failure: ApiFailure) =>
@@ -104,6 +106,11 @@ export function createWriteoffCommands({
     return { kind: 'written-off', result };
   }
 
+  function endedBySession(): WriteoffOutcome {
+    onUnauthenticated();
+    return { kind: 'ended' };
+  }
+
   function refusal(code: string): WriteoffOutcome {
     const outcome = listRefusals.get(code);
     if (outcome === undefined) return { kind: 'refused', code };
@@ -112,21 +119,30 @@ export function createWriteoffCommands({
   }
 
   function settle(
+    batchID: string,
     result: CommandResult<Envelope<WriteoffResult>>,
   ): WriteoffOutcome {
     switch (result.kind) {
       case 'committed':
         return written(result.value.result);
       case 'unknown':
+        // The runner reports any failure without a settled outcome as unknown,
+        // even a definite refusal such as AlreadyWrittenOff. The code decides;
+        // only a transport loss or a malformed answer keeps the attempt open.
+        if (ended(result.failure)) {
+          commands.discard(writeoffKey(restaurantID, batchID));
+          return endedBySession();
+        }
+        if (listRefusals.has(result.failure.code)) {
+          commands.discard(writeoffKey(restaurantID, batchID));
+          return refusal(result.failure.code);
+        }
         return { kind: 'unknown' };
       case 'reset':
         // The runner has dropped the attempt and reported the reset.
         return { kind: 'reset' };
       case 'rejected':
-        if (ended(result.failure)) {
-          onUnauthenticated();
-          return { kind: 'ended' };
-        }
+        if (ended(result.failure)) return endedBySession();
         return refusal(result.failure.code);
     }
   }
@@ -134,7 +150,7 @@ export function createWriteoffCommands({
   async function confirm(batchID: string): Promise<WriteoffOutcome> {
     // A second confirm while the first is in flight joins it; with an
     // unknown attempt of the batch, the runner resends that attempt.
-    return settle(await commands.run(spec(batchID)));
+    return settle(batchID, await commands.run(spec(batchID)));
   }
 
   async function lookup(batchID: string): Promise<WriteoffOutcome> {
@@ -173,7 +189,14 @@ export function createWriteoffCommands({
         commands.discard(key);
         return written(observation.result);
       case 'rejected':
+        // The warehouse rejected the command: nothing was written, the
+        // attempt is settled, and the code says how.
         commands.discard(key);
+        if (observation.code === 'Unauthenticated') return endedBySession();
+        if (observation.code === 'RuntimeReset') {
+          markStale(stockTopics);
+          return { kind: 'reset' };
+        }
         return refusal(observation.code);
       case 'pending':
       case 'unseen':
