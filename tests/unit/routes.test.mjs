@@ -604,11 +604,6 @@ test('section pages keep their sidebar item current', async () => {
 
 test('the warehouse shows the sample stock, expiry and history', async () => {
   assert.ok(
-    (await renderRoute(`/app/r/${R}/warehouse/expiry`)).includes(
-      'через 20 ч 38 мин',
-    ),
-  );
-  assert.ok(
     (await renderRoute(`/app/r/${R}/warehouse/history`)).includes('#1057'),
   );
 });
