@@ -185,9 +185,9 @@ test('the stamp names the last event of the journal, or the read of an empty one
 });
 
 test('UnknownEventSchema and an undecodable event make the journal unreadable', () => {
-  assert.equal(unreadableHistory('UnknownEventSchema'), true);
-  assert.equal(unreadableHistory('Malformed'), true);
-  assert.equal(unreadableHistory('UpstreamUnavailable'), false);
+  assert.equal(unreadableHistory('UnknownEventSchema', 503), true);
+  assert.equal(unreadableHistory('Malformed', 200), true);
+  assert.equal(unreadableHistory('UpstreamUnavailable', 503), false);
 });
 
 test('H1: the page shows the journal from the newest event with the stamp and the filter', async () => {
@@ -287,4 +287,17 @@ test('a restaurant that is not ready shows the shared state, not H7', async () =
   );
   assert.ok(plain.includes('Ресторан подготавливается'));
   assert.ok(!plain.includes('Не удалось получить историю'));
+});
+
+test('an undecodable error body of a failed response is H7, not an unreadable journal', async () => {
+  const plain = text(
+    await renderRoute(page, {
+      data: { history: failedRead('Malformed', 502) },
+    }),
+  );
+  assert.ok(plain.includes('Не удалось получить историю'));
+  assert.ok(plain.includes('Повторить'));
+  assert.ok(!plain.includes('Не удалось показать историю'));
+  assert.equal(unreadableHistory('Malformed', 502), false);
+  assert.equal(unreadableHistory('Malformed', 200), true);
 });

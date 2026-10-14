@@ -66,7 +66,7 @@ const rowGrid = {
 const unreadable = (failure: ScreenFailure | undefined) =>
   failure !== undefined &&
   (failure.kind === 'unavailable' || failure.kind === 'error') &&
-  unreadableHistory(failure.failure.code);
+  unreadableHistory(failure.failure.code, failure.failure.status);
 
 const failedText =
   'Склад не отдал журнал. Это не пустой журнал: повторите чтение.';

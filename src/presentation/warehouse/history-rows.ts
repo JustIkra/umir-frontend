@@ -125,8 +125,11 @@ export function historyStamp(
     : `Последнее событие #${last.sequence} · ${formatStamp(last.recordedAt.epochMs, timeZone)}`;
 }
 
-// UnknownEventSchema from the warehouse, or an event this client cannot
-// decode (Malformed): the journal is not shown at all.
-export function unreadableHistory(code: string): boolean {
-  return code === 'UnknownEventSchema' || code === 'Malformed';
+// UnknownEventSchema from the warehouse, or a successful response whose body
+// this client cannot decode (Malformed with status 200): the journal is not
+// shown at all. Malformed on any other status is an outage (a proxy page).
+export function unreadableHistory(code: string, status: number): boolean {
+  return (
+    code === 'UnknownEventSchema' || (code === 'Malformed' && status === 200)
+  );
 }
