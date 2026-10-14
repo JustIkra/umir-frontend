@@ -394,3 +394,29 @@ test('the snapshot is stable between changes and shows a running request', async
   await pending;
   assert.deepEqual(seen, [true, false]);
 });
+
+test('restart during a request in flight sends the next request anew', async () => {
+  const { flow, fake, storage } = setup();
+  let oldAnswer;
+  fake.answers.begin.push(
+    () =>
+      new Promise((resolve) => {
+        oldAnswer = resolve;
+      }),
+    challenge(C2),
+  );
+  const old = flow.request('old@b.ru');
+  await settled();
+  flow.restart(false);
+  assert.equal(await flow.request('new@b.ru'), 'code');
+  assert.deepEqual(fake.calls, [
+    ['begin', 'old@b.ru', 'cmd-1'],
+    ['begin', 'new@b.ru', 'cmd-2'],
+  ]);
+  assert.equal(storage.box.record.email, 'new@b.ru');
+  assert.equal(storage.box.record.challenge.challengeID, C2);
+  oldAnswer(challenge(C1));
+  assert.equal(await old, 'stay');
+  assert.equal(storage.box.record.email, 'new@b.ru');
+  assert.equal(storage.box.record.challenge.challengeID, C2);
+});

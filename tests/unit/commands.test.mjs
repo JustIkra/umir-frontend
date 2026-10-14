@@ -237,3 +237,37 @@ test('subscribers learn about attempts; discard and clear drop them', async () =
   runner.clear();
   assert.deepEqual(runner.getSnapshot(), []);
 });
+
+for (const [name, detach] of [
+  [
+    'discard detaches a run in flight: the next run sends a new command',
+    (runner) => runner.discard('k'),
+  ],
+  ['clear detaches runs in flight', (runner) => runner.clear()],
+]) {
+  test(name, async () => {
+    const { runner } = setup();
+    const calls = [];
+    const resolvers = [];
+    const execute = (commandID) => {
+      calls.push(commandID);
+      return new Promise((resolve) => {
+        resolvers.push(resolve);
+      });
+    };
+    const first = runner.run({ key: 'k', label: 'x', execute });
+    detach(runner);
+    const second = runner.run({ key: 'k', label: 'x', execute });
+    assert.deepEqual(calls, ['cmd-1', 'cmd-2']);
+    resolvers[0]('old');
+    assert.deepEqual(await first, { kind: 'committed', value: 'old' });
+    assert.deepEqual(
+      runner.getSnapshot().map((item) => item.commandID),
+      ['cmd-2'],
+      'the late answer leaves the newer attempt alone',
+    );
+    resolvers[1]('new');
+    assert.deepEqual(await second, { kind: 'committed', value: 'new' });
+    assert.deepEqual(runner.getSnapshot(), []);
+  });
+}

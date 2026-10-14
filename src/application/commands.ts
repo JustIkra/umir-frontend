@@ -41,6 +41,8 @@ export interface CommandRunner {
   retry(key: string): Promise<CommandResult<unknown>> | undefined;
   readonly subscribe: (listener: () => void) => () => void;
   readonly getSnapshot: () => readonly Attempt[];
+  // Both also detach a request in flight: its answer no longer settles the
+  // key, and the next run sends a new command.
   discard(key: string): void;
   clear(): void;
 }
@@ -90,18 +92,23 @@ export function createCommandRunner({
     for (const listener of listeners) listener();
   }
 
+  // A detached attempt settling late must not touch a newer one of its key.
+  function release(attempt: Pending): void {
+    if (pending.get(attempt.key) === attempt) pending.delete(attempt.key);
+  }
+
   function settle(attempt: Pending, error: unknown): CommandResult<unknown> {
     const failure = failureOf(error) ?? localFailure('Malformed', 'unknown');
     if (
       failure.code === 'RuntimeReset' ||
       failure.outcome === 'indeterminate'
     ) {
-      pending.delete(attempt.key);
+      release(attempt);
       onReset(attempt.restaurantID);
       return { kind: 'reset', failure };
     }
     if (settledOutcomes.has(failure.outcome)) {
-      pending.delete(attempt.key);
+      release(attempt);
       return { kind: 'rejected', failure };
     }
     const { key, commandID, label, restaurantID, startedAt } = attempt;
@@ -117,13 +124,13 @@ export function createCommandRunner({
       .execute(attempt.commandID, attempt.epoch)
       .then(
         (value): CommandResult<unknown> => {
-          pending.delete(attempt.key);
+          release(attempt);
           return { kind: 'committed', value };
         },
         (error: unknown) => settle(attempt, error),
       )
       .finally(() => {
-        inFlight.delete(attempt.key);
+        if (inFlight.get(attempt.key) === result) inFlight.delete(attempt.key);
         publish();
       });
     inFlight.set(attempt.key, result);
@@ -176,10 +183,13 @@ export function createCommandRunner({
     },
     getSnapshot: () => snapshot,
     discard(key) {
-      if (pending.delete(key)) publish();
+      const dropped = pending.delete(key);
+      const detached = inFlight.delete(key);
+      if (dropped || detached) publish();
     },
     clear() {
       pending.clear();
+      inFlight.clear();
       publish();
     },
   };
