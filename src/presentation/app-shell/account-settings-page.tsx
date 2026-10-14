@@ -344,7 +344,7 @@ function LeaveNameDialog({
   return (
     <ModalPanel
       dialogRef={dialogRef}
-      width={520}
+      width={600}
       title="Не сохранять новое имя?"
       actions={
         <>

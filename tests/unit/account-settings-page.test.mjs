@@ -251,3 +251,16 @@ test('the page keeps a pending password closed', async () => {
   );
   assert.ok(plain.includes('Результат изменения пароля неизвестен'));
 });
+
+test('the leave dialog is as wide as the S11 frame, 600 px', async () => {
+  const html = await renderRoute('/app/settings', {
+    pending: { name: 'Новое имя', password: undefined },
+  });
+  const dialog = /<dialog[^>]*class="css-([^"\s]+)"/.exec(html);
+  assert.ok(dialog, 'the dialog is rendered');
+  const style = new RegExp(
+    `<style data-emotion="css ${dialog[1]}">([\\s\\S]*?)</style>`,
+  ).exec(html);
+  assert.ok(style, 'the dialog has its own styles');
+  assert.match(style[1], /@media \(min-width: [^)]+\)\{[^}]*width:37\.5rem;/);
+});
