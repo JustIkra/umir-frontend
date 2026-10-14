@@ -95,8 +95,8 @@ const fixedMessages: Partial<Record<ResetNotice['kind'], ResetMessage>> = {
   },
 };
 
-// R03, R04, R06b, R07, C06 and «Подтверждение устарело». A wait that has run
-// out says nothing.
+// R03, R04, R06b, R07, «Новый код отправлен» and «Подтверждение устарело».
+// A wait that has run out says nothing.
 export function resetMessage(
   notice: ResetNotice | undefined,
   nowMs: number,
@@ -309,7 +309,7 @@ export function PasswordResetRequestPage() {
   );
 }
 
-// Figma R05–R07, R06b, C03, C06.
+// Figma R05–R07, R06b and the states of checking and resending the code.
 export function PasswordResetCodePage() {
   const { passwordReset: flow } = useServices();
   const reset = useReset();

@@ -209,3 +209,41 @@ test('R05 shows a refused renew of an expired code, not only the expiry', async 
   );
   assert.ok(unavailable.includes('Восстановление временно недоступно'));
 });
+
+const tags = (html, name) =>
+  html.match(new RegExp(`<${name}\\b[^>]*>`, 'g')) ?? [];
+const isDisabled = (tag) => /\sdisabled(?:=""|[\s>])/.test(tag);
+
+test('an unknown outcome closes the fields and the submit button of R01, R05 and R08', async () => {
+  for (const [path, reset] of [
+    [
+      '/password-reset',
+      resetSnapshot({ notice: { kind: 'unknown', action: 'request' } }),
+    ],
+    [
+      '/password-reset/code',
+      code({ notice: { kind: 'unknown', action: 'verify' } }),
+    ],
+    [
+      '/password-reset/new',
+      password({ notice: { kind: 'unknown', action: 'complete' } }),
+    ],
+  ]) {
+    const html = await renderRoute(path, { reset });
+    const fieldsets = tags(html, 'fieldset');
+    assert.equal(fieldsets.length, 1, path);
+    assert.ok(isDisabled(fieldsets[0]), `${path}: the fields are closed`);
+    const submits = tags(html, 'button').filter((tag) =>
+      tag.includes('type="submit"'),
+    );
+    assert.equal(submits.length, 1, path);
+    assert.ok(isDisabled(submits[0]), `${path}: the submit button is closed`);
+    const open = await renderRoute(path, {
+      reset: { ...reset, notice: undefined },
+    });
+    assert.ok(
+      !isDisabled(tags(open, 'fieldset')[0]),
+      `${path}: open without it`,
+    );
+  }
+});
