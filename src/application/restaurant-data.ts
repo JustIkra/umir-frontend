@@ -34,6 +34,8 @@ export interface RestaurantData {
   stopList(): ReadModel<Envelope<StopList>>;
   // Ranked by the nearest expiry: re-read on every tick as well.
   recommendations(): ReadModel<Envelope<Recommendations>>;
+  // inventory and pendingWriteoffs re-read on the tick too: without /live an
+  // expired batch moves between the lists only by a re-read.
   inventory(): ReadModel<Envelope<Inventory>>;
   // Batches expiring within 48 hours; their remaining time follows the clock.
   expiringBatches(): ReadModel<Envelope<ExpiringBatches>>;
