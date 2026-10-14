@@ -35,6 +35,7 @@ import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
 import {
   conflictText,
+  footerCaption,
   dishDraftOf,
   dishErrors,
   fieldsSummary,
@@ -215,9 +216,13 @@ export function NewDishPage() {
           ]
         : [];
     });
+    // The sent code stays on screen: a later read of the suggestion must not
+    // replace it in the locked form or in the conflict text.
+    setCode(codeValue.trim());
     void send({ dishID: codeValue.trim(), name: name.trim(), ingredients });
   };
 
+  const caption = footerCaption('dish', shown);
   const message =
     shown === 'invalid' && summary !== undefined
       ? { tone: 'error' as const, ...summary }
@@ -524,13 +529,11 @@ export function NewDishPage() {
           </Stack>
         </chakra.fieldset>
         <CardFooter>
-          <Text textStyle="caption.default" color="text.secondary">
-            {shown === 'sending'
-              ? 'Ждём ответ сервиса. Повторное нажатие не создаст второе блюдо.'
-              : closed
-                ? 'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.'
-                : 'Сервис проверит форму целиком; при ошибке ничего не записывается.'}
-          </Text>
+          {caption !== undefined && (
+            <Text textStyle="caption.default" color="text.secondary">
+              {caption}
+            </Text>
+          )}
           <Flex
             direction={{ base: 'column-reverse', sm: 'row' }}
             gap="3"

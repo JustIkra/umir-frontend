@@ -198,6 +198,24 @@ export function outcomeMessage(
   }
 }
 
+// The footer line of a create form. After a reset no result will come, so
+// nothing says the fields wait for one.
+export function footerCaption(
+  kind: 'product' | 'dish',
+  status: string,
+): string | undefined {
+  if (status === 'sending') {
+    return kind === 'product'
+      ? 'Ждём ответ сервиса. Повторное нажатие не создаст второй продукт.'
+      : 'Ждём ответ сервиса. Повторное нажатие не создаст второе блюдо.';
+  }
+  if (status === 'unknown') {
+    return 'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.';
+  }
+  if (status === 'reset') return undefined;
+  return 'Сервис проверит форму целиком; при ошибке ничего не записывается.';
+}
+
 // What a create form hands to the list or the recipe page it returns to
 // (K09, K21) through the router state.
 export type CreatedNotice =

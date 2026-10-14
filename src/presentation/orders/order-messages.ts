@@ -185,7 +185,9 @@ export function outcomeMessage(
             title: 'Предложение больше не действует',
             ...(phase.checkedAt === undefined
               ? {}
-              : { stamp: `Проверено ${formatStamp(phase.checkedAt, timeZone)}` }),
+              : {
+                  stamp: `Проверено ${formatStamp(phase.checkedAt, timeZone)}`,
+                }),
             text: 'Сервис заказов ответил на ту же попытку: предложение больше не действует, а записана ли продажа, он не подтверждает. Прежде чем оформлять заново, проверьте по истории склада, не списаны ли продукты по этой попытке.',
           }
         : notFound;

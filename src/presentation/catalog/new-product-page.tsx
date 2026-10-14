@@ -31,6 +31,7 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import { rem } from '@/presentation/ui/units';
 import {
   conflictText,
+  footerCaption,
   fieldsSummary,
   outcomeMessage,
   productDraftOf,
@@ -154,6 +155,9 @@ export function NewProductPage() {
       setStatus('invalid');
       return;
     }
+    // The sent code stays on screen: a later read of the suggestion must not
+    // replace it in the locked form or in the conflict text.
+    setCode(codeValue.trim());
     void send({
       productID: codeValue.trim(),
       name: name.trim(),
@@ -161,6 +165,7 @@ export function NewProductPage() {
     });
   };
 
+  const caption = footerCaption('product', shown);
   const message =
     shown === 'invalid' && errorCount > 0
       ? { tone: 'error' as const, ...summary }
@@ -275,13 +280,11 @@ export function NewProductPage() {
           </SplitCardBody>
         </chakra.fieldset>
         <CardFooter>
-          <Text textStyle="caption.default" color="text.secondary">
-            {shown === 'sending'
-              ? 'Ждём ответ сервиса. Повторное нажатие не создаст второй продукт.'
-              : closed
-                ? 'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.'
-                : 'Сервис проверит форму целиком; при ошибке ничего не записывается.'}
-          </Text>
+          {caption !== undefined && (
+            <Text textStyle="caption.default" color="text.secondary">
+              {caption}
+            </Text>
+          )}
           <Flex
             direction={{ base: 'column-reverse', sm: 'row' }}
             gap="3"

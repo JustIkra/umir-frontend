@@ -9,6 +9,7 @@ import {
   createdProductText,
   dishErrors,
   fieldsSummary,
+  footerCaption,
   linesSummary,
   outcomeMessage,
   productErrors,
@@ -223,4 +224,41 @@ test('a pending input is restored into the drafts', () => {
     ],
   );
   assert.equal(new Set(dish.lines.map((line) => line.key)).size, 2);
+});
+
+test('the form footer caption: waiting, locked, none after a reset, default', () => {
+  assert.equal(
+    footerCaption('product', 'sending'),
+    'Ждём ответ сервиса. Повторное нажатие не создаст второй продукт.',
+  );
+  assert.equal(
+    footerCaption('dish', 'sending'),
+    'Ждём ответ сервиса. Повторное нажатие не создаст второе блюдо.',
+  );
+  assert.equal(
+    footerCaption('dish', 'unknown'),
+    'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.',
+  );
+  assert.equal(footerCaption('product', 'reset'), undefined);
+  assert.equal(
+    footerCaption('product', 'idle'),
+    'Сервис проверит форму целиком; при ошибке ничего не записывается.',
+  );
+});
+
+test('a pending create shows the code that was sent, not the live suggestion', async () => {
+  const product = await renderRoute(`/app/r/${R}/catalog/products/new`, {
+    pendingProduct: { productID: '133', name: 'Сыр бри', baseUnit: 'g' },
+    data: {
+      productSuggestion: loaded({ kind: 'product', suggestedID: '134' }),
+    },
+  });
+  assert.ok(product.includes('value="133"'));
+  assert.ok(!product.includes('value="134"'));
+  const dish = await renderRoute(`/app/r/${R}/catalog/dishes/new`, {
+    pendingDish: { dishID: '213', name: 'Паста', ingredients: [] },
+    data: { dishSuggestion: loaded({ kind: 'dish', suggestedID: '214' }) },
+  });
+  assert.ok(dish.includes('value="213"'));
+  assert.ok(!dish.includes('value="214"'));
 });
