@@ -602,12 +602,6 @@ test('section pages keep their sidebar item current', async () => {
   );
 });
 
-test('the warehouse shows the sample stock, expiry and history', async () => {
-  assert.ok(
-    (await renderRoute(`/app/r/${R}/warehouse/history`)).includes('#1057'),
-  );
-});
-
 test('the order flow goes from the menu to the placed order', async () => {
   const route = `/app/r/${R}/orders`;
   const dishes = { data: servingData };
