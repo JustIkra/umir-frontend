@@ -54,6 +54,7 @@ import {
   type ExpiryWindow,
 } from './expiry-rows';
 import { WarehouseLayout } from './warehouse-layout';
+import { WriteoffPanel } from './writeoff-panel';
 
 const daySeconds = 86_400n;
 const noCursors: readonly string[] = [];
@@ -233,8 +234,12 @@ function StaleWindow({
 // Window 24 h: the batches of expiring-batches with at most 24 h left.
 function BatchWindow({
   controls,
+  onRefresh,
+  children,
 }: {
   controls: (boundary: string | undefined) => ReactNode;
+  onRefresh: () => void;
+  children: ReactNode;
 }) {
   const data = useRestaurantData();
   const model = data.expiringBatches();
@@ -248,7 +253,14 @@ function BatchWindow({
   const rows =
     value === undefined ? [] : batchRows(value.result, names, daySeconds);
   return (
-    <WarehouseLayout section="Сроки годности" stamp={stampOf(value)}>
+    <WarehouseLayout
+      section="Сроки годности"
+      stamp={stampOf(value)}
+      onRefresh={() => {
+        refresh();
+        onRefresh();
+      }}
+    >
       {controls(
         value === undefined
           ? undefined
@@ -326,6 +338,7 @@ function BatchWindow({
           ))}
         </ListCard>
       )}
+      {children}
     </WarehouseLayout>
   );
 }
@@ -382,11 +395,15 @@ function ReportWindow({
   riskHours,
   custom,
   onHours,
+  onRefresh,
+  children,
 }: {
   controls: (boundary: string | undefined) => ReactNode;
   riskHours: number;
   custom: boolean;
   onHours: (hours: number) => void;
+  onRefresh: () => void;
+  children: ReactNode;
 }) {
   const { access } = useServices();
   const data = useRestaurantData();
@@ -482,6 +499,10 @@ function ReportWindow({
     <WarehouseLayout
       section="Сроки годности"
       stamp={stampOf(settling ? undefined : value)}
+      onRefresh={() => {
+        refresh();
+        onRefresh();
+      }}
     >
       {controls(
         loading
@@ -548,13 +569,16 @@ function ReportWindow({
           </Text>
         </Stack>
       )}
+      {children}
     </WarehouseLayout>
   );
 }
 
-// Figma S3 «Сроки годности» with the windows of spec 6.1. The window and the
-// hours of «Своя граница» live in the address (?window=, ?hours=).
+// Figma S3 «Сроки годности» with the windows of spec 6.1 and «Ожидают
+// списания» under the list. The window and the hours of «Своя граница» live
+// in the address (?window=, ?hours=); «Обновить» re-reads both blocks.
 export function ExpiryPage() {
+  const data = useRestaurantData();
   const analytics = usePermissions().has('analytics.read');
   const [params, setParams] = useSearchParams();
   const chosen = windowOf(params.get('window'), analytics);
@@ -571,10 +595,19 @@ export function ExpiryPage() {
       {boundary !== undefined && <Text textStyle="mono.body">{boundary}</Text>}
     </Flex>
   );
-  if (chosen === '24h') return <BatchWindow controls={controls} />;
+  const refreshPending = () => {
+    data.pendingWriteoffs().refresh();
+  };
+  if (chosen === '24h')
+    return (
+      <BatchWindow controls={controls} onRefresh={refreshPending}>
+        <WriteoffPanel />
+      </BatchWindow>
+    );
   return (
     <ReportWindow
       controls={controls}
+      onRefresh={refreshPending}
       riskHours={
         chosen === 'custom'
           ? customHoursOf(params.get('hours'))
@@ -587,6 +620,8 @@ export function ExpiryPage() {
           { replace: true },
         );
       }}
-    />
+    >
+      <WriteoffPanel />
+    </ReportWindow>
   );
 }
