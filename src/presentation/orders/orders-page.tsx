@@ -1,11 +1,10 @@
 import { Box, Flex, Grid, Stack, Text } from '@chakra-ui/react';
-import { useRef, useState, type RefObject } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { useParams } from 'react-router';
 import { findRestaurant } from '@/application/access';
 import type { OrderFlow } from '@/application/order-flow';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { useSectionDate } from '@/presentation/app-shell/section-date';
 import { useServices } from '@/presentation/services';
 import {
@@ -14,21 +13,22 @@ import {
   useRestaurantData,
   useStore,
 } from '@/presentation/session/hooks';
-import { draftOrder } from '@/presentation/placeholder-orders';
 import { media } from '@/presentation/theme/system';
-import { Button, TextLink } from '@/presentation/ui/actions';
+import { Button } from '@/presentation/ui/actions';
 import { SearchInput } from '@/presentation/ui/form';
 import { rem } from '@/presentation/ui/units';
 import { MenuTabs } from './menu-tabs';
+import { draftSummary } from './order-messages';
 import {
+  AttemptOrder,
   DraftOrder,
   EmptyOrder,
+  OutcomeOrder,
   PlacedOrder,
   ProposalOrder,
 } from './order-panel';
+import { productMap } from './order-rows';
 import { ShortageDialog } from './shortage-dialog';
-
-export type OrderStep = 'empty' | 'draft' | 'proposal' | 'placed';
 
 const visuallyHidden = {
   position: 'absolute',
@@ -42,11 +42,11 @@ const visuallyHidden = {
 // Figma 01/02-390 order bar at the bottom of the menu: the order summary and
 // «К составу», disabled while the order is empty.
 function OrderBar({
-  empty,
+  summary,
   openRef,
   onOpen,
 }: {
-  empty: boolean;
+  summary: string | undefined;
   openRef: RefObject<HTMLButtonElement | null>;
   onOpen: () => void;
 }) {
@@ -67,16 +67,12 @@ function OrderBar({
       borderColor="border.default"
     >
       <Stack gap="0">
-        <Text textStyle="body.strong">
-          {empty
-            ? 'Заказ пуст'
-            : `Заказ · ${String(draftOrder.length)} позиций`}
-        </Text>
+        <Text textStyle="body.strong">{summary ?? 'Заказ пуст'}</Text>
         <Text textStyle="caption.default" color="text.secondary">
-          {empty ? 'Добавьте блюда из меню' : '9 порций · не проверен'}
+          {summary === undefined ? 'Добавьте блюда из меню' : 'не проверен'}
         </Text>
       </Stack>
-      <Button ref={openRef} disabled={empty} onClick={onOpen}>
+      <Button ref={openRef} disabled={summary === undefined} onClick={onOpen}>
         К составу
       </Button>
     </Flex>
@@ -86,27 +82,41 @@ function OrderBar({
 // Figma «Новый заказ»: the menu with the order panel at its right from 881
 // (320px as in 02 1024, 400px from 1201); on 390 the menu and the order are
 // separate views (01/02/03-390, 05-390, 09-390).
-export function OrdersPage({ step }: { step: OrderStep }) {
+export function OrdersPage() {
   const { restaurantID } = useParams();
   const { orderFlow } = useServices();
   const flow = restaurantID === undefined ? undefined : orderFlow(restaurantID);
-  return flow === undefined ? null : <OrdersView flow={flow} step={step} />;
+  return flow === undefined ? null : <OrdersView flow={flow} />;
 }
 
-function OrdersView({ flow, step }: { flow: OrderFlow; step: OrderStep }) {
+function OrdersView({ flow }: { flow: OrderFlow }) {
   const { restaurantID } = useParams();
   const caption = useSectionDate();
   const snapshot = useStore(flow);
+  const { phase } = snapshot;
   const [query, setQuery] = useState('');
   const access = useAccess();
   const restaurant =
     restaurantID === undefined
       ? undefined
       : findRestaurant(access, restaurantID);
-  const menuRead = useReadModel(useRestaurantData().menu());
+  const data = useRestaurantData();
+  const menuRead = useReadModel(data.menu());
+  const stopRead = useReadModel(data.stopList());
+  const productsRead = useReadModel(data.servingProducts());
   const timeZone =
     restaurant?.timeZone ?? menuRead.value?.context.settings.timeZone ?? 'UTC';
-  const path = useRestaurantPath();
+  const names = new Map<string, string>([
+    ...(stopRead.value?.result.dishes ?? []).map((dish): [string, string] => [
+      dish.dishID,
+      dish.name,
+    ]),
+    ...(menuRead.value?.result.dishes ?? []).map((dish): [string, string] => [
+      dish.dishID,
+      dish.name,
+    ]),
+  ]);
+  const products = productMap(productsRead.value?.result.items ?? []);
   const dialog = useRef<HTMLDialogElement>(null);
   const openButton = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
@@ -119,43 +129,127 @@ function OrdersView({ flow, step }: { flow: OrderFlow; step: OrderStep }) {
     });
     (show ? backButton : openButton).current?.focus();
   };
-  const [orderView, setOrderView] = useState(
-    step === 'proposal' || step === 'placed',
-  );
-  const panel = {
-    empty: <EmptyOrder />,
-    draft: <DraftOrder />,
-    proposal: (
-      <ProposalOrder
-        confirmRef={confirmButton}
-        onConfirm={() => {
-          dialog.current?.showModal();
-        }}
-      />
-    ),
-    placed: <PlacedOrder />,
-  }[step];
-  const back =
-    step === 'draft' ? (
-      <Button
-        ref={backButton}
-        variant="link"
-        alignSelf="flex-start"
-        onClick={() => {
-          showOrder(false);
-        }}
-      >
-        ← Вернуться к меню
-      </Button>
-    ) : (
-      <TextLink
-        to={step === 'proposal' ? path('/orders/draft') : path('/orders')}
-        alignSelf="flex-start"
-        mx="1"
-      >
-        ← Вернуться к меню
-      </TextLink>
-    );
+  // Every phase but the draft lives in the order view; a restored attempt
+  // opens it with the page.
+  const [orderView, setOrderView] = useState(phase.kind !== 'compose');
+  if (phase.kind !== 'compose' && !orderView) setOrderView(true);
+  const composing = phase.kind === 'compose';
+  const summary =
+    snapshot.draft.length === 0 ? undefined : draftSummary(snapshot.draft);
+  const edit = () => {
+    flow.editAgain();
+  };
+  const shortage =
+    (phase.kind === 'proposal' || phase.kind === 'confirming') &&
+    phase.proposal.changes.length > 0
+      ? { proposal: phase.proposal, previous: phase.previous }
+      : phase.kind === 'empty' && phase.proposal !== undefined
+        ? { proposal: phase.proposal, previous: undefined }
+        : undefined;
+  let panel: ReactNode;
+  switch (phase.kind) {
+    case 'compose':
+    case 'preparing':
+      panel =
+        snapshot.draft.length === 0 ? (
+          <EmptyOrder />
+        ) : (
+          <DraftOrder
+            snapshot={snapshot}
+            names={names}
+            onPortions={(lineNo, portions) => {
+              flow.setPortions(lineNo, portions);
+            }}
+            onRemove={(lineNo) => {
+              flow.remove(lineNo);
+            }}
+            onPrepare={() => {
+              void flow.prepare();
+            }}
+          />
+        );
+      break;
+    case 'proposal':
+    case 'confirming':
+      panel = (
+        <ProposalOrder
+          proposal={phase.proposal}
+          names={names}
+          timeZone={timeZone}
+          confirming={phase.kind === 'confirming'}
+          confirmRef={confirmButton}
+          onConfirm={() => {
+            if (phase.proposal.changes.length > 0) {
+              dialog.current?.showModal();
+            } else {
+              void flow.confirm();
+            }
+          }}
+          onEdit={edit}
+        />
+      );
+      break;
+    case 'confirmed':
+      panel = (
+        <PlacedOrder
+          order={phase.order}
+          names={names}
+          timeZone={timeZone}
+          onNew={edit}
+        />
+      );
+      break;
+    case 'unknown':
+    case 'pending':
+    case 'conflict':
+      panel = (
+        <AttemptOrder
+          phase={phase}
+          names={names}
+          timeZone={timeZone}
+          notice={snapshot.notice}
+          onCheck={() => {
+            void flow.check();
+          }}
+        />
+      );
+      break;
+    case 'not-found':
+    case 'refused':
+    case 'reset':
+    case 'superseded':
+    case 'empty':
+      panel = (
+        <OutcomeOrder
+          phase={phase}
+          names={names}
+          timeZone={timeZone}
+          onPrepareAgain={() => {
+            void flow.restart();
+          }}
+          onEdit={edit}
+          onRetry={() => {
+            void flow.confirm();
+          }}
+          onOpenReplacement={() => {
+            flow.openReplacement();
+          }}
+        />
+      );
+      break;
+  }
+  const back = composing ? (
+    <Button
+      ref={backButton}
+      variant="link"
+      alignSelf="flex-start"
+      onClick={() => {
+        showOrder(false);
+      }}
+    >
+      ← Вернуться к меню
+    </Button>
+  ) : undefined;
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       {/* On 390 the order view hides the title from sight, not from the
@@ -187,15 +281,15 @@ function OrdersView({ flow, step }: { flow: OrderFlow; step: OrderStep }) {
           <MenuTabs
             draft={snapshot.draft}
             query={query}
-            canAdd={snapshot.phase.kind === 'compose'}
+            canAdd={composing}
             onAdd={(dishID) => {
               flow.add(dishID);
             }}
             timeZone={timeZone}
           />
-          {(step === 'empty' || step === 'draft') && (
+          {composing && (
             <OrderBar
-              empty={step === 'empty'}
+              summary={summary}
               openRef={openButton}
               onOpen={() => {
                 showOrder(true);
@@ -209,14 +303,27 @@ function OrdersView({ flow, step }: { flow: OrderFlow; step: OrderStep }) {
           position={{ md: 'sticky' }}
           top={{ md: '6' }}
         >
-          {orderView && (
+          {orderView && back !== undefined && (
             <Box display={{ base: 'block', sm: 'none' }}>{back}</Box>
           )}
           {panel}
         </Stack>
       </Grid>
-      {step === 'proposal' && (
-        <ShortageDialog dialogRef={dialog} returnFocusRef={confirmButton} />
+      {shortage !== undefined && (
+        <ShortageDialog
+          dialogRef={dialog}
+          returnFocusRef={confirmButton}
+          proposal={shortage.proposal}
+          previous={shortage.previous}
+          names={names}
+          products={products}
+          timeZone={timeZone}
+          confirming={phase.kind === 'confirming'}
+          onConfirm={() => {
+            void flow.confirm();
+          }}
+          onEdit={edit}
+        />
       )}
     </Stack>
   );

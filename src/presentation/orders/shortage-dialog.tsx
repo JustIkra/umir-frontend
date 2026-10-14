@@ -6,16 +6,23 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { useNavigate } from 'react-router';
-import { useRestaurantPath } from '@/presentation/app-shell/paths';
+import type { OrderProposal, Product } from '@/application/restaurant';
 import clockIcon from '@/presentation/assets/icons/clock-24.svg';
-import { shortage } from '@/presentation/placeholder-orders';
 import { media, scrim } from '@/presentation/theme/system';
 import { Button } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { Dialog } from '@/presentation/ui/dialog';
 import { Icon } from '@/presentation/ui/icon';
+import { formatInstant, formatOffset } from '@/presentation/ui/time';
 import { rem } from '@/presentation/ui/units';
+import {
+  acceptanceText,
+  changeRows,
+  finalText,
+  previousRows,
+  type ChangeRow,
+} from './order-messages';
+import { evaluationText } from './order-rows';
 
 // Groups are divided by a line; the first follows the stamp without one.
 function Group({
@@ -62,106 +69,30 @@ function Position({
   );
 }
 
-const cell = {
-  display: { base: 'block', sm: 'table-cell' },
-  p: { base: '0', sm: '0' },
-  py: { sm: '2' },
-  borderBottomWidth: { base: '0', sm: '1px' },
-  borderColor: 'border.default',
-} as const;
-
-const head = {
-  pb: '2',
-  textStyle: 'caption.default',
-  color: 'text.secondary',
-  fontWeight: 'inherit',
-  borderBottomWidth: '1px',
-  borderColor: 'border.strong',
-  verticalAlign: 'bottom',
-} as const;
-
-// Figma «Не хватает ингредиентов»: a table from 768; on 390 every row reads
-// «Поз. 2 Филе лосося / нужно 360 г · доступно для позиции 220 г».
-function MissingTable() {
+// One position of the dialog: what was asked, what is left and why.
+function ChangeItem({ row }: { row: ChangeRow }) {
   return (
-    <chakra.table w="full" borderCollapse="collapse" textStyle="body.default">
-      <chakra.thead display={{ base: 'none', sm: 'table-header-group' }}>
-        <tr>
-          <chakra.th {...head} textAlign="start" w={rem(60)}>
-            Поз.
-          </chakra.th>
-          <chakra.th {...head} textAlign="start">
-            Ингредиент
-          </chakra.th>
-          <chakra.th {...head} textAlign="end">
-            Нужно
-          </chakra.th>
-          <chakra.th {...head} textAlign="end" w={rem(120)}>
-            Доступно для позиции
-          </chakra.th>
-        </tr>
-      </chakra.thead>
-      <tbody>
-        {shortage.missing.map((row) => (
-          <chakra.tr
-            key={row.position}
-            display={{ base: 'grid', sm: 'table-row' }}
-            gridTemplateAreas="'position ingredient ingredient ingredient' 'need need available available'"
-            gridTemplateColumns="auto auto auto 1fr"
-            alignItems="baseline"
-            columnGap="2"
-            rowGap="1"
-            py={{ base: '2', sm: '0' }}
-            borderBottomWidth={{ base: '1px', sm: '0' }}
-            borderColor="border.default"
-          >
-            <chakra.td
-              {...cell}
-              gridArea="position"
-              textStyle="caption.default"
-              color="text.secondary"
-            >
-              {row.position}
-            </chakra.td>
-            <chakra.td {...cell} gridArea="ingredient">
-              {row.ingredient}
-            </chakra.td>
-            <chakra.td
-              {...cell}
-              gridArea="need"
-              textAlign={{ sm: 'end' }}
-              textStyle="mono.body"
-              whiteSpace="nowrap"
-            >
-              <chakra.span
-                display={{ sm: 'none' }}
-                textStyle="caption.default"
-                color="text.secondary"
-              >
-                нужно{' '}
-              </chakra.span>
-              {row.need}
-            </chakra.td>
-            <chakra.td
-              {...cell}
-              gridArea="available"
-              textAlign={{ sm: 'end' }}
-              textStyle="mono.body"
-              whiteSpace="nowrap"
-            >
-              <chakra.span
-                display={{ sm: 'none' }}
-                textStyle="caption.default"
-                color="text.secondary"
-              >
-                · доступно для позиции{' '}
-              </chakra.span>
-              {row.available}
-            </chakra.td>
-          </chakra.tr>
-        ))}
-      </tbody>
-    </chakra.table>
+    <Stack gap="1">
+      <Position
+        title={row.title}
+        text={row.text}
+        badge={
+          <Flex align="center" gap="2" flexShrink="0">
+            <Text textStyle="mono.default">{row.change}</Text>
+            {row.excluded ? (
+              <Badge tone="error">Исключено</Badge>
+            ) : (
+              <Badge>Сокращено</Badge>
+            )}
+          </Flex>
+        }
+      />
+      {row.deficits.map((deficit) => (
+        <Text key={deficit} textStyle="caption.default" color="text.secondary">
+          {deficit}
+        </Text>
+      ))}
+    </Stack>
   );
 }
 
@@ -171,12 +102,31 @@ function MissingTable() {
 export function ShortageDialog({
   dialogRef,
   returnFocusRef,
+  proposal,
+  previous,
+  names,
+  products,
+  timeZone,
+  confirming,
+  onConfirm,
+  onEdit,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
   returnFocusRef: RefObject<HTMLButtonElement | null>;
+  proposal: OrderProposal;
+  previous: OrderProposal | undefined;
+  names: ReadonlyMap<string, string>;
+  products: ReadonlyMap<string, Product>;
+  timeZone: string;
+  confirming: boolean;
+  onConfirm: () => void;
+  onEdit: () => void;
 }) {
-  const path = useRestaurantPath();
-  const navigate = useNavigate();
+  const rows = changeRows(proposal, names, products);
+  const before =
+    previous === undefined ? [] : previousRows(proposal, previous, names);
+  const empty = proposal.acceptedPositions.length === 0;
+  const at = proposal.evaluatedAt.epochMs;
   const titleId = useId();
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -245,12 +195,27 @@ export function ShortageDialog({
               textStyle="heading.h2"
               _focusVisible={{ outline: 'none' }}
             >
-              Не весь заказ можно приготовить
+              {empty
+                ? 'Ни одно блюдо из заказа сейчас нельзя приготовить'
+                : previous === undefined
+                  ? 'Не весь заказ можно приготовить'
+                  : 'Состав снова сокращён'}
             </chakra.h2>
             <Text textStyle="body.default" color="text.secondary">
-              Блюда используют общие ингредиенты, поэтому часть заказа
-              сократилась. Подтвердите итоговый состав.
+              {empty
+                ? 'Остатки изменились после оценки меню. Измените состав и подготовьте заказ заново.'
+                : previous === undefined
+                  ? 'Блюда используют общие ингредиенты, поэтому часть заказа сократилась. Подтвердите итоговый состав.'
+                  : 'Предыдущее предложение больше не оформляется. Подтвердите новый состав.'}
             </Text>
+            {previous !== undefined && (
+              <Text textStyle="body.default" color="text.secondary">
+                Пока вы подтверждали, доступность снова уменьшилась. Заказ не
+                оформлен: склад пересчитал состав в{' '}
+                {formatInstant(at, timeZone, 'timeSeconds')}{' '}
+                {formatOffset(at, timeZone)}.
+              </Text>
+            )}
             <Flex
               align="center"
               gap="1"
@@ -258,44 +223,22 @@ export function ShortageDialog({
               color="text.secondary"
             >
               <Icon src={clockIcon} size={16} />
-              {shortage.stamp}
+              {evaluationText(at, timeZone)}
             </Flex>
           </Stack>
-          <Group title="Что изменилось" first>
-            {shortage.changed.map((item) => (
-              <Position
-                key={item.title}
-                title={item.title}
-                text={item.text}
-                badge={<Badge>Сокращено</Badge>}
-              />
+          {before.length > 0 && (
+            <Group title="Что было в прошлом предложении" first>
+              {before.map((row) => (
+                <ChangeItem key={row.lineNo} row={row} />
+              ))}
+            </Group>
+          )}
+          <Group title="Что изменилось" first={before.length === 0}>
+            {rows.map((row) => (
+              <ChangeItem key={row.lineNo} row={row} />
             ))}
           </Group>
-          <Group title="Исключённые позиции">
-            {shortage.excluded.map((item) => (
-              <Position
-                key={item.title}
-                title={item.title}
-                text={item.text}
-                badge={<Badge tone="error">Исключено</Badge>}
-              />
-            ))}
-          </Group>
-          <Group title="Не хватает ингредиентов">
-            <MissingTable />
-            <Text textStyle="caption.default" color="text.secondary">
-              Доступное количество учитывает позиции выше по порядку заказа.
-            </Text>
-          </Group>
-          <Group title={shortage.finalTitle}>
-            {shortage.finalLines.map((line) => (
-              <Flex key={line.title} justify="space-between" gap="3">
-                <Text textStyle="body.default">{line.title}</Text>
-                <Text textStyle="mono.body" flexShrink="0">
-                  {line.portions}
-                </Text>
-              </Flex>
-            ))}
+          <Group title={finalText(proposal)}>
             <Text textStyle="caption.default" color="text.secondary">
               При оформлении склад проверит состав ещё раз.
             </Text>
@@ -309,21 +252,24 @@ export function ShortageDialog({
           borderTopWidth="1px"
           borderColor="border.default"
         >
-          <Text textStyle="body.strong">{shortage.total}</Text>
+          <Text textStyle="body.strong">
+            {empty
+              ? 'Итоговый состав пуст — оформить заказ нельзя.'
+              : acceptanceText(proposal, previous !== undefined)}
+          </Text>
           <Flex direction={{ base: 'column', sm: 'row' }} gap="3">
-            <Button
-              onClick={() => {
-                void navigate(path('/orders/placed'));
-              }}
-            >
-              Оформить оставшиеся блюда
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                void navigate(path('/orders/draft'));
-              }}
-            >
+            {!empty && (
+              <Button
+                disabled={confirming}
+                aria-busy={confirming ? 'true' : undefined}
+                onClick={onConfirm}
+              >
+                {confirming
+                  ? 'Отправляем подтверждение…'
+                  : 'Оформить оставшиеся блюда'}
+              </Button>
+            )}
+            <Button variant="secondary" disabled={confirming} onClick={onEdit}>
               Вернуться к изменению заказа
             </Button>
           </Flex>

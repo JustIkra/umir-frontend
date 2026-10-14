@@ -1,19 +1,27 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import type { ReactNode, RefObject } from 'react';
+import type { OrderPhase, OrderSnapshot } from '@/application/order-flow';
+import type { Order, OrderProposal, Position } from '@/application/restaurant';
+import { portionsValid } from '@/domain/order-draft';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
-import {
-  draftOrder,
-  draftSummary,
-  placedOrder,
-  proposal,
-} from '@/presentation/placeholder-orders';
-import { Button, ButtonLink, TextLink } from '@/presentation/ui/actions';
-import { Badge } from '@/presentation/ui/badge';
+import { Button, TextLink } from '@/presentation/ui/actions';
+import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon } from '@/presentation/ui/icon';
 import { Stepper } from '@/presentation/ui/stepper';
+import {
+  attemptMessage,
+  compositionText,
+  confirmedLines,
+  draftSummary,
+  finalText,
+  noticeMessage,
+  outcomeMessage,
+  portionsText,
+} from './order-messages';
+import { evaluationText } from './order-rows';
 
 // Figma Order panel 85:1135: header, body, a grey footer with the action.
 function Panel({
@@ -56,13 +64,21 @@ function Panel({
   );
 }
 
-function Heading({ title, caption }: { title: string; caption: string }) {
+function Heading({
+  title,
+  caption,
+}: {
+  title: string;
+  caption?: string | undefined;
+}) {
   return (
     <Stack gap="0.5">
       <chakra.h2 textStyle="heading.h3">{title}</chakra.h2>
-      <Text textStyle="caption.default" color="text.secondary">
-        {caption}
-      </Text>
+      {caption !== undefined && (
+        <Text textStyle="caption.default" color="text.secondary">
+          {caption}
+        </Text>
+      )}
     </Stack>
   );
 }
@@ -125,36 +141,99 @@ export function EmptyOrder() {
   );
 }
 
-// Figma 02: the sample draft. «−», «+» and delete change nothing yet.
-export function DraftOrder() {
-  const path = useRestaurantPath();
+type Names = ReadonlyMap<string, string>;
+
+const nameOf = (names: Names, dishID: string) => names.get(dishID) ?? dishID;
+
+// The positions of a proposal, an attempt or a placed order: «1 · Борщ» and
+// the portions at the right.
+function PositionList({
+  positions,
+  names,
+}: {
+  positions: readonly Position[];
+  names: Names;
+}) {
+  return (
+    <Stack as="ol" gap="0" listStyleType="none">
+      {positions.map((position) => (
+        <Flex
+          as="li"
+          key={position.lineNo}
+          align="center"
+          justify="space-between"
+          gap="3"
+          py="1.5"
+          {...divider}
+        >
+          <Text textStyle="body.default">
+            {position.lineNo} · {nameOf(names, position.dishID)}
+          </Text>
+          <Text textStyle="mono.body" flexShrink="0" whiteSpace="nowrap">
+            {portionsText(position.portions)}
+          </Text>
+        </Flex>
+      ))}
+    </Stack>
+  );
+}
+
+// Figma 02, 03 and E11: the draft. While the order is being checked the
+// positions are closed.
+export function DraftOrder({
+  snapshot,
+  names,
+  onPortions,
+  onRemove,
+  onPrepare,
+}: {
+  snapshot: OrderSnapshot;
+  names: Names;
+  onPortions: (lineNo: number, portions: string) => void;
+  onRemove: (lineNo: number) => void;
+  onPrepare: () => void;
+}) {
+  const preparing = snapshot.phase.kind === 'preparing';
+  const notice = snapshot.notice;
+  const flagged = notice?.kind === 'portions' ? notice.lines : [];
+  const message = notice === undefined ? undefined : noticeMessage(notice);
   return (
     <Panel
-      header={<Heading title="Состав заказа" caption={draftSummary} />}
+      header={
+        <Heading title="Состав заказа" caption={draftSummary(snapshot.draft)} />
+      }
       footer={
         <>
+          {message !== undefined && (
+            <FormMessage tone={message.tone} title={message.title}>
+              {message.text}
+            </FormMessage>
+          )}
           <Text textStyle="caption.default" color="text.secondary">
-            Проверка учитывает весь заказ: у блюд бывают общие ингредиенты.
-            Продукты не резервируются.
+            {preparing
+              ? 'Пока идёт проверка, состав не меняется.'
+              : 'Проверка учитывает весь заказ: у блюд бывают общие ингредиенты. Продукты не резервируются.'}
           </Text>
-          <ButtonLink to={path('/orders/proposal')} w="full">
-            Подготовить заказ
-          </ButtonLink>
+          <Button
+            w="full"
+            disabled={preparing}
+            aria-busy={preparing ? 'true' : undefined}
+            onClick={onPrepare}
+          >
+            {preparing ? 'Проверяем заказ…' : 'Подготовить заказ'}
+          </Button>
         </>
       }
     >
       <Stack as="ol" gap="0" listStyleType="none">
-        {draftOrder.map((line) => (
-          <Stack as="li" key={line.position} gap="2" py="3" {...divider}>
+        {snapshot.draft.map((line) => (
+          <Stack as="li" key={line.lineNo} gap="2" py="3" {...divider}>
             <Flex align="flex-start" gap="4">
-              <PositionMark>{line.position}</PositionMark>
+              <PositionMark>{line.lineNo}</PositionMark>
               <Stack gap="0.5" flex="1" minW="0">
-                <Text textStyle="body.default">{line.dish}</Text>
-                {line.note && (
-                  <Text textStyle="caption.default" color="text.secondary">
-                    {line.note}
-                  </Text>
-                )}
+                <Text textStyle="body.default">
+                  {nameOf(names, line.dishID)}
+                </Text>
               </Stack>
               <chakra.button
                 type="button"
@@ -166,7 +245,12 @@ export function DraftOrder() {
                 borderRadius="md"
                 cursor="pointer"
                 _hover={{ bg: 'bg.subtle' }}
-                aria-label={`Удалить позицию ${String(line.position)}`}
+                _disabled={{ cursor: 'not-allowed', opacity: '0.5' }}
+                disabled={preparing}
+                aria-label={`Удалить позицию ${String(line.lineNo)}`}
+                onClick={() => {
+                  onRemove(line.lineNo);
+                }}
               >
                 <Icon src={trashIcon} size={20} />
               </chakra.button>
@@ -174,7 +258,14 @@ export function DraftOrder() {
             <Box ps="10">
               <Stepper
                 value={line.portions}
-                label={`позиция ${String(line.position)}`}
+                label={`позиция ${String(line.lineNo)}`}
+                invalid={
+                  flagged.includes(line.lineNo) || !portionsValid(line.portions)
+                }
+                disabled={preparing}
+                onChange={(portions) => {
+                  onPortions(line.lineNo, portions);
+                }}
               />
             </Box>
           </Stack>
@@ -184,79 +275,253 @@ export function DraftOrder() {
   );
 }
 
-// Figma 04 under the dialog: the proposal with reductions.
+// Figma B2, B3 and 04 under the dialog: the proposal. With reductions the
+// confirmation goes through the shortage dialog.
 export function ProposalOrder({
+  proposal,
+  names,
+  timeZone,
+  confirming,
   confirmRef,
   onConfirm,
+  onEdit,
 }: {
-  confirmRef: RefObject<HTMLButtonElement | null>;
+  proposal: OrderProposal;
+  names: Names;
+  timeZone: string;
+  confirming: boolean;
+  confirmRef?: RefObject<HTMLButtonElement | null>;
   onConfirm: () => void;
+  onEdit: () => void;
 }) {
-  const path = useRestaurantPath();
+  const reduced = proposal.changes.length > 0;
   return (
     <Panel
-      header={<Heading title="Предложение заказа" caption={proposal.stamp} />}
+      header={
+        <Heading
+          title={confirming ? 'Оформление заказа' : 'Предложение заказа'}
+          caption={
+            confirming
+              ? 'Отправляем подтверждение…'
+              : evaluationText(proposal.evaluatedAt.epochMs, timeZone)
+          }
+        />
+      }
       footer={
         <>
-          <Text textStyle="caption.strong">{proposal.summary}</Text>
+          <Text textStyle="caption.strong">
+            {confirming
+              ? `Подтверждённый состав · ${compositionText(proposal.acceptedPositions)}`
+              : finalText(proposal)}
+          </Text>
+          {!reduced && !confirming && (
+            <Text textStyle="caption.default" color="text.secondary">
+              Все позиции доступны. Заказ оформится только после подтверждения.
+            </Text>
+          )}
+          {confirming && (
+            <Text textStyle="caption.default" color="text.secondary">
+              Ждём ответ сервиса. Повторное нажатие не создаст вторую продажу.
+            </Text>
+          )}
           <Button
             ref={confirmRef}
             w="full"
-            aria-haspopup="dialog"
+            disabled={confirming}
+            aria-busy={confirming ? 'true' : undefined}
+            aria-haspopup={reduced ? 'dialog' : undefined}
             onClick={onConfirm}
           >
-            Проверить и подтвердить
+            {confirming
+              ? 'Отправляем подтверждение…'
+              : reduced
+                ? 'Проверить и подтвердить'
+                : 'Подтвердить состав'}
           </Button>
-          <ButtonLink variant="secondary" to={path('/orders/draft')} w="full">
-            Вернуться к изменению заказа
-          </ButtonLink>
+          <Button
+            variant="secondary"
+            w="full"
+            disabled={confirming}
+            onClick={onEdit}
+          >
+            {reduced ? 'Вернуться к изменению заказа' : 'Изменить заказ'}
+          </Button>
         </>
       }
     >
-      <Flex
-        justify="space-between"
-        gap="3"
-        py="2"
-        textStyle="caption.default"
-        color="text.secondary"
-        aria-hidden="true"
-      >
-        <span>Позиция</span>
-        <span>запрошено → принято, порц.</span>
-      </Flex>
-      <Stack as="ol" gap="0" listStyleType="none">
-        {proposal.rows.map((row) => (
-          <Stack
-            as="li"
-            key={row.title}
-            gap="1"
-            py="3"
-            borderTopWidth="1px"
-            borderColor="border.default"
+      <PositionList positions={proposal.acceptedPositions} names={names} />
+    </Panel>
+  );
+}
+
+// Figma D2, D3, D4 and F5: an attempt whose outcome is not known. The order
+// is closed until the attempt has a result.
+export function AttemptOrder({
+  phase,
+  names,
+  timeZone,
+  notice,
+  onCheck,
+}: {
+  phase: Extract<OrderPhase, { kind: 'unknown' | 'pending' | 'conflict' }>;
+  names: Names;
+  timeZone: string;
+  notice: OrderSnapshot['notice'];
+  onCheck: () => void;
+}) {
+  const message = attemptMessage(phase, timeZone);
+  const failed =
+    notice?.kind === 'check-failed' ? noticeMessage(notice) : undefined;
+  const { attempt } = phase;
+  return (
+    <Panel
+      header={<Heading title="Оформление заказа" caption={message.stamp} />}
+      footer={
+        <>
+          {failed !== undefined && (
+            <FormMessage tone={failed.tone} title={failed.title}>
+              {failed.text}
+            </FormMessage>
+          )}
+          <Button
+            w="full"
+            disabled={phase.checking}
+            aria-busy={phase.checking ? 'true' : undefined}
+            onClick={onCheck}
           >
-            <Flex align="flex-start" justify="space-between" gap="3">
-              <Text textStyle="body.default">{row.title}</Text>
-              <Flex align="center" gap="2" flexShrink="0">
-                <Text textStyle="mono.default">{row.change}</Text>
-                {row.status === 'reduced' && <Badge>Сокращено</Badge>}
-                {row.status === 'excluded' && (
-                  <Badge tone="error">Исключено</Badge>
-                )}
-              </Flex>
-            </Flex>
-            <Text textStyle="caption.default" color="text.secondary">
-              {row.note}
-            </Text>
-          </Stack>
-        ))}
+            {phase.checking ? 'Проверяем результат…' : 'Проверить результат'}
+          </Button>
+          <Text textStyle="caption.default" color="text.secondary">
+            {message.footer}
+          </Text>
+        </>
+      }
+    >
+      <Stack gap="3" py="2">
+        <FormMessage tone={message.tone} title={message.title}>
+          {message.text}
+        </FormMessage>
+        <Text textStyle="caption.strong">
+          Состав этой попытки ·{' '}
+          {compositionText(attempt.proposal.acceptedPositions)}
+        </Text>
+        <PositionList
+          positions={attempt.proposal.acceptedPositions}
+          names={names}
+        />
+        <chakra.details textStyle="caption.default" color="text.secondary">
+          <chakra.summary cursor="pointer">Детали попытки</chakra.summary>
+          <Text textStyle="mono.default" wordBreak="break-all">
+            commandID {attempt.commandID}
+          </Text>
+          <Text textStyle="mono.default" wordBreak="break-all">
+            proposalID {attempt.proposalID}
+          </Text>
+        </chakra.details>
       </Stack>
     </Panel>
   );
 }
 
-// Figma 08 «Заказ оформлен».
-export function PlacedOrder() {
+// Figma F1, F2, F4, E12 and the reset of the orders service: the order did
+// not go through, or the proposal is gone.
+export function OutcomeOrder({
+  phase,
+  names,
+  timeZone,
+  onPrepareAgain,
+  onEdit,
+  onRetry,
+  onOpenReplacement,
+}: {
+  phase: Extract<
+    OrderPhase,
+    { kind: 'not-found' | 'refused' | 'reset' | 'superseded' | 'empty' }
+  >;
+  names: Names;
+  timeZone: string;
+  onPrepareAgain: () => void;
+  onEdit: () => void;
+  onRetry: () => void;
+  onOpenReplacement: () => void;
+}) {
+  const message = outcomeMessage(phase, timeZone);
+  const back = (label: string) => (
+    <Button variant="secondary" w="full" onClick={onEdit}>
+      {label}
+    </Button>
+  );
+  const again = (
+    <Button w="full" onClick={onPrepareAgain}>
+      Подготовить заказ заново
+    </Button>
+  );
+  let actions: ReactNode;
+  let positions: readonly Position[] = [];
+  let caption: string | undefined;
+  if (phase.kind === 'refused') {
+    positions = phase.proposal.acceptedPositions;
+    caption = `Состав предложения · ${compositionText(positions)}`;
+    actions = (
+      <>
+        <Button w="full" onClick={onRetry}>
+          Повторить оформление
+        </Button>
+        {back('Вернуться к изменению заказа')}
+      </>
+    );
+  } else if (phase.kind === 'superseded' && phase.replacement !== undefined) {
+    positions = phase.replacement.acceptedPositions;
+    caption = `Новое предложение · ${compositionText(positions)}`;
+    actions = (
+      <>
+        <Button w="full" onClick={onOpenReplacement}>
+          Открыть новое предложение
+        </Button>
+        {back('Вернуться к изменению заказа')}
+      </>
+    );
+  } else if (phase.kind === 'reset') {
+    actions = again;
+  } else if (phase.kind === 'empty') {
+    actions = back('Вернуться к изменению заказа');
+  } else {
+    actions = (
+      <>
+        {again}
+        {back('Изменить позиции')}
+      </>
+    );
+  }
+  return (
+    <Panel header={<Heading title="Оформление заказа" />} footer={actions}>
+      <Stack gap="3" py="2">
+        <FormMessage tone={message.tone} title={message.title}>
+          {message.text}
+        </FormMessage>
+        {caption !== undefined && (
+          <Text textStyle="caption.strong">{caption}</Text>
+        )}
+        <PositionList positions={positions} names={names} />
+      </Stack>
+    </Panel>
+  );
+}
+
+// Figma B4, 08 and D5 «Заказ оформлен».
+export function PlacedOrder({
+  order,
+  names,
+  timeZone,
+  onNew,
+}: {
+  order: Order;
+  names: Names;
+  timeZone: string;
+  onNew: () => void;
+}) {
   const path = useRestaurantPath();
+  const lines = confirmedLines(order, timeZone);
   return (
     <Panel
       header={
@@ -267,16 +532,16 @@ export function PlacedOrder() {
               Заказ оформлен
             </chakra.h2>
             <Text textStyle="caption.default" color="text.secondary">
-              {placedOrder.stamp}
+              {lines.stamp}
             </Text>
           </Stack>
         </Flex>
       }
       footer={
         <>
-          <ButtonLink to={path('/orders')} w="full">
+          <Button w="full" onClick={onNew}>
             Новый заказ
-          </ButtonLink>
+          </Button>
           <TextLink
             to={path('/warehouse/history')}
             alignSelf="flex-start"
@@ -294,30 +559,13 @@ export function PlacedOrder() {
             <Text textStyle="caption.default" color="text.secondary">
               Заказ
             </Text>
-            <Text textStyle="mono.default">{placedOrder.id}</Text>
+            <Text textStyle="mono.default">{order.orderID}</Text>
           </Flex>
           <Text textStyle="caption.default" color="text.secondary">
-            {placedOrder.title}
+            {lines.composition}
           </Text>
         </Stack>
-        <Stack as="ol" gap="0" listStyleType="none">
-          {placedOrder.lines.map((line) => (
-            <Flex
-              as="li"
-              key={line.title}
-              align="center"
-              justify="space-between"
-              gap="3"
-              py="1.5"
-              {...divider}
-            >
-              <Text textStyle="body.default">{line.title}</Text>
-              <Text textStyle="mono.body" flexShrink="0" whiteSpace="nowrap">
-                {line.portions}
-              </Text>
-            </Flex>
-          ))}
-        </Stack>
+        <PositionList positions={order.acceptedPositions} names={names} />
         <Text
           px="3"
           py="2"

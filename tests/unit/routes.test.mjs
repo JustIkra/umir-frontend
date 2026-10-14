@@ -18,6 +18,7 @@ import {
   instantOf,
   labels,
   loaded,
+  orderSnapshot,
   readyAccess,
   redirectOf,
   renderRoute,
@@ -114,9 +115,6 @@ const pages = [
   ],
   [`/app/r/${R}`, 'Обзор', []],
   [`/app/r/${R}/orders`, 'Новый заказ', [], { data: servingData }],
-  [`/app/r/${R}/orders/draft`, 'Новый заказ', [], { data: servingData }],
-  [`/app/r/${R}/orders/proposal`, 'Новый заказ', [], { data: servingData }],
-  [`/app/r/${R}/orders/placed`, 'Новый заказ', [], { data: servingData }],
   [`/app/r/${R}/warehouse`, 'Склад', []],
   [`/app/r/${R}/warehouse/expiry`, 'Склад', []],
   [`/app/r/${R}/warehouse/history`, 'Склад', []],
@@ -222,9 +220,6 @@ test('internal links lead to existing pages', async () => {
     '/app/organizations/new',
     '/app/no-restaurants',
     `/app/r/${R}/orders`,
-    `/app/r/${R}/orders/draft`,
-    `/app/r/${R}/orders/proposal`,
-    `/app/r/${R}/orders/placed`,
     `/app/r/${R}/warehouse`,
     `/app/r/${R}/warehouse/expiry`,
     `/app/r/${R}/warehouse/history`,
@@ -484,12 +479,62 @@ test('the warehouse shows the sample stock, expiry and history', async () => {
 });
 
 test('the order flow goes from the menu to the placed order', async () => {
-  const draft = await renderRoute(`/app/r/${R}/orders/draft`);
-  assert.ok(draft.includes('5 позиций · 9 порций'));
-  assert.ok(hrefs(draft).includes(`/app/r/${R}/orders/proposal`));
-  const proposalHtml = await renderRoute(`/app/r/${R}/orders/proposal`);
-  assert.ok(proposalHtml.includes('Не весь заказ можно приготовить'));
-  const placed = await renderRoute(`/app/r/${R}/orders/placed`);
+  const route = `/app/r/${R}/orders`;
+  const dishes = { data: servingData };
+  const draft = await renderRoute(route, {
+    ...dishes,
+    order: orderSnapshot({
+      draft: [
+        { lineNo: 1, dishID: '206', portions: '4' },
+        { lineNo: 2, dishID: '206', portions: '5' },
+      ],
+    }),
+  });
+  assert.ok(text(draft).includes('2 позиции · 9 порций'));
+  assert.ok(text(draft).includes('Подготовить заказ'));
+  const proposed = await renderRoute(route, {
+    ...dishes,
+    order: orderSnapshot({
+      phase: {
+        kind: 'proposal',
+        previous: undefined,
+        proposal: {
+          proposalID: 'prp-1',
+          evaluatedAt: instantOf('2026-10-14T10:00:00+03:00'),
+          stateVersion: '1',
+          requestedPositions: [{ lineNo: '1', dishID: '206', portions: '3' }],
+          acceptedPositions: [{ lineNo: '1', dishID: '206', portions: '1' }],
+          changes: [
+            {
+              lineNo: '1',
+              dishID: '206',
+              requestedPortions: '3',
+              acceptedPortions: '1',
+              deficits: [],
+            },
+          ],
+          warehouseEpoch: '66666666-6666-4666-8666-666666666666',
+        },
+      },
+    }),
+  });
+  assert.ok(text(proposed).includes('Не весь заказ можно приготовить'));
+  const placed = await renderRoute(route, {
+    ...dishes,
+    order: orderSnapshot({
+      phase: {
+        kind: 'confirmed',
+        afterCheck: false,
+        order: {
+          orderID: 'ord-20261010-0042',
+          proposalID: 'prp-1',
+          acceptedPositions: [{ lineNo: '1', dishID: '206', portions: '1' }],
+          allocations: [],
+          placedAt: instantOf('2026-10-14T10:01:00+03:00'),
+        },
+      },
+    }),
+  });
   assert.ok(placed.includes('ord-20261010-0042'));
   assert.ok(hrefs(placed).includes(`/app/r/${R}/warehouse/history`));
 });

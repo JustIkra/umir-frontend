@@ -85,15 +85,7 @@ const restaurantRoutes: RouteObject[] = [
   {
     path: 'orders',
     element: <SectionGate section="orders" />,
-    children: [
-      { index: true, element: <OrdersPage key="empty" step="empty" /> },
-      { path: 'draft', element: <OrdersPage key="draft" step="draft" /> },
-      {
-        path: 'proposal',
-        element: <OrdersPage key="proposal" step="proposal" />,
-      },
-      { path: 'placed', element: <OrdersPage key="placed" step="placed" /> },
-    ],
+    children: [{ index: true, element: <OrdersPage /> }],
   },
   {
     path: 'warehouse',
