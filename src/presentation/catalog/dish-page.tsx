@@ -1,5 +1,5 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import { ReadFailure } from '@/presentation/app-shell/read-failure';
@@ -13,10 +13,12 @@ import { ButtonLink, TextLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
 import { CardFooter, SplitCard, SplitCardBody } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
+import { FormMessage } from '@/presentation/ui/form-message';
 import { StateCard } from '@/presentation/ui/states';
 import { DataTable, Td, Th } from '@/presentation/ui/table';
 import { rem } from '@/presentation/ui/units';
 import { formatStamp, zoneLabel } from '@/presentation/ui/zones';
+import { createdDishText, createdNoticeOf } from './catalog-forms';
 import { recipeRows } from './catalog-rows';
 
 const bareTh = { bg: 'transparent' } as const;
@@ -30,6 +32,7 @@ export function DishPage() {
   const model = data.dish(dishID);
   const { snapshot, failure } = useRestaurantRead(model);
   const productList = useReadModel(data.products()).value;
+  const created = createdNoticeOf(useLocation().state);
   const value = snapshot.value;
   if (value === undefined) {
     if (failure === undefined) return null;
@@ -64,6 +67,10 @@ export function DishPage() {
     );
   }
   const dish = value.result.dish;
+  const createdText =
+    created?.kind === 'dish' && created.code === dish.dishID
+      ? createdDishText(created.name, created.code, created.ingredients)
+      : undefined;
   const { timeZone } = value.context.settings;
   const epochMs = value.result.evaluatedAt.epochMs;
   const recipe = recipeRows(dish, productList?.result.items ?? []);
@@ -81,6 +88,11 @@ export function DishPage() {
           title={dish.name}
           description="Рецептура одной порции. Определение блюда не изменяется после создания."
         />
+        {createdText !== undefined && (
+          <FormMessage tone="success" title={createdText.title}>
+            {createdText.text}
+          </FormMessage>
+        )}
       </Stack>
       <SplitCard>
         <Stack gap={{ base: '6', sm: '4' }}>

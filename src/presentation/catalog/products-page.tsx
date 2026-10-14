@@ -1,5 +1,6 @@
 import { Skeleton, Text, chakra } from '@chakra-ui/react';
 import { useState } from 'react';
+import { useLocation } from 'react-router';
 import { ReadFailure } from '@/presentation/app-shell/read-failure';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import catalogIcon from '@/presentation/assets/icons/catalog-24.svg';
@@ -9,10 +10,12 @@ import {
 } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { SearchInput } from '@/presentation/ui/form';
+import { FormMessage } from '@/presentation/ui/form-message';
 import { StateCard } from '@/presentation/ui/states';
 import { DataTable, TableCard, Td, Th } from '@/presentation/ui/table';
 import { rem } from '@/presentation/ui/units';
 import { catalogStamp, productRows } from './catalog-rows';
+import { createdNoticeOf, createdProductText } from './catalog-forms';
 import { CatalogLayout, StaleCatalog } from './catalog-layout';
 
 // Figma K01 «Продукты». On 390 a row reads «Авокадо / Код 101 · штуки, шт».
@@ -22,6 +25,13 @@ export function ProductsPage() {
   const model = data.products();
   const { snapshot, failure } = useRestaurantRead(model);
   const [query, setQuery] = useState('');
+  const created = createdNoticeOf(useLocation().state);
+  const createdMessage =
+    created?.kind === 'product' ? (
+      <CreatedMessage
+        {...createdProductText(created.name, created.code, created.unit)}
+      />
+    ) : null;
   const value = snapshot.value;
   const rows =
     value === undefined ? [] : productRows(value.result.items, query);
@@ -49,6 +59,7 @@ export function ProductsPage() {
   if (value?.result.items.length === 0) {
     return (
       <CatalogLayout section="Продукты" action={action}>
+        {createdMessage}
         <StateCard
           icon={catalogIcon}
           title="Продуктов пока нет"
@@ -63,6 +74,7 @@ export function ProductsPage() {
   }
   return (
     <CatalogLayout section="Продукты" action={action}>
+      {createdMessage}
       {value !== undefined && failure !== undefined && (
         <StaleCatalog
           stamp={catalogStamp(
@@ -148,5 +160,13 @@ export function ProductsPage() {
         </DataTable>
       </TableCard>
     </CatalogLayout>
+  );
+}
+
+function CreatedMessage({ title, text }: { title: string; text: string }) {
+  return (
+    <FormMessage tone="success" title={title}>
+      {text}
+    </FormMessage>
   );
 }

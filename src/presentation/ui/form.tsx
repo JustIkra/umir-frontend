@@ -393,21 +393,28 @@ export function SearchInput({
 export function SelectField({
   placeholder,
   options,
+  invalid = false,
   ...props
 }: {
   placeholder?: string;
+  invalid?: boolean;
   options: readonly { value: string; label: string }[];
 } & HTMLChakraProps<'select'>) {
   return (
     <Box position="relative" w="full">
       <chakra.select
-        {...controlStyles(false)}
+        {...controlStyles(invalid)}
         appearance="none"
         h="2.75rem"
-        pl="3"
+        pl={invalid ? 'calc({spacing.3} - 1px)' : '3'}
         pr="10"
         cursor="pointer"
-        defaultValue={placeholder === undefined ? undefined : ''}
+        defaultValue={
+          placeholder === undefined || props.value !== undefined
+            ? undefined
+            : ''
+        }
+        aria-invalid={invalid || undefined}
         {...props}
       >
         {placeholder !== undefined && (
@@ -442,15 +449,30 @@ export function RadioGroupField({
   options,
   hint,
   hintId,
+  error,
+  value,
+  onChange,
+  disabled,
 }: {
   legend: string;
   name: string;
   options: readonly { value: string; label: string }[];
   hint?: string;
   hintId?: string;
+  error?: string | undefined;
+  // Controlled use: without value and onChange the browser keeps the choice.
+  value?: string | undefined;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
-    <chakra.fieldset border="0" p="0" m="0" aria-describedby={hintId}>
+    <chakra.fieldset
+      border="0"
+      p="0"
+      m="0"
+      aria-describedby={hintId}
+      disabled={disabled}
+    >
       <chakra.legend textStyle="caption.strong" mb={{ base: '1', sm: '3' }}>
         {legend}
       </chakra.legend>
@@ -469,6 +491,12 @@ export function RadioGroupField({
               type="radio"
               name={name}
               value={option.value}
+              {...(value === undefined
+                ? {}
+                : { checked: value === option.value })}
+              onChange={() => {
+                onChange?.(option.value);
+              }}
               appearance="none"
               boxSize="5"
               m="0"
@@ -484,9 +512,9 @@ export function RadioGroupField({
           </chakra.label>
         ))}
       </Flex>
-      {hint && hintId && (
+      {hintId !== undefined && (hint !== undefined || error !== undefined) && (
         <Box mt={{ base: '1', sm: '3' }}>
-          <FieldMessage id={hintId} hint={hint} />
+          <FieldMessage id={hintId} hint={hint} error={error} />
         </Box>
       )}
     </chakra.fieldset>
@@ -526,17 +554,18 @@ export function TimeInput(
 // Figma quantity field: a number with its unit inside the right edge.
 export function QuantityInput({
   unit,
+  invalid = false,
   ...props
-}: { unit: string } & HTMLChakraProps<'input'>) {
+}: { unit: string; invalid?: boolean } & HTMLChakraProps<'input'>) {
   return (
     <Flex
       align="center"
       gap="2"
       h="2.75rem"
-      px="3"
-      bg="bg.surface"
-      borderWidth="1px"
-      borderColor="border.strong"
+      px={invalid ? 'calc({spacing.3} - 1px)' : '3'}
+      bg={invalid ? 'bg.errorSubtle' : 'bg.surface'}
+      borderWidth={invalid ? '2px' : '1px'}
+      borderColor={invalid ? 'border.error' : 'border.strong'}
       borderRadius="md"
       _focusWithin={{
         outline: '2px solid {colors.border.focus}',
@@ -545,6 +574,7 @@ export function QuantityInput({
     >
       <chakra.input
         inputMode="decimal"
+        aria-invalid={invalid || undefined}
         placeholder="0"
         flex="1"
         minW="0"
