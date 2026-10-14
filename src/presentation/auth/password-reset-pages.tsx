@@ -319,11 +319,11 @@ export function PasswordResetCodePage() {
   const expired = isCodeExpired(reset, now) || reset.notice?.kind === 'expired';
   const locked = reset.notice?.kind === 'locked';
   const unknown = reset.notice?.kind === 'unknown';
-  const message = resetMessage(
-    expired ? { kind: 'expired' } : reset.notice,
-    now,
-  );
-  const limited = reset.notice?.kind === 'limited' && message !== undefined;
+  // The notice's own message wins over the expiry text.
+  const own = resetMessage(reset.notice, now);
+  const message =
+    own ?? (expired ? resetMessage({ kind: 'expired' }, now) : undefined);
+  const limited = reset.notice?.kind === 'limited' && own !== undefined;
   const error = codeError(reset.notice);
   const resendIn = (reset.resendAtMs ?? now) - now;
   const closed = unknown || reset.busy || locked || expired;

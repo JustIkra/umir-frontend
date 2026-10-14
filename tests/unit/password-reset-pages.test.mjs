@@ -189,3 +189,23 @@ test('texts of the notices', () => {
   );
   assert.equal(resetMessage(undefined, NOW), undefined);
 });
+
+test('R05 shows a refused renew of an expired code, not only the expiry', async () => {
+  const limited = await renderRoute('/password-reset/code', {
+    reset: code({
+      expiresAtMs: NOW,
+      notice: { kind: 'limited', untilMs: NOW + 45_000 },
+    }),
+  });
+  assert.ok(text(limited).includes('Повторить запрос можно через 45 с.'));
+  const button = /<button[^>]*>\s*Отправить код ещё раз\s*<\/button>/.exec(
+    limited,
+  );
+  assert.ok(button, 'the resend button is rendered');
+  assert.ok(/\bdisabled\b/.test(button[0]), 'the resend button is disabled');
+  const unavailable = await page(
+    '/password-reset/code',
+    code({ expiresAtMs: NOW, notice: { kind: 'unavailable' } }),
+  );
+  assert.ok(unavailable.includes('Восстановление временно недоступно'));
+});
