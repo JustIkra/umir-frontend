@@ -219,6 +219,55 @@ const checks = {
     assert.equal((await recorded()).at(-1).length, 20000);
   },
 
+  'passes the password reset steps with their bodies and CSRF header':
+    async () => {
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': 'token-2',
+      };
+      const id = '44444444-4444-4444-8444-444444444444';
+      const begin =
+        '{"commandID":"c1","email":"a@b.ru","purpose":"password_reset"}';
+      const verify = `{"commandID":"c2","challengeID":"${id}","code":"482913"}`;
+      assert.equal(
+        (
+          await send('POST', '/api/v2/email-challenges', {
+            headers,
+            body: begin,
+          })
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          await send('POST', `/api/v2/challenges/${id}/verify`, {
+            headers,
+            body: verify,
+          })
+        ).status,
+        200,
+      );
+      const [first, second] = (await recorded()).slice(-2);
+      assert.deepEqual(
+        [
+          first.url,
+          first.length,
+          first.csrf,
+          second.url,
+          second.length,
+          second.csrf,
+        ],
+        [
+          '/api/v2/email-challenges',
+          Buffer.byteLength(begin),
+          'token-2',
+          `/api/v2/challenges/${id}/verify`,
+          Buffer.byteLength(verify),
+          'token-2',
+        ],
+      );
+    },
+
   // Nginx 1.30 already streams small chunks and speaks HTTP/1.1 upstream by
   // default, so the contract's settings are checked in the file as well.
   'configures the restaurant stream for a long-lived connection': () => {
