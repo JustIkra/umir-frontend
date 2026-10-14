@@ -1,6 +1,11 @@
-import type { Product } from '@/application/restaurant';
+import type {
+  DishInput,
+  Product,
+  ProductInput,
+} from '@/application/restaurant';
 import {
   baseUnits,
+  formatThousandths,
   parseQuantity,
   unitShort,
   unitTitles,
@@ -225,4 +230,30 @@ export function createdNoticeOf(state: unknown): CreatedNotice | undefined {
     return { kind, name, code, ingredients };
   }
   return undefined;
+}
+
+// A create whose outcome is unknown keeps its input in the command runner; a
+// page that mounts again copies it back into the fields.
+export function productDraftOf({
+  productID,
+  name,
+  baseUnit,
+}: ProductInput): ProductDraft {
+  return { name, code: productID, unit: baseUnit };
+}
+
+export function dishDraftOf({
+  dishID,
+  name,
+  ingredients,
+}: DishInput): DishDraft {
+  return {
+    name,
+    code: dishID,
+    lines: ingredients.map((ingredient, index) => ({
+      key: index + 1,
+      productID: ingredient.productID,
+      quantity: formatThousandths(ingredient.quantity),
+    })),
+  };
 }

@@ -1,5 +1,5 @@
 import { Flex, Stack, Text, chakra } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { CreateOutcome } from '@/application/catalog-commands';
 import type { Product, ProductInput } from '@/application/restaurant';
@@ -7,7 +7,11 @@ import { baseUnits, unitTitles, type BaseUnit } from '@/domain/quantity';
 import { useLeaveGuard } from '@/presentation/app-shell/leave-guard';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
-import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
+import {
+  useAttempts,
+  useReadModel,
+  useRestaurantData,
+} from '@/presentation/session/hooks';
 import { useServices } from '@/presentation/services';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
@@ -29,6 +33,7 @@ import {
   conflictText,
   fieldsSummary,
   outcomeMessage,
+  productDraftOf,
   productErrors,
 } from './catalog-forms';
 
@@ -63,18 +68,35 @@ export function NewProductPage() {
   const suggested =
     useReadModel(data.suggestion('product')).value?.result.suggestedID ?? '';
   const known = useReadModel(data.products()).value?.result.items;
+  useAttempts();
   const pending = catalog.pendingProduct();
-  const [name, setName] = useState('');
-  const [code, setCode] = useState<string | undefined>(undefined);
-  const [unit, setUnit] = useState<BaseUnit | undefined>(undefined);
-  const [status, setStatus] = useState<Status>('idle');
-  const shown: Status =
-    pending !== undefined && status === 'idle' ? 'unknown' : status;
+  const [start] = useState(() =>
+    pending === undefined ? undefined : productDraftOf(pending),
+  );
+  const [name, setName] = useState(start?.name ?? '');
+  const [code, setCode] = useState<string | undefined>(start?.code);
+  const [unit, setUnit] = useState<BaseUnit | undefined>(start?.unit);
+  const [status, setStatus] = useState<Status>(
+    start === undefined ? 'idle' : 'unknown',
+  );
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  // The attempt was settled elsewhere (W11, or the request of a page we left):
+  // the fields open again with the kept values and the list is read anew.
+  const settledElsewhere = status === 'unknown' && pending === undefined;
+  const productsModel = data.products();
+  useEffect(() => {
+    if (settledElsewhere) productsModel.refresh();
+  }, [settledElsewhere, productsModel]);
+  const shown: Status = settledElsewhere ? 'idle' : status;
   const closed =
     shown === 'sending' || shown === 'unknown' || shown === 'reset';
-  const nameValue = pending?.name ?? name;
-  const codeValue = pending?.productID ?? code ?? suggested;
-  const unitValue = pending?.baseUnit ?? unit;
+  const codeValue = code ?? suggested;
   const errors =
     shown === 'invalid' ? productErrors({ name, code: codeValue, unit }) : {};
   const errorCount = Object.keys(errors).length;
@@ -92,6 +114,7 @@ export function NewProductPage() {
     setStatus('sending');
     const outcome: CreateOutcome<Product> =
       await catalog.registerProduct(input);
+    if (!mounted.current) return;
     switch (outcome.kind) {
       case 'created':
         void navigate(path('/catalog'), {
@@ -200,7 +223,7 @@ export function NewProductPage() {
                   id="product-name"
                   name="name"
                   placeholder="Например, Сыр бри"
-                  value={nameValue}
+                  value={name}
                   invalid={errors.name !== undefined}
                   aria-describedby={
                     errors.name === undefined ? undefined : 'product-name-error'
@@ -241,7 +264,7 @@ export function NewProductPage() {
               legend="Единица учёта"
               name="unit"
               options={unitOptions}
-              value={unitValue ?? ''}
+              value={unit ?? ''}
               onChange={(value) => {
                 setUnit(asUnit(value));
               }}
@@ -272,7 +295,12 @@ export function NewProductPage() {
                 {shown === 'unknown' && pending !== undefined && (
                   <Button
                     onClick={() => {
-                      void send(pending);
+                      const current = catalog.pendingProduct();
+                      if (current === undefined) {
+                        setStatus('idle');
+                        return;
+                      }
+                      void send(current);
                     }}
                   >
                     Проверить результат

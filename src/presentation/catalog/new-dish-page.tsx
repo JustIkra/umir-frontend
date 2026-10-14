@@ -1,14 +1,18 @@
 import { Flex, Grid, Stack, Text, chakra } from '@chakra-ui/react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { Dish, DishInput } from '@/application/restaurant';
-import { formatThousandths, parseQuantity, unitShort } from '@/domain/quantity';
+import { parseQuantity, unitShort } from '@/domain/quantity';
 import { useLeaveGuard } from '@/presentation/app-shell/leave-guard';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
+import {
+  useAttempts,
+  useReadModel,
+  useRestaurantData,
+} from '@/presentation/session/hooks';
 import { useServices } from '@/presentation/services';
 import { media } from '@/presentation/theme/system';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
@@ -31,6 +35,7 @@ import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
 import {
   conflictText,
+  dishDraftOf,
   dishErrors,
   fieldsSummary,
   linesSummary,
@@ -82,26 +87,39 @@ export function NewDishPage() {
     useReadModel(data.suggestion('dish')).value?.result.suggestedID ?? '';
   const products = useReadModel(data.products()).value?.result.items ?? [];
   const known = useReadModel(data.dishCatalog()).value?.result.items;
+  useAttempts();
   const pending = catalog.pendingDish();
-  const [name, setName] = useState('');
-  const [code, setCode] = useState<string | undefined>(undefined);
-  const [lines, setLines] = useState<readonly RecipeLineDraft[]>([]);
-  const [next, setNext] = useState(1);
-  const [status, setStatus] = useState<Status>('idle');
-  const shown: Status =
-    pending !== undefined && status === 'idle' ? 'unknown' : status;
+  const [start] = useState(() =>
+    pending === undefined ? undefined : dishDraftOf(pending),
+  );
+  const [name, setName] = useState(start?.name ?? '');
+  const [code, setCode] = useState<string | undefined>(start?.code);
+  const [lines, setLines] = useState<readonly RecipeLineDraft[]>(
+    start?.lines ?? [],
+  );
+  const [next, setNext] = useState((start?.lines.length ?? 0) + 1);
+  const [status, setStatus] = useState<Status>(
+    start === undefined ? 'idle' : 'unknown',
+  );
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  // The attempt was settled elsewhere (W11, or the request of a page we left):
+  // the form opens again with the kept values and the list is read anew.
+  const settledElsewhere = status === 'unknown' && pending === undefined;
+  const dishesModel = data.dishCatalog();
+  useEffect(() => {
+    if (settledElsewhere) dishesModel.refresh();
+  }, [settledElsewhere, dishesModel]);
+  const shown: Status = settledElsewhere ? 'idle' : status;
   const closed =
     shown === 'sending' || shown === 'unknown' || shown === 'reset';
-  const nameValue = pending?.name ?? name;
-  const codeValue = pending?.dishID ?? code ?? suggested;
-  const rows: readonly RecipeLineDraft[] =
-    pending === undefined
-      ? lines
-      : pending.ingredients.map((ingredient, index) => ({
-          key: index,
-          productID: ingredient.productID,
-          quantity: formatThousandths(ingredient.quantity),
-        }));
+  const codeValue = code ?? suggested;
+  const rows = lines;
   const productOptions = products.map((product) => ({
     value: product.productID,
     label: product.name,
@@ -137,6 +155,7 @@ export function NewDishPage() {
   const send = async (input: DishInput) => {
     setStatus('sending');
     const outcome = await catalog.defineDish(input);
+    if (!mounted.current) return;
     switch (outcome.kind) {
       case 'created': {
         const dish: Dish = outcome.value;
@@ -261,7 +280,7 @@ export function NewDishPage() {
                   id="dish-name"
                   name="name"
                   placeholder="Например, Паста с белыми грибами"
-                  value={nameValue}
+                  value={name}
                   invalid={fieldErrors.name !== undefined}
                   aria-describedby={
                     fieldErrors.name === undefined
@@ -525,7 +544,12 @@ export function NewDishPage() {
                 {shown === 'unknown' && pending !== undefined && (
                   <Button
                     onClick={() => {
-                      void send(pending);
+                      const current = catalog.pendingDish();
+                      if (current === undefined) {
+                        setStatus('idle');
+                        return;
+                      }
+                      void send(current);
                     }}
                   >
                     Проверить результат

@@ -4,6 +4,8 @@ import {
   conflictText,
   createdDishText,
   createdNoticeOf,
+  dishDraftOf,
+  productDraftOf,
   createdProductText,
   dishErrors,
   fieldsSummary,
@@ -196,4 +198,29 @@ test('the created notice is read from the router state', () => {
     createdNoticeOf({ created: { kind: 'dish', name: 'x', code: '1' } }),
     undefined,
   );
+});
+
+test('a pending input is restored into the drafts', () => {
+  assert.deepEqual(
+    productDraftOf({ productID: '133', name: 'Сыр бри', baseUnit: 'g' }),
+    { name: 'Сыр бри', code: '133', unit: 'g' },
+  );
+  const dish = dishDraftOf({
+    dishID: '213',
+    name: 'Паста',
+    ingredients: [
+      { productID: '125', quantity: '20000', baseUnit: 'g' },
+      { productID: '121', quantity: '500', baseUnit: 'ml' },
+    ],
+  });
+  assert.equal(dish.name, 'Паста');
+  assert.equal(dish.code, '213');
+  assert.deepEqual(
+    dish.lines.map((line) => [line.productID, line.quantity]),
+    [
+      ['125', '20'],
+      ['121', '0,5'],
+    ],
+  );
+  assert.equal(new Set(dish.lines.map((line) => line.key)).size, 2);
 });
