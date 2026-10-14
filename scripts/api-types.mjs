@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import * as prettier from 'prettier';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const contract = join(root, 'api/backend-v2-public.json');
+const contract = join(root, 'api/ui-amendment-v1-composed-public.json');
 const target = join(root, 'src/adapters/api/backend-v2.d.ts');
 const check = process.argv.includes('--check');
 
@@ -21,8 +21,8 @@ function pins() {
       /^\| `([^`]+\.json)`\s*\|.+\|\s*`([0-9a-f]{64})`\s*\|$/gm,
     ),
   ];
-  if (rows.length !== 2) {
-    throw new Error('api/README.md must pin both contract files');
+  if (rows.length !== 3) {
+    throw new Error('api/README.md must pin exactly three contract files');
   }
   return rows.map(([, file, hash]) => ({ file, hash }));
 }

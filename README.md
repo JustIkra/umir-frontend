@@ -159,7 +159,7 @@ API-клиент обращается к backend только через gateway
 
 Браузерные сценарии проходят через frontend/Nginx → gateway → реальные serving/warehouse. Межмодульные tests/business и HTTP-проверки tests/http фабрики подтверждают свои уровни поведения; отдельная браузерная приёмка требуется после реализации UI. Проверки интерфейса должны охватывать все варианты результата, клавиатурную навигацию и ширины 1440, 1024 и 390. Проверяйте длинные русские названия, точные большие количества, причины недоступности, фокус, ошибки, ожидание и подтверждённый результат. Сборка и статическая проверка архитектуры не доказывают корректность бизнес-семантики или runtime-JSON.
 
-Публичные поля и варианты ответов описаны в закреплённом контракте `api/backend-v2-public.json`, а бизнес-правила — в [спецификации business-core](https://github.com/JustIkra/umir-factory/blob/main/docs/business-core.md). Фабрика выбирает опубликованные образы по точным SHA; новая версия исходников не меняет выбранную сборку автоматически. Сверяйте контракт и образы с выбранными SHA фабрики.
+Публичные поля и варианты ответов описаны в закреплённом контракте `api/ui-amendment-v1-composed-public.json`, а бизнес-правила — в [спецификации business-core](https://github.com/JustIkra/umir-factory/blob/main/docs/business-core.md). Фабрика выбирает опубликованные образы по точным SHA; новая версия исходников не меняет выбранную сборку автоматически. Сверяйте контракт и образы с выбранными SHA фабрики.
 
 ### Обновления в реальном времени
 
@@ -253,10 +253,10 @@ docker compose up --build -d --wait
 
 ### Контракт API
 
-Каталог `api/` хранит побайтовые копии публичного контракта backend v2 из `umir-factory@66b827cf49fa70777dcba7b54fb7a3d05e64407c` (`info.version` = `2.0.0-draft.2`): `backend-v2-public.json` и `backend-v2-examples.json`. Их SHA-256 закреплены в [api/README.md](api/README.md); файлы не правят и не форматируют вручную.
+Каталог `api/` хранит побайтовые копии composed-контракта UA1 из `umir-factory@9d4941cffcea42608b203ed0a1d00ea0226c32cf` (`info.version` = `2.0.0-UA1.1`): `ui-amendment-v1-composed-public.json`, `backend-v2-examples.json` и `ui-amendment-v1-examples.json`. Их SHA-256 закреплены в [api/README.md](api/README.md); файлы не правят и не форматируют вручную.
 
-- `npm run api:types` генерирует из `backend-v2-public.json` типы `src/adapters/api/backend-v2.d.ts` через `openapi-typescript` и форматирует их Prettier.
-- `npm run api:check` входит в `npm run check`: сверяет SHA-256 обоих файлов с закреплёнными и проверяет, что `backend-v2.d.ts` совпадает с новой генерацией.
+- `npm run api:types` генерирует из `ui-amendment-v1-composed-public.json` типы `src/adapters/api/backend-v2.d.ts` через `openapi-typescript` и форматирует их Prettier.
+- `npm run api:check` входит в `npm run check`: сверяет SHA-256 трёх файлов с закреплёнными и проверяет, что `backend-v2.d.ts` совпадает с новой генерацией.
 
 Сгенерированные типы используют только адаптеры. Они описывают тела запросов, а ответы проверяют декодеры во время выполнения. Чтобы обновить контракт, скопируйте новые файлы, обновите таблицу в `api/README.md` и выполните `npm run api:types`.
 

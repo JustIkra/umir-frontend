@@ -269,9 +269,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    get: operations['organizationInvitations'];
     put?: never;
-    /** @description See backend-v2.md for atomicity, authorization and outcomes. */
+    /** @description UA1 create-mail atomicity is defined in ../ui-api-amendment.md. Predecessor outcome rules remain in backend-v2.md. */
     post: operations['createInvitation'];
     delete?: never;
     options?: never;
@@ -1047,6 +1048,57 @@ export interface paths {
     get: operations['resolveWriteoffCommand'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/r/{restaurantID}/warehouse/products/{productID}/batches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    get: operations['productBatches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/orgs/{orgID}/members': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    get: operations['organizationMembers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/orgs/{orgID}/invitations/{invitationID}/resend-link': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    post: operations['resendInvitationLink'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2885,6 +2937,52 @@ export interface components {
           lifecycleVersion: components['schemas']['Version'];
           restaurantID: components['schemas']['EntityID'];
         };
+    PositiveBatch: components['schemas']['BatchV2'] & {
+      remainingQuantity?: components['schemas']['PositiveQuantity'];
+    };
+    ProductBatchRow: {
+      batch: components['schemas']['PositiveBatch'];
+      baseUnit: components['schemas']['BaseUnit'];
+      /** @enum {string} */
+      status: 'available' | 'pending_writeoff';
+    };
+    ProductBatchPage: {
+      productID: components['schemas']['ID'];
+      evaluatedAt: components['schemas']['Instant'];
+      page: components['schemas']['PageIdentity'];
+      items: components['schemas']['ProductBatchRow'][];
+      nextCursor?: string;
+    };
+    ScopedProductBatches: {
+      context: components['schemas']['BusinessContext'];
+      result: components['schemas']['ProductBatchPage'];
+    };
+    AuthPageIdentity: {
+      orgID: components['schemas']['EntityID'];
+      readerEpoch: components['schemas']['Epoch'];
+      aggregateRevision: components['schemas']['Version'];
+      evaluatedAt: components['schemas']['Instant'];
+    };
+    MemberContact: {
+      membership: components['schemas']['Membership'];
+      displayName: string;
+      email: components['schemas']['Email'] | null;
+    };
+    MembersPage: {
+      context: components['schemas']['AuthPageIdentity'];
+      items: components['schemas']['MemberContact'][];
+      nextCursor?: string;
+    };
+    InvitationListRow: {
+      invitation: components['schemas']['Invitation'];
+      linkDelivery: components['schemas']['MailJob'] | null;
+      resendAllowed: boolean;
+    };
+    InvitationsPage: {
+      context: components['schemas']['AuthPageIdentity'];
+      items: components['schemas']['InvitationListRow'][];
+      nextCursor?: string;
+    };
   };
   responses: {
     /** @description The frontend proxy could not obtain the gateway response. No query result is available. */
@@ -3878,6 +3976,42 @@ export interface operations {
         };
       };
       /** @description Typed failure; a transport failure never proves not_committed. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  organizationInvitations: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+        state?:
+          'pending' | 'accepted' | 'expired' | 'revoked' | 'suppressed' | 'all';
+      };
+      header?: never;
+      path: {
+        orgID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Typed result. Capture time and identity apply to all rows. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvitationsPage'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
       default: {
         headers: {
           [name: string]: unknown;
@@ -5575,6 +5709,112 @@ export interface operations {
         };
       };
       /** @description Typed authorized failure; a GET transport failure is unavailable, never not_committed for the original attempt. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  productBatches: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path: {
+        restaurantID: components['schemas']['EntityID'];
+        productID: components['schemas']['ID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Typed result. Capture time and identity apply to all rows. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopedProductBatches'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  organizationMembers: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+        state?: 'active' | 'revoked' | 'all';
+      };
+      header?: never;
+      path: {
+        orgID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Typed result. Capture time and identity apply to all rows. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MembersPage'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  resendInvitationLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        orgID: components['schemas']['EntityID'];
+        invitationID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Command'];
+      };
+    };
+    responses: {
+      /** @description Exactly one link job was durably accepted; not proof of SMTP delivery. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DurableResult'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
       default: {
         headers: {
           [name: string]: unknown;
