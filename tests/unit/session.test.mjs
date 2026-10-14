@@ -480,3 +480,76 @@ test('returnPath keeps only addresses inside the app', () => {
     assert.equal(returnPath(raw), '/app', String(raw));
   }
 });
+
+test('adopt() activates the new session like a sign-in', async () => {
+  const { api } = account();
+  const { session, events } = setup(api);
+  await session.ensure();
+  session.adopt({
+    ...view(),
+    user: { ...view().user, userID: 'w', login: 'other' },
+    csrfToken: 'csrf-reset',
+  });
+  const state = session.getSnapshot();
+  assert.equal(state.status, 'active');
+  assert.equal(state.user.login, 'other');
+  assert.equal(events.tokens.at(-1), 'csrf-reset');
+  assert.equal(events.userChanged, 1);
+});
+
+test('updateUser() replaces the name of the signed-in user only', async () => {
+  const { api } = account();
+  const { session } = setup(api);
+  await session.ensure();
+  session.updateUser({ ...view().user, displayName: 'Марина Белова-Орлова' });
+  assert.equal(session.getSnapshot().user.displayName, 'Марина Белова-Орлова');
+  session.updateUser({ ...view().user, userID: 'w', displayName: 'Чужой' });
+  assert.equal(session.getSnapshot().user.displayName, 'Марина Белова-Орлова');
+});
+
+test('forget() ends the session without DELETE and keeps the notice', async () => {
+  const { api, calls } = account();
+  const { session, scheduler, events } = setup(api);
+  await session.ensure();
+  session.forget({ kind: 'password-changed', login: 'm.belova' });
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: false,
+    notice: { kind: 'password-changed', login: 'm.belova' },
+  });
+  assert.equal(events.signedOut, 1);
+  assert.equal(events.expired, 0);
+  assert.deepEqual(scheduler.delays(), []);
+  assert.ok(!calls.some(([name]) => name === 'signOut'));
+});
+
+test('signOut() with a notice keeps it for the sign-in page', async () => {
+  const { api } = account();
+  const { session } = setup(api);
+  await session.ensure();
+  assert.equal(
+    await session.signOut({ kind: 'password-unknown', login: 'm.belova' }),
+    'done',
+  );
+  assert.deepEqual(session.getSnapshot().notice, {
+    kind: 'password-unknown',
+    login: 'm.belova',
+  });
+});
+
+test('a /me answer that arrives after forget() keeps the guest', async () => {
+  let answer;
+  const { api } = account({
+    me: () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+  });
+  const { session } = setup(api);
+  const pending = session.ensure();
+  session.forget();
+  answer(view());
+  await pending;
+  await settled();
+  assert.equal(session.getSnapshot().status, 'anonymous');
+});

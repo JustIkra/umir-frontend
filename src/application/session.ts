@@ -14,6 +14,13 @@ import type {
   SessionStatus,
 } from './live-sync';
 
+// What the sign-in page says after the account settings ended the session:
+// L11 (password changed), L13 (outcome unknown), L10 (too many attempts).
+export type SignInNotice =
+  | { readonly kind: 'password-changed'; readonly login: string }
+  | { readonly kind: 'password-unknown'; readonly login: string }
+  | { readonly kind: 'password-limit' };
+
 // unknown: not checked yet. anonymous.expired: the server ended a session
 // this tab had (the sign-in page then says so). unavailable: /me got no
 // answer; it is not a guest.
@@ -24,7 +31,11 @@ export type SessionState =
       readonly user: User;
       readonly session: SessionInfo;
     }
-  | { readonly status: 'anonymous'; readonly expired: boolean }
+  | {
+      readonly status: 'anonymous';
+      readonly expired: boolean;
+      readonly notice?: SignInNotice | undefined;
+    }
   | { readonly status: 'unavailable'; readonly failure: ApiFailure };
 
 export interface SessionStore extends SessionCheck {
@@ -32,7 +43,14 @@ export interface SessionStore extends SessionCheck {
   readonly getSnapshot: () => SessionState;
   ensure(): Promise<SessionState>;
   signIn(input: SignInInput): Promise<CommandResult<User>>;
-  signOut(): Promise<'done' | 'failed'>;
+  signOut(notice?: SignInNotice): Promise<'done' | 'failed'>;
+  // Password reset issued a new session: the same as a sign-in.
+  adopt(view: UserView): void;
+  // A saved display name; another user's profile is ignored.
+  updateUser(user: User): void;
+  // The server has already ended every session (password changed or too many
+  // attempts): end it here without DELETE and forget the user's data.
+  forget(notice?: SignInNotice): void;
   // The live stream reported session-expired.
   expire(): void;
 }
@@ -133,12 +151,16 @@ export function createSessionStore({
     publish({ status: 'active', user: view.user, session: view.session });
   }
 
-  function end(expired: boolean): void {
+  function end(expired: boolean, notice?: SignInNotice): void {
     cancelIdle?.();
     cancelIdle = undefined;
     newGeneration();
     const wasActive = state.status === 'active';
-    publish({ status: 'anonymous', expired });
+    publish(
+      notice === undefined
+        ? { status: 'anonymous', expired }
+        : { status: 'anonymous', expired, notice },
+    );
     if (expired && wasActive) onExpired();
   }
 
@@ -208,15 +230,29 @@ export function createSessionStore({
       activate(result.value);
       return { kind: 'committed', value: result.value.user };
     },
-    async signOut() {
+    async signOut(notice) {
       try {
         await api.signOut();
       } catch (error) {
         if (failureOf(error)?.status !== 401) return 'failed';
       }
-      end(false);
+      end(false, notice);
       onSignedOut();
       return 'done';
+    },
+    adopt(view) {
+      newGeneration();
+      activate(view);
+    },
+    updateUser(user) {
+      if (state.status !== 'active' || state.user.userID !== user.userID) {
+        return;
+      }
+      publish({ ...state, user });
+    },
+    forget(notice) {
+      end(false, notice);
+      onSignedOut();
     },
     expire() {
       if (state.status === 'active') end(true);
