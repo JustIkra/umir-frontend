@@ -4,9 +4,12 @@ import { createElement as h } from 'react';
 import {
   dialogText,
   dialogTitle,
+  checkAction,
   keepsDialog,
+  locksDialog,
   pendingRows,
   pendingTitle,
+  settlesDialog,
   writeoffMessage,
 } from '../../src/presentation/warehouse/writeoff-messages.ts';
 import { WriteoffDialog } from '../../src/presentation/warehouse/writeoff-panel.tsx';
@@ -279,4 +282,22 @@ test('an unknown outcome offers «Проверить результат»; a fai
   assert.ok(failed.includes('Не удалось проверить. Повторите позже.'));
   const checking = dialog({ step: 'checking' });
   assert.equal(checking.split('disabled=""').length - 1, 2);
+});
+
+test('the dialog cannot be dismissed while sending or checking', () => {
+  assert.equal(locksDialog('sending'), true);
+  assert.equal(locksDialog('checking'), true);
+  assert.equal(locksDialog('confirm'), false);
+  assert.equal(locksDialog('unknown'), false);
+});
+
+test('an answer touches the dialog only of its own batch', () => {
+  assert.equal(settlesDialog('P-0170', 'P-0170'), true);
+  assert.equal(settlesDialog('P-0164', 'P-0170'), false);
+  assert.equal(settlesDialog(undefined, 'P-0170'), false);
+});
+
+test('«Проверить результат» never confirms without an open attempt', () => {
+  assert.equal(checkAction(true), 'check');
+  assert.equal(checkAction(false), 'refresh');
 });

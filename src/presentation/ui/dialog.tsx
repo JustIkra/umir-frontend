@@ -11,9 +11,11 @@ export function Dialog({
   label,
   labelledBy,
   css,
+  locked = false,
   children,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
+  locked?: boolean;
   label?: string | undefined;
   labelledBy?: string | undefined;
   css: SystemStyleObject;
@@ -31,8 +33,12 @@ export function Dialog({
       color="text.primary"
       maxW="100vw"
       maxH="100dvh"
+      onCancel={(event) => {
+        if (locked) event.preventDefault();
+      }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) event.currentTarget.close();
+        if (!locked && event.target === event.currentTarget)
+          event.currentTarget.close();
       }}
       css={css}
     >
@@ -51,8 +57,10 @@ export function ModalPanel({
   width,
   children,
   actions,
+  locked = false,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
+  locked?: boolean;
   title: string;
   width: number;
   children: ReactNode;
@@ -63,6 +71,7 @@ export function ModalPanel({
     <Dialog
       dialogRef={dialogRef}
       labelledBy={titleId}
+      locked={locked}
       css={{
         position: 'fixed',
         insetInline: '0',

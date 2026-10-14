@@ -127,3 +127,26 @@ export function writeoffMessage(
 export function keepsDialog(outcome: WriteoffOutcome): boolean {
   return outcome.kind === 'unknown' || outcome.kind === 'check-failed';
 }
+
+// While a request is in flight the dialog cannot be dismissed: Esc and a
+// click on the backdrop are ignored.
+export function locksDialog(
+  step: 'confirm' | 'sending' | 'unknown' | 'checking',
+): boolean {
+  return step === 'sending' || step === 'checking';
+}
+
+// A late answer changes the dialog only when that dialog is still the one of
+// its batch; otherwise it only shows the message above the block.
+export function settlesDialog(
+  openBatchID: string | undefined,
+  batchID: string,
+): boolean {
+  return openBatchID === batchID;
+}
+
+// The check without an open attempt would send a fresh confirm, so then the
+// dialog closes and the list is read again.
+export function checkAction(attemptOpen: boolean): 'check' | 'refresh' {
+  return attemptOpen ? 'check' : 'refresh';
+}

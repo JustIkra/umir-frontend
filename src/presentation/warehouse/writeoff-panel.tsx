@@ -22,9 +22,12 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import {
   dialogText,
   dialogTitle,
+  checkAction,
   keepsDialog,
+  locksDialog,
   pendingRows,
   pendingTitle,
+  settlesDialog,
   unknownMessage,
   writeoffMessage,
   type PendingRowView,
@@ -68,6 +71,7 @@ export function WriteoffDialog({
     <ModalPanel
       dialogRef={dialogRef}
       width={520}
+      locked={locksDialog(step)}
       title={dialogTitle(row.batchID)}
       actions={
         <>
@@ -125,7 +129,9 @@ export function WriteoffPanel() {
   const [message, setMessage] = useState<WriteoffMessage>();
   const dialog = useRef<HTMLDialogElement>(null);
   const headingId = useId();
+  const targetBatch = useRef<string>(undefined);
   const closed = useCallback(() => {
+    targetBatch.current = undefined;
     setTarget(undefined);
   }, []);
   const value = snapshot.value;
@@ -140,6 +146,10 @@ export function WriteoffPanel() {
   const settle = (batchID: string, outcome: WriteoffOutcome) => {
     if (outcome.kind === 'refused' && outcome.code === 'Forbidden')
       void access.refresh();
+    if (!settlesDialog(targetBatch.current, batchID)) {
+      setMessage(writeoffMessage(outcome, batchID, timeZone));
+      return;
+    }
     if (keepsDialog(outcome)) {
       setStep('unknown');
       setNotice(
@@ -157,6 +167,11 @@ export function WriteoffPanel() {
     settle(batchID, await commands.confirm(batchID));
   };
   const check = async (batchID: string) => {
+    if (checkAction(commands.pending(batchID)) === 'refresh') {
+      dialog.current?.close();
+      model.refresh();
+      return;
+    }
     setStep('checking');
     setNotice(undefined);
     settle(batchID, await commands.check(batchID));
@@ -165,6 +180,7 @@ export function WriteoffPanel() {
     setMessage(undefined);
     setNotice(undefined);
     setStep(commands.pending(row.batchID) ? 'unknown' : 'confirm');
+    targetBatch.current = row.batchID;
     setTarget(row);
   };
   return (
