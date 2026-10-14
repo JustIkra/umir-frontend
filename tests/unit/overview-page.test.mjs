@@ -14,6 +14,7 @@ import {
   tileWindows,
   writeoffFigures,
 } from '../../src/presentation/overview/overview-rows.ts';
+import { localFailure } from '../../src/application/api.ts';
 import {
   R,
   failedRead,
@@ -275,6 +276,29 @@ test('the header names the organization and the restaurant from access and today
   // NOW is 2026-10-14T07:00Z: Wednesday 10:00 in Moscow.
   assert.ok(page.includes('Среда, 14 октября 2026 · Москва, UTC+3'));
   assert.ok(!page.includes('Суббота, 10 октября'));
+});
+
+test('unverified access keeps the tiles of the last ready answer', async () => {
+  const failure = localFailure('NotFound', 'not_committed', 404);
+  const html = await overview({
+    access: {
+      status: 'unverified',
+      failure,
+      previous: readyAccess().organizations,
+    },
+  });
+  assert.deepEqual(tiles(html), tileNames);
+  assert.ok(text(html).includes('Собрать заказ'));
+  assert.ok(text(html).includes('Восток Фуд · На Пушкинской'));
+});
+
+test('unverified access with no earlier answer says so instead of an empty header', async () => {
+  const failure = localFailure('NotFound', 'not_committed', 404);
+  const html = await overview({ access: { status: 'unverified', failure } });
+  const page = text(html);
+  assert.ok(page.includes('Доступ не проверен'));
+  assert.ok(page.includes('Повторить проверку'));
+  assert.deepEqual(tiles(html), []);
 });
 
 test('the warehouse tile shows the batches of the 24 h window', async () => {

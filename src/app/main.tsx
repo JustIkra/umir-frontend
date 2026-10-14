@@ -30,7 +30,7 @@ import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender
 import { createGatewayClient } from '@/adapters/http/gateway-client';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createAccountSettings } from '@/application/account-settings';
-import { createAccessStore } from '@/application/access';
+import { createAccessStore, knownOrganizations } from '@/application/access';
 import {
   createCatalogCommands,
   type CatalogCommands,
@@ -180,9 +180,7 @@ const deliveryFlows = createDeliveryFlowRegistry(
 // The settings version the stock report is read with: the organization of
 // the restaurant in the known access, read at the time of the request.
 function settingsVersionOf(restaurantID: string): string | undefined {
-  const state = access.getSnapshot();
-  if (state.status !== 'ready') return undefined;
-  return state.organizations.find((organization) =>
+  return knownOrganizations(access.getSnapshot())?.find((organization) =>
     organization.restaurants.some(
       (restaurant) => restaurant.restaurantID === restaurantID,
     ),

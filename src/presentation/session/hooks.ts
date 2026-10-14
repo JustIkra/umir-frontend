@@ -106,8 +106,8 @@ export function useRestaurantData(): RestaurantData {
 const noPermissions: ReadonlySet<Permission> = new Set();
 
 // The rights of the restaurant in the address: tiles, actions and windows are
-// shown by them. Empty while access is not ready (loading or unverified) and
-// for a restaurant outside access.
+// shown by them. Empty while access was never read (loading, or unverified
+// with no earlier answer) and for a restaurant outside access.
 export function usePermissions(): ReadonlySet<Permission> {
   const { restaurantID } = useParams();
   const access = useAccess();

@@ -206,7 +206,7 @@ function DeliveryView({
 }) {
   const path = useRestaurantPath();
   const base = useId();
-  const { now } = useServices();
+  const { now, access: accessStore } = useServices();
   const access = useAccess();
   const data = useRestaurantData();
   const items = useReadModel(data.products()).value?.result.items;
@@ -218,6 +218,8 @@ function DeliveryView({
   const nowMs = now();
   const zone = zoneLabel(timeZone, nowMs);
   const products = productMap(items ?? []);
+  // Without the settings the zone is unknown, not UTC.
+  const zoneText = settings === undefined ? '' : ` Время — ${zone}.`;
   const header = (
     <Stack gap={{ base: '4', sm: '6' }}>
       <Breadcrumbs
@@ -229,7 +231,7 @@ function DeliveryView({
       />
       <PageHeader
         title="Приём поставки"
-        description={`Каждая строка — отдельная партия. «Годна до» рассчитает склад от изготовления. Время — ${zone}.`}
+        description={`Каждая строка — отдельная партия. «Годна до» рассчитает склад от изготовления.${zoneText}`}
       />
     </Stack>
   );
@@ -248,6 +250,30 @@ function DeliveryView({
           stockPath={path('/warehouse')}
           onRestart={restart}
         />
+      </Stack>
+    );
+  }
+  if (settings === undefined) {
+    return (
+      <Stack gap={{ base: '4', sm: '6' }}>
+        {header}
+        <FormMessage
+          tone="unknown"
+          title="Настройки организации не получены"
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void accessStore.refresh();
+              }}
+            >
+              Повторить
+            </Button>
+          }
+        >
+          Сервис авторизации не ответил, поэтому часовой пояс организации
+          неизвестен. Поставку нельзя оформить, пока настройки не получены.
+        </FormMessage>
       </Stack>
     );
   }
@@ -345,8 +371,6 @@ function DeliveryView({
       setChecked(true);
       return;
     }
-    // The restaurant scope renders after access is known.
-    if (settings === undefined) return;
     setChecked(false);
     void flow.submit(
       deliveryInput(draft, settings.settingsVersion, snapshot.occurrence),

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
+import { localFailure } from '../../src/application/api.ts';
 import { productMap } from '../../src/presentation/orders/order-rows.ts';
 import {
   checkFailedMessage,
@@ -400,6 +401,32 @@ const render = (delivery, access) =>
     delivery,
     ...(access === undefined ? {} : { access }),
   });
+
+test('unverified access keeps the zone of the last ready answer', async () => {
+  const failure = localFailure('NotFound', 'not_committed', 404);
+  const html = await render(deliverySnapshot(), {
+    status: 'unverified',
+    failure,
+    previous: zoneAccess('Asia/Yekaterinburg').organizations,
+  });
+  const plain = text(html);
+  assert.ok(plain.includes('Время — Екатеринбург, UTC+5.'));
+  assert.ok(!plain.includes('UTC.'));
+  assert.ok(!plain.includes('Повторить'));
+});
+
+test('unverified access with no earlier answer offers «Повторить» instead of UTC labels', async () => {
+  const failure = localFailure('NotFound', 'not_committed', 404);
+  const html = await render(deliverySnapshot(), {
+    status: 'unverified',
+    failure,
+  });
+  const plain = text(html);
+  assert.ok(plain.includes('Настройки организации не получены'));
+  assert.ok(plain.includes('Повторить'));
+  assert.ok(!plain.includes('UTC.'));
+  assert.ok(!labels(html).some((label) => label.includes('UTC')));
+});
 
 test('P1: the form names the zone of the organization in every time field', async () => {
   const html = await render(

@@ -1,4 +1,8 @@
-import { findRestaurant, type AccessState } from '@/application/access';
+import {
+  findRestaurant,
+  knownOrganizations,
+  type AccessState,
+} from '@/application/access';
 import type { Settings } from '@/application/api';
 import type { DeliveryPhase } from '@/application/delivery-flow';
 import type { Product } from '@/application/restaurant';
@@ -245,8 +249,8 @@ export function organizationSettings(
   restaurantID: string,
 ): Settings | undefined {
   const restaurant = findRestaurant(access, restaurantID);
-  if (access.status !== 'ready' || restaurant === undefined) return undefined;
-  return access.organizations.find(
+  if (restaurant === undefined) return undefined;
+  return knownOrganizations(access)?.find(
     (organization) => organization.orgID === restaurant.orgID,
   )?.settings;
 }
