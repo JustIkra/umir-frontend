@@ -271,3 +271,46 @@ for (const [name, detach] of [
     assert.deepEqual(runner.getSnapshot(), []);
   });
 }
+
+test('restore keeps a saved attempt and a retry resends it with the saved id and epoch', async () => {
+  const sent = [];
+  const commands = createCommandRunner({
+    newId: () => 'new-id',
+    now: () => 5,
+    epochs: createEpochRegistry(),
+    onReset: () => {},
+  });
+  const spec = {
+    key: 'order.confirm.r',
+    label: 'оформления заказа',
+    restaurantID: 'r',
+    service: 'serving',
+    execute: (commandID, epoch) => {
+      sent.push([commandID, epoch]);
+      return Promise.resolve('ok');
+    },
+  };
+  commands.restore(spec, {
+    commandID: 'saved-id',
+    epoch: 'saved-epoch',
+    startedAt: 1,
+  });
+  assert.deepEqual(commands.getSnapshot(), [
+    {
+      key: 'order.confirm.r',
+      commandID: 'saved-id',
+      label: 'оформления заказа',
+      restaurantID: 'r',
+      startedAt: 1,
+    },
+  ]);
+  commands.restore(spec, { commandID: 'other', epoch: 'x', startedAt: 2 });
+  assert.equal(commands.getSnapshot()[0].commandID, 'saved-id');
+  const result = await commands.run({
+    ...spec,
+    execute: () => Promise.reject(new Error('not this')),
+  });
+  assert.deepEqual(result, { kind: 'committed', value: 'ok' });
+  assert.deepEqual(sent, [['saved-id', 'saved-epoch']]);
+  assert.deepEqual(commands.getSnapshot(), []);
+});

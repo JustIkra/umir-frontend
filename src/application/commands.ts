@@ -39,6 +39,17 @@ export interface CommandRunner {
   // commandID, body and epoch) instead of the new spec.
   run<T>(spec: CommandSpec<T>): Promise<CommandResult<T>>;
   retry(key: string): Promise<CommandResult<unknown>> | undefined;
+  // A pending attempt saved outside the runner (the tab after a reload): kept
+  // with its commandID, epoch and start time, not sent; retry or run of the
+  // same key resends it.
+  restore<T>(
+    spec: CommandSpec<T>,
+    saved: {
+      readonly commandID: string;
+      readonly epoch: string | undefined;
+      readonly startedAt: number;
+    },
+  ): void;
   readonly subscribe: (listener: () => void) => () => void;
   readonly getSnapshot: () => readonly Attempt[];
   // Both also detach a request in flight: its answer no longer settles the
@@ -175,6 +186,19 @@ export function createCommandRunner({
       return send(attempt) as Promise<CommandResult<T>>;
     },
     retry: resend,
+    restore(spec, saved) {
+      if (pending.has(spec.key) || inFlight.has(spec.key)) return;
+      pending.set(spec.key, {
+        key: spec.key,
+        commandID: saved.commandID,
+        label: spec.label,
+        restaurantID: spec.restaurantID,
+        startedAt: saved.startedAt,
+        epoch: saved.epoch,
+        execute: spec.execute,
+      });
+      publish();
+    },
     subscribe(listener) {
       listeners.add(listener);
       return () => {
