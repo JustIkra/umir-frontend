@@ -2,7 +2,8 @@ import { Stack, Text, chakra } from '@chakra-ui/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { CommandResult } from '@/application/commands';
-import { returnPath } from '@/application/session';
+import { returnPath, type SignInNotice } from '@/application/session';
+import { useSession } from '@/presentation/session/hooks';
 import { useServices } from '@/presentation/services';
 import { Button, TextLink } from '@/presentation/ui/actions';
 import {
@@ -29,6 +30,7 @@ const rateLimits = new Set(['LoginRateLimited', 'RateLimited']);
 // RS06 pattern for a lost answer).
 export function signInMessage(
   result: CommandResult<unknown>,
+  notice?: SignInNotice,
 ): SignInMessage | undefined {
   switch (result.kind) {
     case 'committed':
@@ -62,11 +64,48 @@ export function signInMessage(
       break;
     }
   }
+  // L14: after an unknown password change the valid password is not known
+  // until Auth answers again.
+  if (notice?.kind === 'password-unknown') {
+    return {
+      tone: 'error',
+      title: 'Вход не выполнен',
+      text: 'Действующий пароль пока не определён. Повторите вход через несколько минут.',
+    };
+  }
   return {
     tone: 'error',
     title: 'Вход не выполнен',
     text: 'Сервис авторизации не отвечает. Повторите попытку через несколько минут.',
   };
+}
+
+// L11, L13 and L10 after «Учётная запись» ended the session.
+export function noticeMessage(notice: SignInNotice): {
+  readonly tone: 'success' | 'unknown';
+  readonly title: string;
+  readonly text: string;
+} {
+  switch (notice.kind) {
+    case 'password-changed':
+      return {
+        tone: 'success',
+        title: 'Пароль изменён',
+        text: 'Все сеансы завершены. Войдите с новым паролем.',
+      };
+    case 'password-unknown':
+      return {
+        tone: 'unknown',
+        title: 'Результат изменения пароля неизвестен',
+        text: 'Если пароль изменился, войти можно только с новым. Попробуйте войти с ним — изменение повторно не отправляется.',
+      };
+    case 'password-limit':
+      return {
+        tone: 'unknown',
+        title: 'Сессия завершена',
+        text: 'Превышено число неверных попыток ввести текущий пароль. Войдите снова.',
+      };
+  }
 }
 
 const field = (value: FormDataEntryValue | null) =>
@@ -76,6 +115,10 @@ const field = (value: FormDataEntryValue | null) =>
 // (decision of 13.10).
 export function SignInPage() {
   const { session } = useServices();
+  const sessionState = useSession();
+  const notice =
+    sessionState.status === 'anonymous' ? sessionState.notice : undefined;
+  const shown = notice === undefined ? undefined : noticeMessage(notice);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const target = returnPath(params.get('return'));
@@ -107,7 +150,7 @@ export function SignInPage() {
       void navigate(target, { replace: true });
       return;
     }
-    const next = signInMessage(result);
+    const next = signInMessage(result, notice);
     setMessage(next);
     if (next?.waitSeconds !== undefined) setWait({ seconds: next.waitSeconds });
   };
@@ -121,7 +164,12 @@ export function SignInPage() {
       help="Нет доступа к почте или учётной записи — обратитесь к администратору организации."
     >
       <AuthTitle>Вход</AuthTitle>
-      {expired && !message && (
+      {shown && (
+        <FormMessage tone={shown.tone} title={shown.title}>
+          {shown.text}
+        </FormMessage>
+      )}
+      {expired && notice === undefined && !message && (
         <FormMessage tone="unknown" title="Сессия завершена">
           Войдите снова — после входа откроется та же страница.
         </FormMessage>
@@ -154,7 +202,16 @@ export function SignInPage() {
           <Stack gap="4">
             <FieldGroup>
               <FieldLabel htmlFor="login">Логин</FieldLabel>
-              <TextInput id="login" name="login" autoComplete="username" />
+              <TextInput
+                id="login"
+                name="login"
+                autoComplete="username"
+                defaultValue={
+                  notice !== undefined && 'login' in notice
+                    ? notice.login
+                    : undefined
+                }
+              />
             </FieldGroup>
             <FieldGroup>
               <FieldLabel htmlFor="password">Пароль</FieldLabel>

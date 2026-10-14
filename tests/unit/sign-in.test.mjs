@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import { localFailure } from '../../src/application/api.ts';
-import { signInMessage } from '../../src/presentation/auth/sign-in-page.tsx';
+import {
+  noticeMessage,
+  signInMessage,
+} from '../../src/presentation/auth/sign-in-page.tsx';
+import { renderRoute, text } from './support/render-route.mjs';
 
 const rejected = (code, extra = {}) => ({
   kind: 'rejected',
@@ -58,4 +62,62 @@ test('any other refusal says the service did not answer', () => {
     },
   );
   assert.equal(signInMessage({ kind: 'committed', value: {} }), undefined);
+});
+
+const unknownChange = { kind: 'password-unknown', login: 'm.belova' };
+
+test('under L13 a refused service reads as L14; wrong credentials stay L05', () => {
+  assert.deepEqual(
+    signInMessage(rejected('AuthUnavailable', { status: 503 }), unknownChange),
+    {
+      tone: 'error',
+      title: 'Вход не выполнен',
+      text: 'Действующий пароль пока не определён. Повторите вход через несколько минут.',
+    },
+  );
+  assert.equal(
+    signInMessage(rejected('InvalidCredentials'), unknownChange).title,
+    'Не удалось войти',
+  );
+});
+
+test('notices of L11, L13 and L10', () => {
+  assert.deepEqual(
+    noticeMessage({ kind: 'password-changed', login: 'm.belova' }),
+    {
+      tone: 'success',
+      title: 'Пароль изменён',
+      text: 'Все сеансы завершены. Войдите с новым паролем.',
+    },
+  );
+  assert.deepEqual(noticeMessage(unknownChange), {
+    tone: 'unknown',
+    title: 'Результат изменения пароля неизвестен',
+    text: 'Если пароль изменился, войти можно только с новым. Попробуйте войти с ним — изменение повторно не отправляется.',
+  });
+  assert.deepEqual(noticeMessage({ kind: 'password-limit' }), {
+    tone: 'unknown',
+    title: 'Сессия завершена',
+    text: 'Превышено число неверных попыток ввести текущий пароль. Войдите снова.',
+  });
+});
+
+test('the sign-in page shows the notice and fills in the login', async () => {
+  const html = await renderRoute('/login', {
+    session: {
+      status: 'anonymous',
+      expired: false,
+      notice: { kind: 'password-changed', login: 'm.belova' },
+    },
+  });
+  assert.ok(text(html).includes('Пароль изменён'));
+  assert.ok(html.includes('value="m.belova"'));
+  const limit = await renderRoute('/login', {
+    session: {
+      status: 'anonymous',
+      expired: false,
+      notice: { kind: 'password-limit' },
+    },
+  });
+  assert.ok(text(limit).includes('Превышено число неверных попыток'));
 });
