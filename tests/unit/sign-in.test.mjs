@@ -121,3 +121,34 @@ test('the sign-in page shows the notice and fills in the login', async () => {
   });
   assert.ok(text(limit).includes('Превышено число неверных попыток'));
 });
+
+test('an expired session with the L13 notice shows L13, not the plain expiry', async () => {
+  const plainExpiry = 'Войдите снова — после входа откроется та же страница.';
+  const html = await renderRoute('/login?return=%2Fapp%2Fsettings&expired=1', {
+    session: { status: 'anonymous', expired: true, notice: unknownChange },
+  });
+  const plain = text(html);
+  assert.ok(plain.includes('Результат изменения пароля неизвестен'));
+  assert.ok(html.includes('value="m.belova"'));
+  assert.ok(!plain.includes('Сессия завершена'));
+  assert.ok(!plain.includes(plainExpiry));
+  const changed = text(
+    await renderRoute('/login?expired=1', {
+      session: {
+        status: 'anonymous',
+        expired: true,
+        notice: { kind: 'password-changed', login: 'm.belova' },
+      },
+    }),
+  );
+  assert.ok(changed.includes('Пароль изменён'));
+  assert.ok(!changed.includes('Сессия завершена'));
+  assert.ok(!changed.includes(plainExpiry));
+  const bare = text(
+    await renderRoute('/login?expired=1', {
+      session: { status: 'anonymous', expired: true },
+    }),
+  );
+  assert.ok(bare.includes('Сессия завершена'));
+  assert.ok(bare.includes(plainExpiry));
+});

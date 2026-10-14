@@ -8,7 +8,7 @@ export interface AccountSettingsOptions {
   readonly commands: CommandRunner;
   readonly session: Pick<
     SessionStore,
-    'getSnapshot' | 'check' | 'updateUser' | 'forget' | 'signOut'
+    'subscribe' | 'getSnapshot' | 'check' | 'updateUser' | 'forget' | 'signOut'
   >;
 }
 
@@ -67,7 +67,7 @@ export interface AccountSettings {
   checkPassword(): Promise<PasswordCheck>;
   refreshProfile(): Promise<boolean>;
   signInToCheck(): Promise<'done' | 'failed'>;
-  // Changes whose outcome is still unknown: the page keeps their fields
+  // Changes in flight or with an unknown outcome: the page keeps their fields
   // closed after a visit elsewhere, as the command runner holds the attempt.
   pending(): PendingChanges;
 }
@@ -118,8 +118,20 @@ export function createAccountSettings({
     return state.status === 'active' ? state.user.login : '';
   };
 
-  let lostName: string | undefined;
-  let lostPassword: 'unknown' | 'recovering' | undefined;
+  // What the attempt of each key carries; pending() reports it only while
+  // the command runner lists the key (in flight or unknown).
+  let pendingName: string | undefined;
+  let pendingPassword: 'unknown' | 'recovering' | undefined;
+
+  // A pending password change ends with the session: the server ends every
+  // session once the change applies. The sign-in page then says L13, and
+  // after the next sign-in the page does not check the change against the
+  // new session. The name stays pending (X03): the profile tells its outcome.
+  session.subscribe(() => {
+    if (session.getSnapshot().status === 'active') return;
+    commands.discard(passwordKey);
+    pendingPassword = undefined;
+  });
 
   async function readProfile(): Promise<ProfileRead> {
     try {
@@ -137,6 +149,7 @@ export function createAccountSettings({
     const name = draft.trim();
     const length = codePoints(name);
     if (length < minName || length > maxName) return { kind: 'invalid' };
+    pendingName = name;
     const result = await commands.run({
       key: renameKey,
       label: 'изменения имени',
@@ -147,7 +160,6 @@ export function createAccountSettings({
       return { kind: 'saved', user: result.value };
     }
     if (result.kind === 'unknown') {
-      lostName = name;
       return result.failure.code === recoveringCode
         ? { kind: 'recovering', code: result.failure.code }
         : { kind: 'lost' };
@@ -185,6 +197,7 @@ export function createAccountSettings({
     const errors = passwordErrors(input);
     if (Object.keys(errors).length > 0) return { kind: 'invalid', errors };
     const who = login();
+    pendingPassword = 'unknown';
     const result = await commands.run({
       key: passwordKey,
       label: 'изменения пароля',
@@ -202,7 +215,7 @@ export function createAccountSettings({
       return { kind: 'changed' };
     }
     if (result.kind === 'unknown') {
-      lostPassword =
+      pendingPassword =
         result.failure.code === recoveringCode ? 'recovering' : 'unknown';
       return result.failure.code === recoveringCode
         ? { kind: 'recovering', code: result.failure.code }
@@ -265,8 +278,8 @@ export function createAccountSettings({
   function pending(): PendingChanges {
     const keys = commands.getSnapshot().map((attempt) => attempt.key);
     return {
-      name: keys.includes(renameKey) ? lostName : undefined,
-      password: keys.includes(passwordKey) ? lostPassword : undefined,
+      name: keys.includes(renameKey) ? pendingName : undefined,
+      password: keys.includes(passwordKey) ? pendingPassword : undefined,
     };
   }
 

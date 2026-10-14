@@ -122,6 +122,16 @@ const session = createSessionStore({
     access.clear();
     void access.refresh();
   },
+  // L13: the server ended the session while a password change is pending,
+  // probably because the change applied. The session is still active here,
+  // so its login is the one to fill in.
+  expiryNotice: () => {
+    const state = session.getSnapshot();
+    if (state.status !== 'active') return undefined;
+    return accountSettings.pending().password === undefined
+      ? undefined
+      : { kind: 'password-unknown', login: state.user.login };
+  },
 });
 const passwordReset = createPasswordResetFlow({
   api: createRecoveryApi(client),

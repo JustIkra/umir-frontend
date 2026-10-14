@@ -8,6 +8,7 @@ import {
 } from '../../src/application/account-settings.ts';
 import { createCommandRunner } from '../../src/application/commands.ts';
 import { createEpochRegistry } from '../../src/application/epochs.ts';
+import { createSessionStore } from '../../src/application/session.ts';
 
 const user = {
   userID: '11111111-1111-4111-8111-111111111111',
@@ -50,7 +51,12 @@ function setup() {
   });
   const events = [];
   let state = { status: 'active', user, session: {} };
+  const listeners = new Set();
   const session = {
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     getSnapshot: () => state,
     check: () => {
       events.push(['check']);
@@ -69,7 +75,23 @@ function setup() {
     },
   };
   const settings = createAccountSettings({ api, commands, session });
-  return { settings, answers, calls, events, commands };
+  // The session store publishes another state, e.g. the server ended it.
+  const become = (next) => {
+    state = next;
+    for (const listener of listeners) listener();
+  };
+  return { settings, answers, calls, events, commands, become };
+}
+
+// An answer the test settles later.
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((ok, fail) => {
+    resolve = ok;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
 }
 
 const named = (displayName) => ({ ...user, displayName });
@@ -308,4 +330,183 @@ test('pending() reports an unknown or recovering password change', async () => {
   answers.me.push({ user });
   assert.equal(await settings.checkPassword(), 'unchanged');
   assert.equal(settings.pending().password, undefined);
+});
+
+test('pending() reports a save in flight with the value being sent', async () => {
+  const { settings, answers } = setup();
+  const name = deferred();
+  answers.changeDisplayName.push(name.promise);
+  const renaming = settings.rename(' Новое имя ');
+  assert.equal(settings.pending().name, 'Новое имя');
+  name.resolve(named('Новое имя'));
+  assert.equal((await renaming).kind, 'saved');
+  assert.equal(settings.pending().name, undefined);
+  const password = deferred();
+  answers.changePassword.push(password.promise);
+  const changing = settings.changePassword(input);
+  assert.equal(settings.pending().password, 'unknown');
+  password.reject(recovering());
+  assert.equal((await changing).kind, 'recovering');
+  assert.equal(settings.pending().password, 'recovering');
+});
+
+test('an ended session drops the password attempt and keeps the name (X03)', async () => {
+  const { settings, answers, commands, become } = setup();
+  answers.changeDisplayName.push(lost());
+  await settings.rename('Новое имя');
+  answers.changePassword.push(recovering());
+  await settings.changePassword(input);
+  become({ status: 'active', user, session: {} });
+  assert.equal(settings.pending().password, 'recovering');
+  become({ status: 'anonymous', expired: true });
+  assert.deepEqual(settings.pending(), {
+    name: 'Новое имя',
+    password: undefined,
+  });
+  assert.deepEqual(
+    commands.getSnapshot().map((attempt) => attempt.key),
+    [renameKey],
+  );
+});
+
+// The real session store, command runner and account settings, wired as
+// main.tsx wires them: the server ending the session during an unknown
+// password change sends the user to sign-in with L13.
+function wired(answers) {
+  const me = [];
+  const api = {
+    me: () => {
+      const next = me.shift() ?? Promise.reject(new Error('no me answer'));
+      return next instanceof Error ? Promise.reject(next) : next;
+    },
+    signIn: () => Promise.resolve(view),
+    signOut: () => Promise.resolve(),
+    changeDisplayName: () => Promise.reject(new Error('no rename here')),
+    changePassword: () => answers.shift(),
+  };
+  let n = 0;
+  const commands = createCommandRunner({
+    newId: () => `cmd-${String((n += 1))}`,
+    now: () => 0,
+    epochs: createEpochRegistry(),
+    onReset: () => {},
+  });
+  const tasks = [];
+  const shown = new Set();
+  let settings;
+  const session = createSessionStore({
+    api,
+    commands,
+    scheduler: {
+      schedule: (delayMs, callback) => {
+        const task = { callback, done: false };
+        tasks.push(task);
+        return () => {
+          task.done = true;
+        };
+      },
+    },
+    visibility: {
+      isVisible: () => true,
+      subscribe: (listener) => {
+        shown.add(listener);
+        return () => shown.delete(listener);
+      },
+    },
+    now: () => 0,
+    setCsrfToken: () => {},
+    onSignedOut: () => commands.clear(),
+    onExpired: () => {},
+    onUserChanged: () => commands.clear(),
+    expiryNotice: () => {
+      const state = session.getSnapshot();
+      return state.status === 'active' &&
+        settings.pending().password !== undefined
+        ? { kind: 'password-unknown', login: state.user.login }
+        : undefined;
+    },
+  });
+  settings = createAccountSettings({ api, commands, session });
+  return {
+    session,
+    settings,
+    commands,
+    // The next /me answers: a value or an ApiError.
+    me: (answer) =>
+      me.push(answer instanceof Error ? answer : Promise.resolve(answer)),
+    // A background /me: the tab is shown again, or the idle deadline passed.
+    show: () => {
+      for (const listener of shown) listener();
+    },
+    idle: () => {
+      for (const task of tasks.filter((item) => !item.done)) {
+        task.done = true;
+        task.callback();
+      }
+    },
+  };
+}
+
+const instant = { iso: '2026-10-14T10:00:00Z', epochMs: 9e12 };
+const view = {
+  user,
+  session: {
+    expiresAt: instant,
+    idleExpiresAt: instant,
+    absoluteExpiresAt: instant,
+    rememberMe: false,
+  },
+  csrfToken: 'csrf',
+};
+const settledSoon = () => new Promise((resolve) => setTimeout(resolve, 0));
+const signInAgain = (session) =>
+  session.signIn({
+    login: user.login,
+    password: 'new pass 1',
+    rememberMe: false,
+  });
+const unauthenticated = () => refused(401, 'Unauthenticated', 'not_committed');
+
+for (const [frame, answer, outcome, background] of [
+  ['S20', recovering, 'recovering', 'show'],
+  ['S19', lost, 'unknown', 'idle'],
+]) {
+  test(`${frame}, then the server ends the session: L13, and after sign-in the change is not pending`, async () => {
+    const { session, settings, commands, me, ...checks } = wired([
+      Promise.reject(answer()),
+    ]);
+    await signInAgain(session);
+    assert.equal((await settings.changePassword(input)).kind, outcome);
+    me(unauthenticated());
+    checks[background]();
+    await settledSoon();
+    assert.deepEqual(session.getSnapshot(), {
+      status: 'anonymous',
+      expired: true,
+      notice: { kind: 'password-unknown', login: user.login },
+    });
+    await signInAgain(session);
+    assert.equal(settings.pending().password, undefined);
+    assert.ok(
+      !commands.getSnapshot().some((attempt) => attempt.key === passwordKey),
+    );
+  });
+}
+
+test('a password change in flight when the session expires: L13, and its late answer stays unpending', async () => {
+  const answer = deferred();
+  const { session, settings, commands } = wired([answer.promise]);
+  await signInAgain(session);
+  const changing = settings.changePassword(input);
+  session.expire();
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: true,
+    notice: { kind: 'password-unknown', login: user.login },
+  });
+  await signInAgain(session);
+  answer.reject(lost());
+  assert.equal((await changing).kind, 'unknown');
+  assert.equal(settings.pending().password, undefined);
+  assert.deepEqual(commands.getSnapshot(), []);
 });

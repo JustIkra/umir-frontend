@@ -70,6 +70,10 @@ export interface SessionOptions {
   // Sign-in or /me brought another user than the last one: forget the
   // previous user's access, models, epochs and attempts.
   readonly onUserChanged: () => void;
+  // What the sign-in page says when the server ended an active session, e.g.
+  // L13 while a password change is pending. It is asked while the ending
+  // session is still the snapshot.
+  readonly expiryNotice?: (() => SignInNotice | undefined) | undefined;
 }
 
 export const signInKey = 'session.sign-in';
@@ -102,6 +106,7 @@ export function createSessionStore({
   onSignedOut,
   onExpired,
   onUserChanged,
+  expiryNotice,
 }: SessionOptions): SessionStore {
   const listeners = new Set<() => void>();
   let state: SessionState = { status: 'unknown' };
@@ -151,17 +156,20 @@ export function createSessionStore({
     publish({ status: 'active', user: view.user, session: view.session });
   }
 
-  function end(expired: boolean, notice?: SignInNotice): void {
+  // expired: the server ended the session, and an active one carries the
+  // expiry notice. Sign-out and forget() pass their own notice.
+  function end(expired: boolean, given?: SignInNotice): void {
     cancelIdle?.();
     cancelIdle = undefined;
     newGeneration();
-    const wasActive = state.status === 'active';
+    const ended = expired && state.status === 'active';
+    const notice = given ?? (ended ? expiryNotice?.() : undefined);
     publish(
       notice === undefined
         ? { status: 'anonymous', expired }
         : { status: 'anonymous', expired, notice },
     );
-    if (expired && wasActive) onExpired();
+    if (ended) onExpired();
   }
 
   function load(background: boolean): Promise<SessionState> {

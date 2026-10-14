@@ -553,3 +553,73 @@ test('a /me answer that arrives after forget() keeps the guest', async () => {
   await settled();
   assert.equal(session.getSnapshot().status, 'anonymous');
 });
+
+test('the server ending an active session carries the expiry notice, read before the session ends', async () => {
+  const notice = { kind: 'password-unknown', login: 'm.belova' };
+  let answer = Promise.resolve(view());
+  const { api } = account({ me: () => answer });
+  const seen = [];
+  let store;
+  const { session, visibility } = setup(api, {
+    expiryNotice: () => {
+      seen.push(store.getSnapshot().status);
+      return notice;
+    },
+  });
+  store = session;
+  await session.ensure();
+  answer = Promise.reject(refused(401, 'Unauthenticated', 'not_committed'));
+  visibility.show();
+  await settled();
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: true,
+    notice,
+  });
+  await session.signIn(credentials);
+  session.expire();
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: true,
+    notice,
+  });
+  assert.deepEqual(seen, ['active', 'active']);
+});
+
+test('sign-out, forget and a guest 401 keep their own notice; no expiry notice leaves the plain expiry', async () => {
+  let asked = 0;
+  const expiryNotice = () => {
+    asked += 1;
+    return undefined;
+  };
+  const { api } = account();
+  const { session } = setup(api, { expiryNotice });
+  await session.ensure();
+  session.expire();
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: true,
+  });
+  assert.equal(asked, 1);
+  await session.signIn(credentials);
+  await session.signOut({ kind: 'password-unknown', login: 'm.belova' });
+  await session.signIn(credentials);
+  session.forget({ kind: 'password-changed', login: 'm.belova' });
+  assert.deepEqual(session.getSnapshot().notice, {
+    kind: 'password-changed',
+    login: 'm.belova',
+  });
+  const guest = setup(
+    account({
+      me: () =>
+        Promise.reject(refused(401, 'Unauthenticated', 'not_committed')),
+    }).api,
+    { expiryNotice },
+  );
+  await guest.session.ensure();
+  assert.deepEqual(guest.session.getSnapshot(), {
+    status: 'anonymous',
+    expired: false,
+  });
+  assert.equal(asked, 1);
+});
