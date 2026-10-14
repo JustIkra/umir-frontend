@@ -62,7 +62,12 @@ export type OrderPhase =
       readonly kind: 'superseded';
       readonly replacement: OrderProposal | undefined;
     }
-  | { readonly kind: 'not-found'; readonly afterAttempt: boolean }
+  | {
+      readonly kind: 'not-found';
+      readonly afterAttempt: boolean;
+      // When the check was answered; only after an attempt.
+      readonly checkedAt: number | undefined;
+    }
   | {
       readonly kind: 'refused';
       readonly code: string;
@@ -267,7 +272,7 @@ export function createOrderFlow({
       }
       case 'ConfirmationPending': {
         if (attempt === undefined) {
-          show({ kind: 'not-found', afterAttempt: true });
+          show({ kind: 'not-found', afterAttempt: true, checkedAt: now() });
           return;
         }
         const waiting = keepAttempt({ ...attempt, state: 'pending' });
@@ -296,11 +301,6 @@ export function createOrderFlow({
       show({ kind: 'proposal', proposal, previous });
       return;
     }
-    if (failure.code === 'ProposalNotFound') {
-      clearAttempt();
-      show({ kind: 'not-found', afterAttempt: checking });
-      return;
-    }
     if (failure.code === 'CommandConflict' && attempt !== undefined) {
       const kept = keepAttempt({ ...attempt, state: 'conflict' });
       show({ kind: 'conflict', attempt: kept, checking: false });
@@ -327,6 +327,21 @@ export function createOrderFlow({
     previous: OrderProposal | undefined,
   ): void {
     if (disposed) return;
+    // Serving answers ProposalNotFound with an unknown outcome, so the runner
+    // keeps the attempt open; the code decides, not the outcome.
+    if (
+      result.kind !== 'committed' &&
+      result.failure.code === 'ProposalNotFound'
+    ) {
+      commands.discard(key);
+      clearAttempt();
+      show({
+        kind: 'not-found',
+        afterAttempt: checking,
+        checkedAt: checking ? now() : undefined,
+      });
+      return;
+    }
     switch (result.kind) {
       case 'committed':
         applyResult(result.value.result, checking);
@@ -384,7 +399,7 @@ export function createOrderFlow({
       }
       if (failure.code === 'ProposalNotFound') {
         clearAttempt();
-        show({ kind: 'not-found', afterAttempt: true });
+        show({ kind: 'not-found', afterAttempt: true, checkedAt: now() });
         return;
       }
       show({ ...current, checking: false }, { kind: 'check-failed' });

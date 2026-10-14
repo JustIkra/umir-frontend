@@ -94,6 +94,10 @@ test('compositions and the draft summary', () => {
     '2 позиции · 9 порций',
   );
   assert.equal(finalText(proposal), 'Итоговый состав · 2 позиции, 3 порции');
+  assert.equal(
+    finalText({ ...proposal, acceptedPositions: [] }),
+    'Итоговый состав · 0 позиций',
+  );
 });
 
 test('the shortage dialog: cut and excluded positions with their deficits', () => {
@@ -250,14 +254,25 @@ test('attempt messages: D2, D3, D4, F5', () => {
 test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
   const tz = 'Europe/Moscow';
   assert.equal(
-    outcomeMessage({ kind: 'not-found', afterAttempt: false }, tz).title,
+    outcomeMessage(
+      { kind: 'not-found', afterAttempt: false, checkedAt: undefined },
+      tz,
+    ).title,
     'Предложение больше не найдено',
   );
   assert.deepEqual(
-    outcomeMessage({ kind: 'not-found', afterAttempt: true }, tz),
+    outcomeMessage(
+      {
+        kind: 'not-found',
+        afterAttempt: true,
+        checkedAt: Date.UTC(2026, 9, 14, 12, 31, 5),
+      },
+      tz,
+    ),
     {
       tone: 'info',
       title: 'Предложение больше не действует',
+      stamp: 'Проверено 14.10.2026, 15:31:05 UTC+3',
       text: 'Сервис заказов ответил на ту же попытку: предложение больше не действует, а записана ли продажа, он не подтверждает. Прежде чем оформлять заново, проверьте по истории склада, не списаны ли продукты по этой попытке.',
     },
   );
@@ -348,9 +363,15 @@ test('the panel follows the phase of the order', async () => {
   assert.ok(
     (
       await render(
-        orderSnapshot({ phase: { kind: 'not-found', afterAttempt: true } }),
+        orderSnapshot({
+          phase: {
+            kind: 'not-found',
+            afterAttempt: true,
+            checkedAt: Date.UTC(2026, 9, 14, 12, 31, 5),
+          },
+        }),
       )
-    ).includes('Предложение больше не действует'),
+    ).includes('Проверено 14.10.2026, 15:31:05 UTC+3'),
   );
   assert.ok(
     (

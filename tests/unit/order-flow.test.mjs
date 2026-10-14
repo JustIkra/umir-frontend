@@ -121,7 +121,16 @@ function setup({ stored, epoch = EPOCH, commands: shared } = {}) {
     onOrdered: () => events.push('ordered'),
     onUnauthenticated: () => events.push('check'),
   });
-  return { flow, calls, answers, storage, scheduler, events, commands };
+  return {
+    flow,
+    calls,
+    answers,
+    storage,
+    scheduler,
+    events,
+    commands,
+    epochs,
+  };
 }
 
 async function atProposal(options) {
@@ -327,26 +336,60 @@ test('a lost answer keeps the attempt; the check repeats the same command', asyn
   assert.equal(phase(flow).afterCheck, true);
 });
 
-test('ProposalNotFound: a fresh refusal is F2, after a lost answer it proves no sale (F4)', async () => {
-  const fresh = await atProposal();
-  fresh.answers.confirm.push(refused(404, 'ProposalNotFound', 'not_committed'));
-  await fresh.flow.confirm();
-  assert.deepEqual(phase(fresh.flow), {
+test('ProposalNotFound is F2 on a first send and F4 on a check; the runner and the store are free', async () => {
+  for (const outcome of ['unknown', 'not_committed']) {
+    const fresh = await atProposal();
+    fresh.answers.confirm.push(refused(404, 'ProposalNotFound', outcome));
+    await fresh.flow.confirm();
+    assert.deepEqual(phase(fresh.flow), {
+      kind: 'not-found',
+      afterAttempt: false,
+      checkedAt: undefined,
+    });
+    assert.deepEqual(fresh.commands.getSnapshot(), []);
+    assert.equal(fresh.storage.box.record.attempt, undefined);
+    assert.equal(fresh.flow.getSnapshot().locked, false);
+  }
+  for (const outcome of ['unknown', 'not_committed']) {
+    const checked = await atProposal();
+    checked.answers.confirm.push(
+      lost(),
+      refused(404, 'ProposalNotFound', outcome),
+    );
+    await checked.flow.confirm();
+    await checked.flow.check();
+    assert.deepEqual(phase(checked.flow), {
+      kind: 'not-found',
+      afterAttempt: true,
+      checkedAt: 42,
+    });
+    assert.deepEqual(checked.commands.getSnapshot(), []);
+    assert.equal(checked.storage.box.record.attempt, undefined);
+    assert.equal(checked.flow.getSnapshot().locked, false);
+  }
+});
+
+test('the serving epoch changes between prepare and confirm: ProposalNotFound/unknown is F2 and unlocked', async () => {
+  const context = await atProposal();
+  const NEXT = '77777777-7777-4777-8777-777777777777';
+  context.epochs.record(R, 'serving', NEXT);
+  context.answers.confirm.push(refused(404, 'ProposalNotFound', 'unknown'));
+  await context.flow.confirm();
+  assert.deepEqual(context.calls.at(-1), [
+    'confirm',
+    R,
+    'prp-1',
+    'cmd-1',
+    NEXT,
+  ]);
+  assert.deepEqual(phase(context.flow), {
     kind: 'not-found',
     afterAttempt: false,
+    checkedAt: undefined,
   });
-  const checked = await atProposal();
-  checked.answers.confirm.push(
-    lost(),
-    refused(404, 'ProposalNotFound', 'not_committed'),
-  );
-  await checked.flow.confirm();
-  await checked.flow.check();
-  assert.deepEqual(phase(checked.flow), {
-    kind: 'not-found',
-    afterAttempt: true,
-  });
-  assert.equal(checked.storage.box.record.attempt, undefined);
+  assert.deepEqual(context.commands.getSnapshot(), []);
+  assert.equal(context.storage.box.record.attempt, undefined);
+  assert.equal(context.flow.getSnapshot().locked, false);
 });
 
 test('CommandConflict keeps the attempt and checks it through resolve', async () => {

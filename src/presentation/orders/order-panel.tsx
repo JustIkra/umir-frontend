@@ -514,6 +514,9 @@ export function OutcomeOrder({
     <Panel header={<Heading title="Оформление заказа" />} footer={actions}>
       <Stack gap="3" py="2">
         <FormMessage tone={message.tone} title={message.title}>
+          {message.stamp !== undefined && (
+            <Text textStyle="caption.default">{message.stamp}</Text>
+          )}
           {message.text}
         </FormMessage>
         {caption !== undefined && (

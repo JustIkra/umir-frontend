@@ -117,13 +117,16 @@ export function acceptanceText(
 }
 
 export function finalText(proposal: OrderProposal): string {
-  return `Итоговый состав · ${compositionText(proposal.acceptedPositions)}`;
+  const accepted = proposal.acceptedPositions;
+  return `Итоговый состав · ${accepted.length === 0 ? positionsText(0) : compositionText(accepted)}`;
 }
 
 export interface PanelMessage {
   readonly tone: 'error' | 'unknown' | 'success' | 'info';
   readonly title: string;
   readonly text: string;
+  // The time line under the title (F4).
+  readonly stamp?: string;
 }
 
 export function attemptMessage(
@@ -180,6 +183,9 @@ export function outcomeMessage(
         ? {
             tone: 'info',
             title: 'Предложение больше не действует',
+            ...(phase.checkedAt === undefined
+              ? {}
+              : { stamp: `Проверено ${formatStamp(phase.checkedAt, timeZone)}` }),
             text: 'Сервис заказов ответил на ту же попытку: предложение больше не действует, а записана ли продажа, он не подтверждает. Прежде чем оформлять заново, проверьте по истории склада, не списаны ли продукты по этой попытке.',
           }
         : notFound;
