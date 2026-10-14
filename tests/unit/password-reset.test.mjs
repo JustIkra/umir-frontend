@@ -420,3 +420,51 @@ test('restart during a request in flight sends the next request anew', async () 
   assert.equal(storage.box.record.email, 'new@b.ru');
   assert.equal(storage.box.record.challenge.challengeID, C2);
 });
+
+test('a stale answer does not reopen the fields while a newer action runs', async () => {
+  const { flow, fake } = setup();
+  let oldAnswer;
+  let newAnswer;
+  fake.answers.begin.push(
+    () =>
+      new Promise((resolve) => {
+        oldAnswer = resolve;
+      }),
+    () =>
+      new Promise((resolve) => {
+        newAnswer = resolve;
+      }),
+  );
+  const old = flow.request('old@b.ru');
+  await settled();
+  flow.restart(false);
+  const next = flow.request('new@b.ru');
+  await settled();
+  assert.equal(flow.getSnapshot().busy, true);
+  oldAnswer(challenge(C1));
+  assert.equal(await old, 'stay');
+  assert.equal(flow.getSnapshot().busy, true, 'the newer request still runs');
+  newAnswer(challenge(C2));
+  assert.equal(await next, 'code');
+  assert.equal(flow.getSnapshot().busy, false);
+});
+
+test('check() repeats a lost verify after the clock passed expiresAt', async () => {
+  const { flow, fake, clock } = await atCode();
+  fake.answers.verify.push(lost(), {
+    challenge: { ...challenge(), state: 'verified' },
+    proof: 'proof-1',
+    retainUntil: instant(START + 86_400_000),
+  });
+  assert.equal(await flow.verify('482 913'), 'stay');
+  assert.deepEqual(flow.getSnapshot().notice, {
+    kind: 'unknown',
+    action: 'verify',
+  });
+  clock.now = START + 600_000;
+  assert.equal(await flow.check(), 'password');
+  assert.deepEqual(fake.calls.slice(1), [
+    ['verify', C1, '482913', 'cmd-2'],
+    ['verify', C1, '482913', 'cmd-2'],
+  ]);
+});

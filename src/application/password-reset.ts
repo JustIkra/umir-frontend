@@ -139,6 +139,13 @@ export function createPasswordResetFlow({
   let lastCode = '';
   let lastPassword = '';
 
+  // The code and the password are not kept once the reset is done or
+  // started over.
+  function forgetInputs(): void {
+    lastCode = '';
+    lastPassword = '';
+  }
+
   function view(): ResetSnapshot {
     let step: ResetStep = 'email';
     if (record !== undefined) {
@@ -191,7 +198,10 @@ export function createPasswordResetFlow({
     return { kind: 'unavailable' };
   }
 
+  // own is the generation of the action: a stale answer leaves busy to the
+  // newer action that runs after restart().
   async function send<T>(
+    own: number,
     action: ResetAction,
     key: string,
     execute: (commandID: string) => Promise<T>,
@@ -199,7 +209,7 @@ export function createPasswordResetFlow({
     busy = true;
     show(undefined);
     const result = await commands.run({ key, label: labels[action], execute });
-    busy = false;
+    if (own === generation) busy = false;
     return result;
   }
 
@@ -208,7 +218,7 @@ export function createPasswordResetFlow({
     address: string,
   ): Promise<ResetMove> {
     const own = generation;
-    const result = await send(action, resetKeys.begin, (commandID) =>
+    const result = await send(own, action, resetKeys.begin, (commandID) =>
       api.begin(address, commandID),
     );
     if (dropped(own)) return 'stay';
@@ -263,9 +273,19 @@ export function createPasswordResetFlow({
       return 'stay';
     }
     lastCode = code;
+    return sendCode(current, code);
+  }
+
+  // check() repeats a lost verify without the clock pre-check: the server
+  // answers for an expired code itself, and a proof issued before expiry
+  // must not be lost.
+  async function sendCode(
+    current: ResetRecord,
+    code: string,
+  ): Promise<ResetMove> {
     const own = generation;
     const { challengeID } = current.challenge;
-    const result = await send('verify', resetKeys.verify, (commandID) =>
+    const result = await send(own, 'verify', resetKeys.verify, (commandID) =>
       api.verify(challengeID, code, commandID),
     );
     if (dropped(own)) return 'stay';
@@ -302,7 +322,7 @@ export function createPasswordResetFlow({
     const current = record;
     if (current === undefined) return 'stay';
     const own = generation;
-    const result = await send('resend', resetKeys.resend, (commandID) =>
+    const result = await send(own, 'resend', resetKeys.resend, (commandID) =>
       api.resend(current.challenge.challengeID, commandID),
     );
     if (dropped(own)) return 'stay';
@@ -340,8 +360,11 @@ export function createPasswordResetFlow({
       proof,
       newPassword,
     };
-    const result = await send('complete', resetKeys.complete, (commandID) =>
-      api.complete(completion, commandID),
+    const result = await send(
+      own,
+      'complete',
+      resetKeys.complete,
+      (commandID) => api.complete(completion, commandID),
     );
     if (dropped(own)) return 'stay';
     if (result.kind === 'committed') {
@@ -349,6 +372,7 @@ export function createPasswordResetFlow({
       generation += 1;
       keep(undefined);
       email = '';
+      forgetInputs();
       show(undefined);
       return 'done';
     }
@@ -384,7 +408,9 @@ export function createPasswordResetFlow({
       case 'renew':
         return renew();
       case 'verify':
-        return verify(lastCode);
+        return record === undefined
+          ? Promise.resolve('stay')
+          : sendCode(record, lastCode);
       case 'resend':
         return resend();
       case 'complete':
@@ -397,6 +423,7 @@ export function createPasswordResetFlow({
     for (const key of Object.values(resetKeys)) commands.discard(key);
     keep(undefined);
     if (!keepEmail) email = '';
+    forgetInputs();
     busy = false;
     show(undefined);
   }
