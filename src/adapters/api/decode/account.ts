@@ -1,4 +1,4 @@
-import type { UserView } from '@/application/account';
+import type { User, UserView } from '@/application/account';
 import {
   boolean,
   entityId,
@@ -9,17 +9,22 @@ import {
   string,
 } from './common';
 
+// #User: the profile inside UserView and the answer to a saved display name.
+export function decodeUser(body: unknown, path = 'user'): User {
+  const user = object(body, path);
+  return {
+    userID: entityId(user.userID, `${path}.userID`),
+    login: string(user.login, `${path}.login`),
+    displayName: string(user.displayName, `${path}.displayName`),
+    email: optionalString(user.email, `${path}.email`),
+  };
+}
+
 export function decodeUserView(body: unknown): UserView {
   const view = object(body, 'UserView');
-  const user = object(view.user, 'UserView.user');
   const session = object(view.session, 'UserView.session');
   return {
-    user: {
-      userID: entityId(user.userID, 'user.userID'),
-      login: string(user.login, 'user.login'),
-      displayName: string(user.displayName, 'user.displayName'),
-      email: optionalString(user.email, 'user.email'),
-    },
+    user: decodeUser(view.user, 'UserView.user'),
     session: {
       expiresAt: instant(session.expiresAt, 'session.expiresAt'),
       idleExpiresAt: instant(session.idleExpiresAt, 'session.idleExpiresAt'),

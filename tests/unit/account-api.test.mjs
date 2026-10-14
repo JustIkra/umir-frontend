@@ -82,3 +82,52 @@ test('a malformed answer is unavailable for /me and unknown for sign-in', async 
     (error) => error.failure.outcome === 'unknown',
   );
 });
+
+test('changeDisplayName() patches the name and returns the saved user', async () => {
+  const saved = { ...body.user, displayName: 'Марина Белова-Орлова' };
+  const fake = client(saved);
+  const user = await createAccountApi(fake).changeDisplayName(
+    'Марина Белова-Орлова',
+    'cmd-8',
+  );
+  assert.equal(user.displayName, 'Марина Белова-Орлова');
+  assert.equal(user.email, undefined);
+  assert.deepEqual(fake.calls, [
+    [
+      'send',
+      'PATCH',
+      '/api/v2/me/display-name',
+      { body: { displayName: 'Марина Белова-Орлова', commandID: 'cmd-8' } },
+    ],
+  ]);
+});
+
+test('changePassword() patches both passwords as typed', async () => {
+  const fake = client(undefined);
+  await createAccountApi(fake).changePassword(
+    { currentPassword: ' old ', newPassword: 'new pass 1' },
+    'cmd-9',
+  );
+  assert.deepEqual(fake.calls, [
+    [
+      'send',
+      'PATCH',
+      '/api/v2/me/password',
+      {
+        body: {
+          currentPassword: ' old ',
+          newPassword: 'new pass 1',
+          commandID: 'cmd-9',
+        },
+      },
+    ],
+  ]);
+});
+
+test('a malformed saved user is unknown', async () => {
+  await assert.rejects(
+    createAccountApi(client({ login: 'x' })).changeDisplayName('Имя', 'c'),
+    (error) =>
+      error.failure.code === 'Malformed' && error.failure.outcome === 'unknown',
+  );
+});
