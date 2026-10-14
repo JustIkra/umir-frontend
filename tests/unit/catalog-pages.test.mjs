@@ -136,6 +136,16 @@ test('the dish card shows the recipe in base units and the zone of the stamp', a
     assert.ok(plain.includes(part), part);
 });
 
+test('the dish card shows its header and «Получаем новую оценку…» while the read loads', async () => {
+  const html = await renderRoute(`/app/r/${R}/catalog/dishes/206`, {
+    data: { dish: loadingRead },
+  });
+  const plain = text(html);
+  assert.ok(plain.includes('Получаем новую оценку…'));
+  assert.ok(plain.includes('Справочники'));
+  assert.ok(plain.includes('Блюда'));
+});
+
 test('a dish the catalog does not have shows «Блюдо не найдено»', async () => {
   const plain = text(
     await renderRoute(`/app/r/${R}/catalog/dishes/999`, {

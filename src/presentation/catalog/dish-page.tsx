@@ -35,7 +35,23 @@ export function DishPage() {
   const created = createdNoticeOf(useLocation().state);
   const value = snapshot.value;
   if (value === undefined) {
-    if (failure === undefined) return null;
+    if (failure === undefined) {
+      return (
+        <Stack gap={{ base: '4', sm: '6' }}>
+          <Breadcrumbs
+            items={[
+              { title: 'Справочники', to: path('/catalog') },
+              { title: 'Блюда', to: path('/catalog/dishes') },
+              { title: 'Блюдо' },
+            ]}
+          />
+          <PageHeader title="Блюдо" />
+          <Text textStyle="caption.default" color="text.secondary">
+            Получаем новую оценку…
+          </Text>
+        </Stack>
+      );
+    }
     if (
       (failure.kind === 'unavailable' || failure.kind === 'error') &&
       failure.failure.code === 'NotFound'
