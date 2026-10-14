@@ -4,6 +4,7 @@ import type { AccessStore, LastRestaurantStore } from '@/application/access';
 import type { CatalogCommands } from '@/application/catalog-commands';
 import type { CommandRunner } from '@/application/commands';
 import type { CookieNoticeStore } from '@/application/cookie-notice';
+import type { DeliveryFlow } from '@/application/delivery-flow';
 import type { FeedbackSubmitter } from '@/application/feedback';
 import type { LiveSync } from '@/application/live-sync';
 import type { ModelRegistry } from '@/application/models';
@@ -11,6 +12,7 @@ import type { OrderFlow } from '@/application/order-flow';
 import type { PasswordResetFlow } from '@/application/password-reset';
 import type { RestaurantData } from '@/application/restaurant-data';
 import type { SessionStore } from '@/application/session';
+import type { WriteoffCommands } from '@/application/writeoff-commands';
 
 // Application ports the screens use; the app layer assembles the adapters.
 export interface PresentationServices {
@@ -31,6 +33,10 @@ export interface PresentationServices {
   catalogCommands: (restaurantID: string) => CatalogCommands;
   // undefined without a signed-in user.
   orderFlow: (restaurantID: string) => OrderFlow | undefined;
+  // One per restaurant; dropped on sign-out and on a user change.
+  writeoffCommands: (restaurantID: string) => WriteoffCommands;
+  // undefined without a signed-in user.
+  deliveryFlow: (restaurantID: string) => DeliveryFlow | undefined;
 }
 
 const ServicesContext = createContext<PresentationServices | null>(null);

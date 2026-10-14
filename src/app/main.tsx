@@ -14,11 +14,15 @@ import {
   createRestaurantReads,
 } from '@/adapters/api/restaurant-api';
 import { createRecoveryApi } from '@/adapters/api/recovery-api';
-import { createWarehouseReads } from '@/adapters/api/warehouse-api';
+import {
+  createWarehouseApi,
+  createWarehouseReads,
+} from '@/adapters/api/warehouse-api';
 import { createAccountApi } from '@/adapters/api/account-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
+import { createDeliveryStore } from '@/adapters/browser-storage/delivery-store';
 import { createOrderStore } from '@/adapters/browser-storage/order-store';
 import { createPasswordResetStore } from '@/adapters/browser-storage/password-reset-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
@@ -32,6 +36,8 @@ import {
   type CatalogCommands,
 } from '@/application/catalog-commands';
 import { createCommandRunner } from '@/application/commands';
+import { createDeliveryFlow } from '@/application/delivery-flow';
+import { createDeliveryFlowRegistry } from '@/application/delivery-flows';
 import { createEpochRegistry } from '@/application/epochs';
 import { createFeedbackSubmitter } from '@/application/feedback';
 import { createLiveSync } from '@/application/live-sync';
@@ -44,6 +50,10 @@ import {
   type RestaurantData,
 } from '@/application/restaurant-data';
 import { createSessionStore } from '@/application/session';
+import {
+  createWriteoffCommands,
+  type WriteoffCommands,
+} from '@/application/writeoff-commands';
 import { createRoutes } from '@/presentation/routes';
 import {
   ServicesProvider,
@@ -139,6 +149,45 @@ const orderFlows = createOrderFlowRegistry(
     }),
   orderStore,
 );
+const warehouseApi = createWarehouseApi(client);
+const deliveryStore = createDeliveryStore(browserSessionStorage());
+const writeoffCommands = new Map<string, WriteoffCommands>();
+const deliveryFlows = createDeliveryFlowRegistry(
+  (userID, restaurantID) =>
+    createDeliveryFlow({
+      api: warehouseApi,
+      commands,
+      epochs,
+      storage: deliveryStore,
+      newID: () => crypto.randomUUID(),
+      now,
+      restaurantID,
+      userID,
+      // Stock, expiry, the report, history and the menu follow stock.
+      onReceived: () => {
+        models.markStale(restaurantID, ['stock']);
+      },
+      // DS03: the zone of the organization changed; access carries it.
+      onSettingsChanged: () => {
+        void access.refresh();
+      },
+      onUnauthenticated: () => {
+        void session.check();
+      },
+    }),
+  deliveryStore,
+);
+// The settings version the stock report is read with: the organization of
+// the restaurant in the known access, read at the time of the request.
+function settingsVersionOf(restaurantID: string): string | undefined {
+  const state = access.getSnapshot();
+  if (state.status !== 'ready') return undefined;
+  return state.organizations.find((organization) =>
+    organization.restaurants.some(
+      (restaurant) => restaurant.restaurantID === restaurantID,
+    ),
+  )?.settings.settingsVersion;
+}
 const accountApi = createAccountApi(client);
 const session = createSessionStore({
   api: accountApi,
@@ -157,6 +206,8 @@ const session = createSessionStore({
     access.clear();
     orderFlows.forget();
     catalogCommands.clear();
+    deliveryFlows.forget();
+    writeoffCommands.clear();
     client.clearCsrfToken();
   },
   onExpired: () => {
@@ -173,6 +224,8 @@ const session = createSessionStore({
     access.clear();
     orderFlows.forget();
     catalogCommands.clear();
+    deliveryFlows.forget();
+    writeoffCommands.clear();
     void access.refresh();
   },
   // L13: the server ended the session while a password change is pending,
@@ -221,7 +274,7 @@ const services: PresentationServices = {
         restaurantReads,
         warehouseReads,
         restaurantID,
-        () => undefined,
+        () => settingsVersionOf(restaurantID),
       );
       restaurantData.set(restaurantID, data);
     }
@@ -249,6 +302,30 @@ const services: PresentationServices = {
     const state = session.getSnapshot();
     return state.status === 'active'
       ? orderFlows.get(state.user.userID, restaurantID)
+      : undefined;
+  },
+  writeoffCommands: (restaurantID) => {
+    let writeoff = writeoffCommands.get(restaurantID);
+    if (writeoff === undefined) {
+      writeoff = createWriteoffCommands({
+        api: warehouseApi,
+        commands,
+        restaurantID,
+        markStale: (topics) => {
+          models.markStale(restaurantID, topics);
+        },
+        onUnauthenticated: () => {
+          void session.check();
+        },
+      });
+      writeoffCommands.set(restaurantID, writeoff);
+    }
+    return writeoff;
+  },
+  deliveryFlow: (restaurantID) => {
+    const state = session.getSnapshot();
+    return state.status === 'active'
+      ? deliveryFlows.get(state.user.userID, restaurantID)
       : undefined;
   },
 };

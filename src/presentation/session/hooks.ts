@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { useParams } from 'react-router';
-import type { AccessState } from '@/application/access';
+import { findRestaurant, type AccessState } from '@/application/access';
 import type { Attempt } from '@/application/commands';
 import { screenFailure, type ScreenFailure } from '@/application/failure';
 import type { LiveState } from '@/application/live-sync';
@@ -8,6 +8,7 @@ import type { RefreshNotice } from '@/application/models';
 import type { ReadModel, ReadModelSnapshot } from '@/application/read-model';
 import type { RestaurantData } from '@/application/restaurant-data';
 import type { SessionState } from '@/application/session';
+import type { Permission } from '@/domain/access';
 import { useServices } from '@/presentation/services';
 
 // getSnapshot doubles as the server snapshot: route tests render on the
@@ -100,4 +101,16 @@ export function useRestaurantData(): RestaurantData {
     throw new Error('useRestaurantData outside a restaurant');
   }
   return restaurantData(restaurantID);
+}
+
+const noPermissions: ReadonlySet<Permission> = new Set();
+
+// The rights of the restaurant in the address: tiles, actions and windows are
+// shown by them. Empty while access is not ready (loading or unverified) and
+// for a restaurant outside access.
+export function usePermissions(): ReadonlySet<Permission> {
+  const { restaurantID } = useParams();
+  const access = useAccess();
+  if (restaurantID === undefined) return noPermissions;
+  return findRestaurant(access, restaurantID)?.permissions ?? noPermissions;
 }

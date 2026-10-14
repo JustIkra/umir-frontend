@@ -9,6 +9,7 @@ import {
 } from 'react-router';
 import { ApiError, localFailure } from '../../../src/application/api.ts';
 import { permissionsFor } from '../../../src/domain/access.ts';
+import { emptyDeliveryDraft } from '../../../src/domain/delivery-draft.ts';
 import { createRoutes } from '../../../src/presentation/routes.tsx';
 import { ServicesProvider } from '../../../src/presentation/services.tsx';
 import { system } from '../../../src/presentation/theme/system.ts';
@@ -118,6 +119,31 @@ export const orderSnapshot = (overrides = {}) => ({
   ...overrides,
 });
 
+export const deliverySnapshot = (overrides = {}) => ({
+  draft: emptyDeliveryDraft(),
+  phase: { kind: 'editing' },
+  occurrence: undefined,
+  notice: undefined,
+  locked: false,
+  ...overrides,
+});
+
+// permissions replaces the rights of every restaurant in access, for pages
+// that hide tiles and actions by right; without it the roles decide.
+const withPermissions = (state, permissions) =>
+  permissions === undefined || state.status !== 'ready'
+    ? state
+    : {
+        ...state,
+        organizations: state.organizations.map((organization) => ({
+          ...organization,
+          restaurants: organization.restaurants.map((restaurant) => ({
+            ...restaurant,
+            permissions: new Set(permissions),
+          })),
+        })),
+      };
+
 const staticModel = (snapshot) => ({
   subscribe: () => () => {},
   getSnapshot: () => snapshot,
@@ -137,11 +163,14 @@ export const resetSnapshot = (overrides = {}) => ({
 
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
-// «Данные обновились» notice of models.
+// «Данные обновились» notice of models; data.stockReport is keyed by
+// riskHours; writeoff overrides confirm, check and pending of the write-off
+// commands.
 export function fakeServices({
   session = activeSession,
-  access = readyAccess(),
-  refreshed = access,
+  access: givenAccess = readyAccess(),
+  refreshed: givenRefreshed = givenAccess,
+  permissions,
   accessCalls = { ensure: 0, refresh: 0 },
   remembered,
   attempts = [],
@@ -152,7 +181,11 @@ export function fakeServices({
   pendingProduct,
   pendingDish,
   order = orderSnapshot(),
+  writeoff = {},
+  delivery = deliverySnapshot(),
 } = {}) {
+  const access = withPermissions(givenAccess, permissions);
+  const refreshed = withPermissions(givenRefreshed, permissions);
   return {
     now: () => NOW,
     passwordReset: {
@@ -234,6 +267,14 @@ export function fakeServices({
       menu: () => staticModel(data.menu ?? loadingRead),
       stopList: () => staticModel(data.stopList ?? loadingRead),
       recommendations: () => staticModel(data.recommendations ?? loadingRead),
+      inventory: () => staticModel(data.inventory ?? loadingRead),
+      expiringBatches: () => staticModel(data.expiringBatches ?? loadingRead),
+      pendingWriteoffs: () => staticModel(data.pendingWriteoffs ?? loadingRead),
+      stockReport: (riskHours) =>
+        staticModel(data.stockReport?.[riskHours] ?? loadingRead),
+      // «Показать ещё» is never pressed during a render.
+      stockReportPage: () => staticModel(loadingRead),
+      history: () => staticModel(data.history ?? loadingRead),
     }),
     catalogCommands: () => ({
       registerProduct: () =>
@@ -255,6 +296,21 @@ export function fakeServices({
       openReplacement() {},
       editAgain() {},
       restart: () => Promise.resolve(),
+      dispose() {},
+    }),
+    writeoffCommands: () => ({
+      confirm: () => Promise.reject(new Error('no commands in render tests')),
+      check: () => Promise.reject(new Error('no commands in render tests')),
+      pending: () => false,
+      ...writeoff,
+    }),
+    deliveryFlow: () => ({
+      ...store(delivery),
+      edit() {},
+      chooseOccurrence() {},
+      submit: () => Promise.resolve(),
+      check: () => Promise.resolve(),
+      restart() {},
       dispose() {},
     }),
   };

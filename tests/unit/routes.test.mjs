@@ -6,6 +6,7 @@ import { renderToString } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { OverviewPage } from '../../src/presentation/overview/overview-page.tsx';
 import { ServicesProvider } from '../../src/presentation/services.tsx';
+import { usePermissions } from '../../src/presentation/session/hooks.ts';
 import { system } from '../../src/presentation/theme/system.ts';
 import {
   NOW,
@@ -89,6 +90,142 @@ const servingData = {
   }),
 };
 
+// The warehouse of the render tests at 10:00 Moscow time: salmon has a batch
+// in the 24 h window and one later in 48 h, cream waits for its write-off,
+// eggs ran out.
+const stockRows = [
+  {
+    productID: '130',
+    name: 'Филе лосося',
+    baseUnit: 'g',
+    availableQuantity: '2100000',
+    pendingWriteoffQuantity: '0',
+    onHandQuantity: '2100000',
+    expiringQuantity: '2100000',
+  },
+  {
+    productID: '121',
+    name: 'Сливки 33%',
+    baseUnit: 'ml',
+    availableQuantity: '0',
+    pendingWriteoffQuantity: '1000000',
+    onHandQuantity: '1000000',
+    expiringQuantity: '0',
+  },
+  {
+    productID: '132',
+    name: 'Яйцо',
+    baseUnit: 'pcs',
+    availableQuantity: '0',
+    pendingWriteoffQuantity: '0',
+    onHandQuantity: '0',
+    expiringQuantity: '0',
+  },
+];
+const stockReportFor = (riskHours, cutoff) =>
+  loaded({
+    riskHours,
+    riskCutoff: instantOf(cutoff),
+    items: stockRows,
+    nextCursor: undefined,
+  });
+const warehouseData = {
+  products: catalogProducts,
+  inventory: loaded({ items: stockRows }),
+  expiringBatches: loaded({
+    evaluatedAt,
+    stateVersion: '1',
+    items: [
+      {
+        batchID: 'P-0147',
+        productID: '130',
+        remainingQuantity: '100000',
+        baseUnit: 'g',
+        expiresAt: instantOf('2026-10-15T06:38:00+03:00'),
+        remainingSeconds: '74280',
+      },
+      {
+        batchID: 'P-0158',
+        productID: '130',
+        remainingQuantity: '2000000',
+        baseUnit: 'g',
+        expiresAt: instantOf('2026-10-16T09:00:00+03:00'),
+        remainingSeconds: '169200',
+      },
+    ],
+  }),
+  pendingWriteoffs: loaded({
+    items: [
+      {
+        status: 'pending_writeoff',
+        batch: {
+          batchID: 'P-0164',
+          deliveryID: 'dlv-1192',
+          lineNo: '4',
+          productID: '121',
+          manufacturedAt: instantOf('2026-10-01T09:00:00+03:00'),
+          shelfLife: { value: '10', unit: 'day' },
+          receivedAt: instantOf('2026-10-14T09:21:00+03:00'),
+          expiresAt: instantOf('2026-10-11T09:00:00+03:00'),
+          receivedQuantity: '1000000',
+          remainingQuantity: '1000000',
+        },
+      },
+    ],
+  }),
+  stockReport: {
+    72: stockReportFor(72, '2026-10-17T10:00:00+03:00'),
+    168: stockReportFor(168, '2026-10-21T10:00:00+03:00'),
+  },
+  history: loaded({
+    events: [
+      {
+        type: 'ProductRegistered',
+        sequence: '1049',
+        recordedAt: instantOf('2026-10-14T08:10:00+03:00'),
+      },
+      {
+        type: 'DeliveryReceived',
+        sequence: '1052',
+        recordedAt: instantOf('2026-10-14T09:02:11+03:00'),
+        number: '1190',
+        lines: 2,
+        batches: 2,
+      },
+      {
+        type: 'OrderPlaced',
+        sequence: '1055',
+        recordedAt: instantOf('2026-10-14T09:06:31+03:00'),
+        orderID: 'ord-20261014-0042',
+        positions: 3,
+      },
+      {
+        type: 'DeliveryReceived',
+        sequence: '1056',
+        recordedAt: instantOf('2026-10-14T09:21:08+03:00'),
+        number: '1192',
+        lines: 4,
+        batches: 4,
+      },
+      {
+        type: 'BatchExpiryPending',
+        sequence: '1057',
+        recordedAt: instantOf('2026-10-14T09:21:08+03:00'),
+        batchID: 'P-0164',
+        productID: '121',
+        quantity: '1000000',
+        baseUnit: 'ml',
+      },
+    ],
+  }),
+};
+// The overview reads the warehouse, the catalog and serving.
+const overviewData = {
+  ...servingData,
+  ...warehouseData,
+  dishCatalog: catalogDishes,
+};
+
 const guest = { session: { status: 'anonymous', expired: false } };
 
 const pages = [
@@ -113,15 +250,16 @@ const pages = [
     ['Новый пароль', 'Повторите новый пароль'],
     { reset: resetSnapshot({ step: 'password', email: 'a@b.ru' }) },
   ],
-  [`/app/r/${R}`, 'Обзор', []],
+  [`/app/r/${R}`, 'Обзор', [], { data: overviewData }],
   [`/app/r/${R}/orders`, 'Новый заказ', [], { data: servingData }],
-  [`/app/r/${R}/warehouse`, 'Склад', []],
-  [`/app/r/${R}/warehouse/expiry`, 'Склад', []],
-  [`/app/r/${R}/warehouse/history`, 'Склад', []],
+  [`/app/r/${R}/warehouse`, 'Склад', [], { data: warehouseData }],
+  [`/app/r/${R}/warehouse/expiry`, 'Склад', [], { data: warehouseData }],
+  [`/app/r/${R}/warehouse/history`, 'Склад', [], { data: warehouseData }],
   [
     `/app/r/${R}/warehouse/delivery`,
     'Приём поставки',
     ['Номер поставки', 'Дата и время создания поставки (Москва, UTC+3)'],
+    { data: warehouseData },
   ],
   [`/app/r/${R}/catalog`, 'Справочники', [], catalogData],
   [`/app/r/${R}/catalog/dishes`, 'Справочники', [], catalogData],
@@ -817,4 +955,59 @@ test('W12: the overview names the missing section between the header and the til
       html.indexOf(`href="/app/r/${R}/warehouse"`),
     'the notice precedes the tiles',
   );
+});
+
+function Rights() {
+  return h('output', null, [...usePermissions()].sort().join(' '));
+}
+
+const rightsOf = (options, restaurantID = R) =>
+  text(
+    renderToString(
+      h(
+        ServicesProvider,
+        { services: fakeServices(options) },
+        h(
+          MemoryRouter,
+          { initialEntries: [`/app/r/${restaurantID}`] },
+          h(
+            Routes,
+            null,
+            h(Route, { path: '/app/r/:restaurantID', element: h(Rights) }),
+          ),
+        ),
+      ),
+    ),
+  );
+
+test('usePermissions gives the rights of the restaurant in the address', () => {
+  const rights = rightsOf().split(' ');
+  for (const permission of [
+    'stock.read',
+    'delivery.create',
+    'writeoff.confirm',
+    'analytics.read',
+    'catalog.read',
+    'catalog.write',
+    'menu.read',
+    'recommendations.read',
+    'order.prepare',
+  ])
+    assert.ok(rights.includes(permission), permission);
+  assert.equal(
+    rightsOf({
+      access: readyAccess([sampleRestaurant({ roles: ['Waiter'] })]),
+    }),
+    'feedback.submit menu.read order.confirm order.prepare order.read recommendations.read',
+  );
+  assert.equal(
+    rightsOf({ permissions: ['stock.read', 'analytics.read'] }),
+    'analytics.read stock.read',
+  );
+});
+
+test('usePermissions is empty until access is ready and outside access', () => {
+  assert.equal(rightsOf({ access: { status: 'loading' } }), '');
+  assert.equal(rightsOf({ access: unverified }), '');
+  assert.equal(rightsOf({}, '55555555-5555-4555-8555-555555555555'), '');
 });
