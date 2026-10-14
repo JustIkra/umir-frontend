@@ -1,18 +1,23 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
-import { useLoaderData } from 'react-router';
+import { useParams } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
+import { ReadFailure } from '@/presentation/app-shell/read-failure';
+import catalogIcon from '@/presentation/assets/icons/catalog-24.svg';
 import {
-  catalogStamp,
-  findProduct,
-  type Dish,
-} from '@/presentation/placeholder-catalog';
-import { ButtonLink } from '@/presentation/ui/actions';
+  useReadModel,
+  useRestaurantData,
+  useRestaurantRead,
+} from '@/presentation/session/hooks';
+import { ButtonLink, TextLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
 import { CardFooter, SplitCard, SplitCardBody } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
+import { StateCard } from '@/presentation/ui/states';
 import { DataTable, Td, Th } from '@/presentation/ui/table';
 import { rem } from '@/presentation/ui/units';
+import { formatStamp, zoneLabel } from '@/presentation/ui/zones';
+import { recipeRows } from './catalog-rows';
 
 const bareTh = { bg: 'transparent' } as const;
 
@@ -20,8 +25,48 @@ const bareTh = { bg: 'transparent' } as const;
 // On 390 the fields, the recipe list and the footer are separate blocks.
 export function DishPage() {
   const path = useRestaurantPath();
-  const dish = useLoaderData<Dish>();
-  const recipe = dish.recipe ?? [];
+  const data = useRestaurantData();
+  const { dish: dishID = '' } = useParams();
+  const model = data.dish(dishID);
+  const { snapshot, failure } = useRestaurantRead(model);
+  const productList = useReadModel(data.products()).value;
+  const value = snapshot.value;
+  if (value === undefined) {
+    if (failure === undefined) return null;
+    if (
+      (failure.kind === 'unavailable' || failure.kind === 'error') &&
+      failure.failure.code === 'NotFound'
+    ) {
+      return (
+        <StateCard
+          icon={catalogIcon}
+          title="Блюдо не найдено"
+          actions={
+            <TextLink to={path('/catalog/dishes')}>К списку блюд</TextLink>
+          }
+        >
+          Такого блюда нет в каталоге этого ресторана.
+        </StateCard>
+      );
+    }
+    return (
+      <ReadFailure
+        failure={failure}
+        section="Справочники"
+        title="Не удалось получить блюдо"
+        onRetry={() => {
+          model.refresh();
+        }}
+      >
+        Рецептура сейчас недоступна. Повторите чтение; определение блюда не
+        меняется, пока вы ждёте.
+      </ReadFailure>
+    );
+  }
+  const dish = value.result.dish;
+  const { timeZone } = value.context.settings;
+  const epochMs = value.result.evaluatedAt.epochMs;
+  const recipe = recipeRows(dish, productList?.result.items ?? []);
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <Stack gap={{ base: '4', sm: '6' }}>
@@ -47,15 +92,15 @@ export function DishPage() {
               <Box w={{ sm: rem(360) }}>
                 <ReadOnlyValue
                   label="Код блюда"
-                  value={dish.code}
+                  value={dish.dishID}
                   note="Постоянный, не изменяется"
                 />
               </Box>
               <Box w={{ sm: rem(360) }}>
                 <ReadOnlyValue
                   label="Справочник на"
-                  value={catalogStamp}
-                  note="Москва, UTC+3"
+                  value={formatStamp(epochMs, timeZone)}
+                  note={zoneLabel(timeZone, epochMs)}
                 />
               </Box>
             </Flex>
@@ -100,44 +145,41 @@ export function DishPage() {
                   </tr>
                 </chakra.thead>
                 <tbody>
-                  {recipe.map((line, index) => {
-                    const product = findProduct(line.product);
-                    return (
-                      <chakra.tr
-                        key={line.product}
-                        gridTemplateAreas="'number name quantity' 'number code quantity'"
-                        gridTemplateColumns="auto 1fr auto"
-                        alignItems="start"
+                  {recipe.map((line) => (
+                    <chakra.tr
+                      key={line.code}
+                      gridTemplateAreas="'number name quantity' 'number code quantity'"
+                      gridTemplateColumns="auto 1fr auto"
+                      alignItems="start"
+                    >
+                      <Td gridArea="number" pr="0" color="text.secondary">
+                        {line.no}
+                      </Td>
+                      <Td gridArea="name">{line.name}</Td>
+                      <Td
+                        gridArea="code"
+                        textStyle="mono.default"
+                        color="text.secondary"
                       >
-                        <Td gridArea="number" pr="0" color="text.secondary">
-                          {index + 1}
-                        </Td>
-                        <Td gridArea="name">{product?.name}</Td>
-                        <Td
-                          gridArea="code"
-                          textStyle="mono.default"
-                          color="text.secondary"
+                        <Text
+                          as="span"
+                          display={{ sm: 'none' }}
+                          textStyle="caption.default"
                         >
-                          <Text
-                            as="span"
-                            display={{ sm: 'none' }}
-                            textStyle="caption.default"
-                          >
-                            Код{' '}
-                          </Text>
-                          {line.product}
-                        </Td>
-                        <Td
-                          gridArea="quantity"
-                          textStyle="mono.body"
-                          textAlign="end"
-                          whiteSpace="nowrap"
-                        >
-                          {`${line.quantity} ${product?.unit ?? ''}`}
-                        </Td>
-                      </chakra.tr>
-                    );
-                  })}
+                          Код{' '}
+                        </Text>
+                        {line.code}
+                      </Td>
+                      <Td
+                        gridArea="quantity"
+                        textStyle="mono.body"
+                        textAlign="end"
+                        whiteSpace="nowrap"
+                      >
+                        {line.quantity}
+                      </Td>
+                    </chakra.tr>
+                  ))}
                 </tbody>
               </DataTable>
             </Box>

@@ -11,10 +11,13 @@ import {
   NOW,
   R,
   activeSession,
+  failedRead,
   fakeServices,
   h1,
   hrefs,
+  instantOf,
   labels,
+  loaded,
   readyAccess,
   redirectOf,
   renderRoute,
@@ -22,6 +25,44 @@ import {
   sampleRestaurant,
   text,
 } from './support/render-route.mjs';
+
+const evaluatedAt = instantOf('2026-10-14T10:00:00+03:00');
+const productItems = [
+  { productID: '132', name: 'Яйцо', baseUnit: 'pcs' },
+  { productID: '130', name: 'Филе лосося', baseUnit: 'g' },
+  { productID: '121', name: 'Сливки 33%', baseUnit: 'ml' },
+];
+const sampleDish = {
+  dishID: '206',
+  name: 'Паста с лососем и шпинатом',
+  ingredients: [
+    { productID: '130', quantity: '120000', baseUnit: 'g' },
+    { productID: '121', quantity: '50000', baseUnit: 'ml' },
+    { productID: '124', quantity: '500', baseUnit: 'g' },
+  ],
+};
+const catalogProducts = loaded({
+  evaluatedAt,
+  stateVersion: '1',
+  items: productItems,
+});
+const catalogDishes = loaded({
+  evaluatedAt,
+  stateVersion: '1',
+  items: [sampleDish, { dishID: '201', name: 'Борщ', ingredients: [] }],
+});
+const catalogDish = loaded({
+  evaluatedAt,
+  stateVersion: '1',
+  dish: sampleDish,
+});
+const catalogData = {
+  data: {
+    products: catalogProducts,
+    dishCatalog: catalogDishes,
+    dish: catalogDish,
+  },
+};
 
 const guest = { session: { status: 'anonymous', expired: false } };
 
@@ -60,9 +101,14 @@ const pages = [
     'Приём поставки',
     ['Номер поставки', 'Дата и время создания поставки (Москва, UTC+3)'],
   ],
-  [`/app/r/${R}/catalog`, 'Справочники', []],
-  [`/app/r/${R}/catalog/dishes`, 'Справочники', []],
-  [`/app/r/${R}/catalog/dishes/206`, 'Паста с лососем и шпинатом', []],
+  [`/app/r/${R}/catalog`, 'Справочники', [], catalogData],
+  [`/app/r/${R}/catalog/dishes`, 'Справочники', [], catalogData],
+  [
+    `/app/r/${R}/catalog/dishes/206`,
+    'Паста с лососем и шпинатом',
+    [],
+    catalogData,
+  ],
   [
     `/app/r/${R}/catalog/products/new`,
     'Новый продукт',
@@ -168,14 +214,23 @@ test('internal links lead to existing pages', async () => {
   const checked = new Set();
   for (const source of sources)
     for (const href of hrefs(
-      await renderRoute(source, source === '/login' ? guest : {}),
+      await renderRoute(
+        source,
+        source === '/login'
+          ? guest
+          : source.includes('/catalog')
+            ? catalogData
+            : {},
+      ),
     )) {
       if (!href.startsWith('/') || href.startsWith('//')) continue;
       const path = href.split('#')[0] || '/';
       if (checked.has(path)) continue;
       checked.add(path);
       assert.notEqual(
-        h1(await renderRoute(path)),
+        h1(
+          await renderRoute(path, path.includes('/catalog') ? catalogData : {}),
+        ),
         'Страница не найдена',
         `${source} → ${href}`,
       );
@@ -363,21 +418,23 @@ test('outside a restaurant the menu marks no restaurant current', async () => {
   }
 });
 
-test('the catalog lists the sample products and dishes', async () => {
-  const productsHtml = await renderRoute(`/app/r/${R}/catalog`);
-  assert.ok(productsHtml.includes('Яйцо куриное'));
+test('the catalog lists the products and dishes of the restaurant', async () => {
+  const productsHtml = await renderRoute(`/app/r/${R}/catalog`, catalogData);
+  assert.ok(productsHtml.includes('Филе лосося'));
   assert.ok(hrefs(productsHtml).includes(`/app/r/${R}/catalog/products/new`));
-  const dishesHtml = await renderRoute(`/app/r/${R}/catalog/dishes`);
+  const dishesHtml = await renderRoute(
+    `/app/r/${R}/catalog/dishes`,
+    catalogData,
+  );
   assert.ok(hrefs(dishesHtml).includes(`/app/r/${R}/catalog/dishes/206`));
-  assert.ok(!hrefs(dishesHtml).includes(`/app/r/${R}/catalog/dishes/201`));
+  assert.ok(hrefs(dishesHtml).includes(`/app/r/${R}/catalog/dishes/201`));
 });
 
-test('dish pages exist only for sample recipes', async () => {
-  for (const path of [
-    `/app/r/${R}/catalog/dishes/201`,
-    `/app/r/${R}/catalog/dishes/999`,
-  ])
-    assert.equal(h1(await renderRoute(path)), notFound, path);
+test('a dish the catalog does not have shows «Блюдо не найдено»', async () => {
+  const html = await renderRoute(`/app/r/${R}/catalog/dishes/999`, {
+    data: { dish: failedRead('NotFound', 404) },
+  });
+  assert.ok(text(html).includes('Блюдо не найдено'));
 });
 
 test('section pages keep their sidebar item current', async () => {
