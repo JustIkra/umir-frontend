@@ -92,8 +92,8 @@ export function DocumentFooter() {
       borderColor="border.default"
     >
       <Text textStyle="caption.default" color="text.secondary">
-        © 2026 «Ровный ход» — веб-сервис для единого учёта складской логистики
-        организации.
+        © 2026 «Ровный ход» — склад, меню и заказы ваших ресторанов в одном
+        месте.
       </Text>
       <chakra.nav aria-label="Документы">
         <Stack
