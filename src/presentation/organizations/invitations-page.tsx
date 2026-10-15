@@ -98,6 +98,12 @@ function InvitationsLoaded({
   const resending = (id: string) => commands.isPending(orgKeys.resendLink(id));
   const cancelling = (id: string) =>
     commands.isPending(orgKeys.cancelInvitation(id));
+  // The unknown outcome is shown for a lost answer only; a request on its way
+  // just locks the row.
+  const resendUnknown = (id: string) =>
+    commands.isUnsettled(orgKeys.resendLink(id));
+  const cancelUnknown = (id: string) =>
+    commands.isUnsettled(orgKeys.cancelInvitation(id));
 
   const resend = async (row: InvitationRow) => {
     const { email, invitationID } = row.invitation;
@@ -143,7 +149,7 @@ function InvitationsLoaded({
         </FormMessage>
       )}
       {rows
-        .filter((row) => resending(row.invitation.invitationID))
+        .filter((row) => resendUnknown(row.invitation.invitationID))
         .map((row) => (
           <UnknownOutcomeAlert
             key={`resend-${row.invitation.invitationID}`}
@@ -156,7 +162,7 @@ function InvitationsLoaded({
           </UnknownOutcomeAlert>
         ))}
       {rows
-        .filter((row) => cancelling(row.invitation.invitationID))
+        .filter((row) => cancelUnknown(row.invitation.invitationID))
         .map((row) => (
           <UnknownOutcomeAlert
             key={`cancel-${row.invitation.invitationID}`}

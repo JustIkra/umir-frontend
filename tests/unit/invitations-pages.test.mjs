@@ -660,6 +660,36 @@ test('a resend without a known outcome is checked from the list', async () => {
   assert.match(page, /Проверить результат/);
 });
 
+test('a resend that is merely in flight does not show the unknown outcome', async () => {
+  const html = await renderRoute(
+    listPath,
+    withInvitations([lebedeva], {
+      inFlight: new Set([orgKeys.resendLink(INVITATION)]),
+    }),
+  );
+  const page = text(html);
+  assert.ok(!page.includes('Результат повторной отправки неизвестен'));
+  assert.ok(!html.includes('role="alert"'));
+  // The row stays locked while the request is on its way.
+  assert.match(
+    /<button[^>]*disabled[^>]*>\s*Отправить ссылку повторно/.exec(html)?.[0] ??
+      '',
+    /disabled/,
+  );
+});
+
+test('a cancellation that is merely in flight does not show the unknown outcome', async () => {
+  const page = text(
+    await renderRoute(
+      listPath,
+      withInvitations([lebedeva], {
+        inFlight: new Set([orgKeys.cancelInvitation(INVITATION)]),
+      }),
+    ),
+  );
+  assert.ok(!page.includes('Результат отмены неизвестен'));
+});
+
 test('a cancellation without a known outcome is checked from the list', async () => {
   const page = text(
     await renderRoute(

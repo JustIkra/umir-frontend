@@ -965,3 +965,29 @@ test('a refusal of an unsent step on the check is returned and the list is read 
     kind: 'unchanged',
   });
 });
+
+test('isUnsettled: in flight is not unsettled, an unknown answer is, a settled command is not', async () => {
+  const { organizations, commands } = setup();
+  const key = orgKeys.resendLink(INVITATION);
+  const resolvers = [];
+  const slow = () =>
+    new Promise((resolve, reject) => {
+      resolvers.push({ resolve, reject });
+    });
+  assert.equal(organizations.isUnsettled(key), false);
+  const running = commands.run({ key, label: 'x', execute: slow });
+  // The request is on its way: locked, but its outcome is not unknown.
+  assert.equal(organizations.isPending(key), true);
+  assert.equal(organizations.isUnsettled(key), false);
+  resolvers[0].reject(refusal(504, 'UpstreamTimeout', 'unknown'));
+  assert.equal((await running).kind, 'unknown');
+  assert.equal(organizations.isPending(key), true);
+  assert.equal(organizations.isUnsettled(key), true);
+  // The check is on its way again.
+  const checking = commands.retry(key);
+  assert.equal(organizations.isUnsettled(key), false);
+  resolvers[1].resolve('ok');
+  await checking;
+  assert.equal(organizations.isPending(key), false);
+  assert.equal(organizations.isUnsettled(key), false);
+});

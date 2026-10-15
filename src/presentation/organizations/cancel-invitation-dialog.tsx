@@ -56,13 +56,13 @@ export function CancelInvitationDialog({
     };
   }, [dialogRef]);
 
-  const pending = commands.isPending(orgKeys.cancelInvitation(invitationID));
+  const unknown = commands.isUnsettled(orgKeys.cancelInvitation(invitationID));
   // A closed invitation is told apart by the list read again: accepted is
   // CX03, anything else is not valid any more.
   const state: CancelState =
     stored.kind === 'cancelling'
       ? stored
-      : pending
+      : unknown
         ? { kind: 'unknown' }
         : stored.kind === 'closed' && row?.invitation.state === 'accepted'
           ? { kind: 'accepted' }

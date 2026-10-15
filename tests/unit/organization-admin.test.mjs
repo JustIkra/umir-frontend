@@ -271,6 +271,19 @@ test('a deletion of a restaurant without a known outcome is shown in its row', a
   assert.equal(page.match(/Проверить результат/g)?.length, 1);
 });
 
+test('a deletion of a restaurant that is merely in flight is not an unknown outcome', async () => {
+  const page = text(
+    await renderRoute(restaurantsPath, {
+      access,
+      organizations: {
+        inFlight: new Set([orgKeys.deleteRestaurant(BEREGOVAYA)]),
+      },
+    }),
+  );
+  assert.ok(!page.includes('Результат удаления неизвестен'));
+  assert.ok(!page.includes('Проверить результат'));
+});
+
 test('the profile has a section to delete the organization', async () => {
   const html = await renderRoute(profilePath, {
     access,
@@ -305,6 +318,19 @@ test('a deletion of the organization without a known outcome is shown in the pro
   );
   assert.match(page, /Результат удаления неизвестен/);
   assert.match(page, /Проверить результат/);
+});
+
+test('a deletion of the organization that is merely in flight is not an unknown outcome', async () => {
+  const page = text(
+    await renderRoute(profilePath, {
+      access,
+      organizations: {
+        profile: organizationProfile(),
+        inFlight: new Set([orgKeys.deleteOrganization(ORG)]),
+      },
+    }),
+  );
+  assert.ok(!page.includes('Результат удаления неизвестен'));
 });
 
 const deletion = (status, name = 'Северная сеть') => ({

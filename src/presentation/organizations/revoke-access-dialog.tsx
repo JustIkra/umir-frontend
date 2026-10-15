@@ -66,7 +66,7 @@ export function RevokeAccessDialog({
   const state: RevokeState =
     stored.kind === 'revoking'
       ? stored
-      : commands.isPending(orgKeys.revokeMembership(membershipID))
+      : commands.isUnsettled(orgKeys.revokeMembership(membershipID))
         ? { kind: 'unknown' }
         : stored.kind === 'changed' && !present
           ? { kind: 'already' }

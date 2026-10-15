@@ -63,7 +63,7 @@ function RestaurantRow({
       ? stalledPreparation(operations, restaurant)
       : undefined;
   const roles = rolesOf(restaurant, admin);
-  const unsettled = commands.isPending(
+  const unsettled = commands.isUnsettled(
     orgKeys.deleteRestaurant(restaurant.restaurantID),
   );
   const deleteState =

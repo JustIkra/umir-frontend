@@ -147,7 +147,7 @@ function DeletionSection({ profile }: { profile: OrganizationProfile }) {
     void navigate('/app/organizations');
   };
   const { stored, run } = useOrganizationDeletion(orgID, name, leave);
-  const unsettled = commands.isPending(orgKeys.deleteOrganization(orgID));
+  const unsettled = commands.isUnsettled(orgKeys.deleteOrganization(orgID));
   const state =
     stored.kind === 'deleting' || stored.kind === 'done'
       ? stored
@@ -217,7 +217,7 @@ function ProfileSections({ profile }: { profile: OrganizationProfile }) {
   const state: ZoneState =
     stored.kind === 'saving'
       ? stored
-      : commands.isPending(key)
+      : commands.isUnsettled(key)
         ? { kind: 'unknown' }
         : stored.kind === 'idle' && differs
           ? { kind: 'changed' }

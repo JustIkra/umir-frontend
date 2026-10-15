@@ -201,8 +201,13 @@ export interface OrganizationCommands {
   // The input of the invitation that has no known outcome, per organization:
   // «Проверить результат» resends the attempt that was sent with it.
   pendingInvite(orgID: string): InviteInput | undefined;
-  // True while a command of that key has no known outcome.
+  // True while a command of that key has no known outcome, or its request is
+  // still on its way. It locks the fields of the action.
   isPending(key: string): boolean;
+  // True while the outcome of that key is unknown and no request is on its way:
+  // the answer was lost, so the screen offers «Проверить результат». A request
+  // merely in flight is the sending state, not an unknown outcome.
+  isUnsettled(key: string): boolean;
   // The input of the creation that has no known outcome: the attempt that is
   // checked is the one sent with it, whatever a screen holds now.
   pendingOrganization(): NewOrganization | undefined;
@@ -317,6 +322,9 @@ export function createOrganizationCommands({
 
   const isPending = (key: string) =>
     commands.getSnapshot().some((attempt) => attempt.key === key);
+
+  const isUnsettled = (key: string) =>
+    isPending(key) && !commands.isInFlight(key);
 
   // What the attempt of a key was sent with, while it has no known outcome.
   // A call made meanwhile resends that attempt, so it is the name of the
@@ -671,6 +679,7 @@ export function createOrganizationCommands({
       return result;
     },
     isPending,
+    isUnsettled,
     pendingInvite: (orgID) =>
       isPending(orgKeys.invite(orgID)) ? invites.get(orgID) : undefined,
     pendingOrganization: () =>

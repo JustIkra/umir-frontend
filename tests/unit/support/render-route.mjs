@@ -270,7 +270,7 @@ export const inviteSnapshot = (overrides = {}) => ({
 // commands. organizations carries the snapshots of the organization models
 // (members, invitations, profile; loading by default), operations (the
 // followed preparations and deletions), pending (command keys without a known
-// outcome; pendingOrganization and pendingRestaurantName are the inputs of
+// outcome, none on its way; inFlight is the keys whose request is on its way; pendingOrganization and pendingRestaurantName are the inputs of
 // their attempts) and commands (replacements of command methods; pendingMembership is the remembered membership change; pendingInvite the remembered invitation input).
 export function fakeServices({
   session = activeSession,
@@ -353,7 +353,10 @@ export function fakeServices({
         resendLink: done,
         cancelInvitation: done,
         pendingInvite: () => organizations.pendingInvite,
-        isPending: (key) => (organizations.pending ?? new Set()).has(key),
+        isPending: (key) =>
+          (organizations.pending ?? new Set()).has(key) ||
+          (organizations.inFlight ?? new Set()).has(key),
+        isUnsettled: (key) => (organizations.pending ?? new Set()).has(key),
         pendingOrganization: () => organizations.pendingOrganization,
         pendingRestaurantName: () => organizations.pendingRestaurantName,
         ...organizations.commands,
@@ -411,6 +414,7 @@ export function fakeServices({
       ...store(attempts),
       run: () => Promise.reject(new Error('no commands')),
       retry: () => undefined,
+      isInFlight: () => false,
       discard: () => {},
       clear: () => {},
     },
