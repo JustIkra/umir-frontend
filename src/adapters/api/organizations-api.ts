@@ -40,25 +40,24 @@ export function createOrganizationsApi(
   client: Pick<GatewayClient, 'read' | 'send'>,
 ): OrganizationsApi {
   return {
-    async members(orgID, state, { cursor, background }) {
+    async members(orgID, state, { cursor, ...options }) {
       return readMembers(
-        await client.read(`${orgPath(orgID)}/members${query(state, cursor)}`, {
-          background,
-        }),
-      );
-    },
-    async invitations(orgID, state, { cursor, background }) {
-      return readInvitations(
         await client.read(
-          `${orgPath(orgID)}/invitations${query(state, cursor)}`,
-          { background },
+          `${orgPath(orgID)}/members${query(state, cursor)}`,
+          options,
         ),
       );
     },
-    async organization(orgID, { background }) {
-      return readOrganization(
-        await client.read(orgPath(orgID), { background }),
+    async invitations(orgID, state, { cursor, ...options }) {
+      return readInvitations(
+        await client.read(
+          `${orgPath(orgID)}/invitations${query(state, cursor)}`,
+          options,
+        ),
       );
+    },
+    async organization(orgID, options) {
+      return readOrganization(await client.read(orgPath(orgID), options));
     },
     async createOrganization(input, commandID) {
       const body: components['schemas']['CreateOrganization'] = {

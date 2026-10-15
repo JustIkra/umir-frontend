@@ -513,3 +513,27 @@ test('a read answer that is not the contract is unavailable', async () => {
     failsWith('Malformed', 'unavailable'),
   );
 });
+
+test('organization HTTP reads retain their cancellation signal', async () => {
+  for (const kind of ['members', 'invitations', 'organization']) {
+    const fake = client(
+      kind === 'organization' ? organization : { context, items: [] },
+    );
+    const api = createOrganizationsApi(fake);
+    const controller = new AbortController();
+    if (kind === 'organization')
+      await api.organization(ORG, {
+        background: true,
+        signal: controller.signal,
+      });
+    else
+      await api[kind](ORG, 'all', {
+        cursor: undefined,
+        background: true,
+        signal: controller.signal,
+      });
+    assert.equal(fake.calls[0][2].signal, controller.signal);
+    controller.abort();
+    assert.equal(fake.calls[0][2].signal.aborted, true);
+  }
+});

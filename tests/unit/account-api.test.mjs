@@ -158,3 +158,24 @@ test('logoutAll() leaves the outcome unknown for an answer off the schema', asyn
       error.failure.code === 'Malformed' && error.failure.outcome === 'unknown',
   );
 });
+
+for (const [input, expected] of [
+  ['  Ma\u0301x@GMAIL.COM  ', 'Máx@gmail.com'],
+  ['Max@gmail.com', 'Max@gmail.com'],
+  ['Max@İ.INVALID', 'Max@i.invalid'],
+  ['Max@ΟΣ.INVALID', 'Max@οσ.invalid'],
+  ['foo..bar@EXAMPLE.COM', 'foo..bar@example.com'],
+  ['admin', 'admin'],
+  ['  admin  ', '  admin  '],
+  ['not@a-domain', 'not@a-domain'],
+]) {
+  test(`email-like sign-in canonicalizes ${JSON.stringify(input)} without changing other logins`, async () => {
+    const fake = client();
+    await createAccountApi(fake).signIn(
+      { login: input, password: ' pass word ', rememberMe: false },
+      'canonical-login',
+    );
+    assert.equal(fake.calls[0][3].body.login, expected);
+    assert.equal(fake.calls[0][3].body.password, ' pass word ');
+  });
+}

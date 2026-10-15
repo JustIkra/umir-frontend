@@ -21,7 +21,12 @@ function fakeApi() {
     calls,
     api: {
       members: (orgID, state, query) => {
-        calls.push(['members', orgID, state, query]);
+        calls.push([
+          'members',
+          orgID,
+          state,
+          { cursor: query.cursor, background: query.background },
+        ]);
         return Promise.resolve(
           query.cursor === undefined
             ? { context, items: ['m1'], nextCursor: 'c1' }
@@ -29,7 +34,12 @@ function fakeApi() {
         );
       },
       invitations: (orgID, state, query) => {
-        calls.push(['invitations', orgID, state, query]);
+        calls.push([
+          'invitations',
+          orgID,
+          state,
+          { cursor: query.cursor, background: query.background },
+        ]);
         return Promise.resolve({
           context,
           items: ['i1'],
@@ -37,7 +47,7 @@ function fakeApi() {
         });
       },
       organization: (orgID, query) => {
-        calls.push(['organization', orgID, query]);
+        calls.push(['organization', orgID, { background: query.background }]);
         return Promise.resolve({ orgID, name: 'Сеть' });
       },
     },
@@ -132,4 +142,73 @@ test('clear() forgets every model', () => {
   assert.notEqual(set.members(A), before[0]);
   assert.notEqual(set.invitations(A), before[1]);
   assert.notEqual(set.profile(A), before[2]);
+});
+
+test('clearing every organization read aborts it and ignores a late answer', async () => {
+  for (const kind of ['members', 'invitations', 'profile']) {
+    const controllers = [];
+    const pending = [];
+    const delayed = (...args) =>
+      new Promise((resolve) => pending.push({ args, resolve }));
+    const set = createOrganizationReads({
+      api: { members: delayed, invitations: delayed, organization: delayed },
+      now: () => 7000,
+      createCancellation: () => {
+        const controller = new AbortController();
+        controllers.push(controller);
+        return controller;
+      },
+    });
+    const old = set[kind](A);
+    let notifications = 0;
+    old.subscribe(() => notifications++);
+    assert.equal(pending.length, 1);
+    const query = pending[0].args.at(-1);
+    assert.equal(query.signal, controllers[0].signal);
+    set.clear();
+    const afterClear = notifications;
+    assert.equal(controllers[0].signal.aborted, true);
+    const next = set[kind](A);
+    next.subscribe(() => undefined);
+    const stale =
+      kind === 'profile'
+        ? { orgID: A, name: 'Old account' }
+        : { context, items: ['old'], nextCursor: undefined };
+    const current =
+      kind === 'profile'
+        ? { orgID: A, name: 'New account' }
+        : { context, items: ['new'], nextCursor: undefined };
+    pending[0].resolve(stale);
+    await settled();
+    assert.equal(old.getSnapshot().value, undefined);
+    assert.equal(next.getSnapshot().value, undefined);
+    assert.equal(notifications, afterClear);
+    pending[1].resolve(current);
+    await settled();
+    if (kind === 'profile')
+      assert.equal(next.getSnapshot().value.name, 'New account');
+    else assert.deepEqual(next.getSnapshot().value.items, ['new']);
+  }
+});
+
+test('a cancelled member capture does not request another page after a late response', async () => {
+  let resolve;
+  const calls = [];
+  const set = createOrganizationReads({
+    api: {
+      members: (...args) => {
+        calls.push(args);
+        return new Promise((done) => {
+          resolve = done;
+        });
+      },
+    },
+    now: () => 7000,
+    createCancellation: () => new AbortController(),
+  });
+  set.members(A).subscribe(() => undefined);
+  set.clear();
+  resolve({ context, items: ['old'], nextCursor: 'old-next-page' });
+  await settled();
+  assert.equal(calls.length, 1);
 });

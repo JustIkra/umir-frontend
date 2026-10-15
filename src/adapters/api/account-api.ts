@@ -1,3 +1,4 @@
+import { normalizedLogin } from '@/application/credentials';
 import type { AccountApi } from '@/application/account';
 import type { GatewayClient } from '@/adapters/http/gateway-client';
 import type { components } from './backend-v2';
@@ -24,7 +25,7 @@ export function createAccountApi(
     async signIn({ login, password, rememberMe }, commandID) {
       // The password goes as typed: never trimmed or normalized.
       const body: components['schemas']['LoginRequestV2'] = {
-        login,
+        login: normalizedLogin(login),
         password,
         rememberMe,
         commandID,

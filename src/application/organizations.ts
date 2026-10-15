@@ -1,4 +1,5 @@
 import { ApiError, localFailure, type Instant, type Settings } from './api';
+import type { LoadOptions } from './read-model';
 import type {
   OrgLifecycle,
   RestaurantLifecycle,
@@ -154,9 +155,8 @@ export interface MembershipUpdate {
 export type MemberFilter = 'active' | 'revoked' | 'all';
 export type InvitationFilter = InvitationState | 'all';
 
-export interface PageQuery {
+export interface PageQuery extends LoadOptions {
   readonly cursor: string | undefined;
-  readonly background: boolean;
 }
 
 // Each call rejects with ApiError. The reads page by an opaque cursor; the
@@ -173,10 +173,7 @@ export interface OrganizationsApi {
     query: PageQuery,
   ): Promise<Page<InvitationRow>>;
   // GET /api/v2/orgs/{orgID}: the name, the zone and its settingsVersion.
-  organization(
-    orgID: string,
-    query: { readonly background: boolean },
-  ): Promise<OrganizationProfile>;
+  organization(orgID: string, query: LoadOptions): Promise<OrganizationProfile>;
   createOrganization(
     input: NewOrganization,
     commandID: string,

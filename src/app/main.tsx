@@ -211,6 +211,8 @@ const session = createSessionStore({
   onExpired: () => {
     live.stop();
     models.clear();
+    organizationReads.clear();
+    lifecycles.clear();
     access.clear();
     client.clearCsrfToken();
   },

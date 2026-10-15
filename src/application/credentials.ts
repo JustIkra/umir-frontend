@@ -42,3 +42,15 @@ export function emailProblem(email: string): 'required' | 'format' | undefined {
   if (email === '') return 'required';
   return emailPattern.test(email) ? undefined : 'format';
 }
+
+export function normalizedLogin(input: string): string {
+  const value = input.trim().normalize('NFC');
+  if (!emailPattern.test(value)) return input;
+  const at = value.lastIndexOf('@');
+  const domain = value
+    .slice(at + 1)
+    .replace(/./gsu, (letter) =>
+      letter === '\u0130' ? 'i' : letter.toLowerCase(),
+    );
+  return `${value.slice(0, at)}@${domain}`;
+}

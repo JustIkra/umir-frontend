@@ -60,22 +60,27 @@ export function createOrganizationReads({
 
   return {
     members: (orgID) =>
-      cached(members, orgID, ({ background }) =>
-        collectPages((cursor) =>
-          api.members(orgID, 'active', { cursor, background }),
-        ),
+      cached(members, orgID, ({ background, signal }) =>
+        collectPages((cursor) => {
+          signal?.throwIfAborted();
+          return api.members(orgID, 'active', { cursor, background, signal });
+        }),
       ),
     invitations: (orgID) =>
-      cached(invitations, orgID, ({ background }) =>
-        collectPages((cursor) =>
-          api.invitations(orgID, 'all', { cursor, background }),
-        ),
+      cached(invitations, orgID, ({ background, signal }) =>
+        collectPages((cursor) => {
+          signal?.throwIfAborted();
+          return api.invitations(orgID, 'all', { cursor, background, signal });
+        }),
       ),
     profile: (orgID) =>
-      cached(profiles, orgID, ({ background }) =>
-        api.organization(orgID, { background }),
+      cached(profiles, orgID, ({ background, signal }) =>
+        api.organization(orgID, { background, signal }),
       ),
     clear() {
+      for (const model of members.values()) model.dispose();
+      for (const model of invitations.values()) model.dispose();
+      for (const model of profiles.values()) model.dispose();
       members.clear();
       invitations.clear();
       profiles.clear();

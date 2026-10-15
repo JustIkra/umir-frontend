@@ -9,22 +9,6 @@ const emailChallengesPath = '/api/v2/email-challenges';
 const challengePath = (challengeID: string) =>
   `/api/v2/challenges/${encodeURIComponent(challengeID)}`;
 
-// Proposal umir-factory#14: the generated types do not know the purpose
-// «registration» yet. Replace these two bodies with the generated types once
-// the contract is fixed.
-type RegistrationBegin = Omit<
-  components['schemas']['EmailChallengeBegin'],
-  'purpose'
-> & { readonly purpose: 'registration' };
-type RegistrationComplete = Omit<
-  components['schemas']['EmailChallengeComplete'],
-  'purpose' | 'newPassword' | 'rememberMe'
-> & {
-  readonly purpose: 'registration';
-  readonly displayName: string;
-  readonly password: string;
-};
-
 // A command's answer that is not the contract's leaves its outcome unknown.
 const issued = decoded((body) => decodeChallenge(body), 'unknown');
 const verified = decoded(decodeVerifiedChallenge, 'unknown');
@@ -38,7 +22,7 @@ export function createRegistrationApi(
 ): RegistrationApi {
   return {
     async begin(email, commandID) {
-      const body: RegistrationBegin = {
+      const body: components['schemas']['EmailChallengeBegin'] = {
         commandID,
         email,
         purpose: 'registration',
@@ -66,7 +50,7 @@ export function createRegistrationApi(
       );
     },
     async complete({ challengeID, proof, displayName, password }, commandID) {
-      const body: RegistrationComplete = {
+      const body: components['schemas']['EmailChallengeComplete'] = {
         commandID,
         challengeID,
         proof,
