@@ -100,6 +100,89 @@ export const loadingRead = {
   failure: undefined,
 };
 
+// A snapshot of an organization model: the value is the model's own value
+// (a member list, an invitation list or a profile), not a business envelope.
+export const loadedValue = (value) => ({
+  value,
+  loadedAt: NOW,
+  loading: false,
+  failed: false,
+  failure: undefined,
+});
+
+const authContext = {
+  orgID: ORG,
+  readerEpoch: '1',
+  aggregateRevision: '1',
+  evaluatedAt: instantOf('2026-10-14T10:00:00+03:00'),
+};
+
+export const memberList = (items = []) =>
+  loadedValue({ context: authContext, items });
+
+export const invitationList = (items = []) =>
+  loadedValue({ context: authContext, items });
+
+export const organizationProfile = (overrides = {}) =>
+  loadedValue({
+    orgID: ORG,
+    name: 'Северная сеть',
+    settings: { timeZone: 'Europe/Moscow', settingsVersion: '1' },
+    lifecycle: 'active',
+    lifecycleVersion: '1',
+    ...overrides,
+  });
+
+export const MEMBER = '55555555-5555-4555-8555-555555555555';
+export const MEMBERSHIP = '66666666-6666-4666-8666-666666666666';
+export const INVITATION = '77777777-7777-4777-8777-777777777777';
+
+export const sampleMember = (overrides = {}) => {
+  const { membership, ...rest } = overrides;
+  return {
+    membership: {
+      membershipID: MEMBERSHIP,
+      membershipVersion: '3',
+      userID: MEMBER,
+      orgID: ORG,
+      orgRoles: [],
+      assignments: [
+        {
+          restaurantID: R,
+          assignmentID: '88888888-8888-4888-8888-888888888888',
+          assignmentVersion: '2',
+          roles: ['Warehouse'],
+        },
+      ],
+      state: 'active',
+      ...membership,
+    },
+    displayName: 'Анна Смирнова',
+    email: 'a.smirnova@example.test',
+    ...rest,
+  };
+};
+
+export const sampleInvitationRow = (overrides = {}) => {
+  const { invitation, ...rest } = overrides;
+  return {
+    invitation: {
+      invitationID: INVITATION,
+      orgID: ORG,
+      email: 'i.petrov@example.test',
+      assignments: [{ restaurantID: R, roles: ['Waiter'] }],
+      expiresAt: instantOf('2026-10-20T10:00:00+03:00'),
+      resendAvailableAt: instantOf('2026-10-14T10:05:00+03:00'),
+      state: 'pending',
+      version: '1',
+      ...invitation,
+    },
+    linkDelivery: undefined,
+    resendAllowed: true,
+    ...rest,
+  };
+};
+
 export const failedRead = (code, status, outcome = 'unavailable') => ({
   value: undefined,
   loadedAt: undefined,
@@ -144,6 +227,8 @@ const withPermissions = (state, permissions) =>
         })),
       };
 
+const done = () => Promise.resolve({ kind: 'done', value: undefined });
+
 const staticModel = (snapshot) => ({
   subscribe: () => () => {},
   getSnapshot: () => snapshot,
@@ -165,7 +250,10 @@ export const resetSnapshot = (overrides = {}) => ({
 // answers refreshed; accessCalls counts the reads of access; notice is the
 // «Данные обновились» notice of models; data.stockReport is keyed by
 // riskHours; writeoff overrides confirm, check and pending of the write-off
-// commands.
+// commands. organizations carries the snapshots of the organization models
+// (members, invitations, profile; loading by default), operations (the
+// followed preparations and deletions), pending (command keys without a known
+// outcome) and commands (replacements of command methods).
 export function fakeServices({
   session = activeSession,
   access: givenAccess = readyAccess(),
@@ -183,6 +271,7 @@ export function fakeServices({
   order = orderSnapshot(),
   writeoff = {},
   delivery = deliverySnapshot(),
+  organizations = {},
 } = {}) {
   const access = withPermissions(givenAccess, permissions);
   const refreshed = withPermissions(givenRefreshed, permissions);
@@ -208,6 +297,37 @@ export function fakeServices({
         Promise.reject(new Error('no password in render tests')),
       refreshProfile: () => Promise.resolve(true),
       signInToCheck: () => Promise.resolve('done'),
+    },
+    organizations: {
+      reads: {
+        members: () => staticModel(organizations.members ?? loadingRead),
+        invitations: () =>
+          staticModel(organizations.invitations ?? loadingRead),
+        profile: () => staticModel(organizations.profile ?? loadingRead),
+        clear() {},
+      },
+      commands: {
+        createOrganization: done,
+        addRestaurant: done,
+        deleteRestaurant: done,
+        deleteOrganization: done,
+        setTimeZone: done,
+        saveAssignments: done,
+        setAdmin: done,
+        revokeMember: done,
+        invite: done,
+        resendLink: done,
+        cancelInvitation: done,
+        isPending: (key) => (organizations.pending ?? new Set()).has(key),
+        ...organizations.commands,
+      },
+      lifecycles: {
+        ...store(organizations.operations ?? []),
+        follow() {},
+        retry() {},
+        forget() {},
+        clear() {},
+      },
     },
     cookieNotice: { isClosed: () => true, close: () => {} },
     feedback: {},
