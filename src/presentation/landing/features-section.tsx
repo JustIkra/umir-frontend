@@ -193,7 +193,7 @@ function Line({
           {title}
         </Text>
         {quantity && (
-          <Text textStyle="mono.default" whiteSpace="nowrap">
+          <Text textStyle="numeric.default" whiteSpace="nowrap">
             {quantity}
           </Text>
         )}

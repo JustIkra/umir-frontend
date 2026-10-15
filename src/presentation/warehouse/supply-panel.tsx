@@ -63,13 +63,13 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                         : ''}
                     </Text>
                   </Td>
-                  <Td gridArea="stock" textStyle="mono.body">
+                  <Td gridArea="stock" textStyle="numeric.body">
                     <MobileCellLabel aria-hidden="true">
                       Пригодно
                     </MobileCellLabel>
                     {formatQuantity(row.availableQuantity, row.baseUnit)}
                   </Td>
-                  <Td gridArea="mean" textStyle="mono.body">
+                  <Td gridArea="mean" textStyle="numeric.body">
                     <MobileCellLabel aria-hidden="true">
                       Средний расход
                     </MobileCellLabel>
@@ -86,7 +86,7 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                   </Td>
                   <Td
                     gridArea="suggestion"
-                    textStyle="mono.body"
+                    textStyle="numeric.body"
                     color="text.action"
                   >
                     <MobileCellLabel aria-hidden="true">

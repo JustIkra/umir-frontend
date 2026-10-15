@@ -126,7 +126,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                     <Text textStyle="body.strong">
                       {name(row.productID, value.context.runtimeEpoch)}
                     </Text>
-                    <Text textStyle="mono.default" overflowWrap="anywhere">
+                    <Text textStyle="numeric.default" overflowWrap="anywhere">
                       Партия {row.batchID} ·{' '}
                       {formatQuantity(row.remainingQuantity, row.baseUnit)}
                     </Text>
@@ -199,7 +199,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                       <Text textStyle="body.strong">
                         {name(batch.productID, value.context.runtimeEpoch)}
                       </Text>
-                      <Text textStyle="mono.default" overflowWrap="anywhere">
+                      <Text textStyle="numeric.default" overflowWrap="anywhere">
                         Партия {batch.batchID}
                         {unit === undefined
                           ? ' · получаем единицу измерения…'

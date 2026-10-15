@@ -181,7 +181,7 @@ function PositionList({
           <Text textStyle="body.default">
             {position.lineNo} · {nameOf(names, position.dishID)}
           </Text>
-          <Text textStyle="mono.body" flexShrink="0" whiteSpace="nowrap">
+          <Text textStyle="numeric.body" flexShrink="0" whiteSpace="nowrap">
             {portionsText(position.portions)}
           </Text>
         </Flex>
@@ -429,10 +429,10 @@ export function AttemptOrder({
         />
         <chakra.details textStyle="caption.default" color="text.secondary">
           <chakra.summary cursor="pointer">Детали попытки</chakra.summary>
-          <Text textStyle="mono.default" wordBreak="break-all">
+          <Text textStyle="numeric.default" wordBreak="break-all">
             commandID {attempt.commandID}
           </Text>
-          <Text textStyle="mono.default" wordBreak="break-all">
+          <Text textStyle="numeric.default" wordBreak="break-all">
             proposalID {attempt.proposalID}
           </Text>
         </chakra.details>
@@ -582,7 +582,7 @@ export function PlacedOrder({
             <Text textStyle="caption.default" color="text.secondary">
               Заказ
             </Text>
-            <Text textStyle="mono.default">{order.orderID}</Text>
+            <Text textStyle="numeric.default">{order.orderID}</Text>
           </Flex>
           <Text textStyle="caption.default" color="text.secondary">
             {lines.composition}

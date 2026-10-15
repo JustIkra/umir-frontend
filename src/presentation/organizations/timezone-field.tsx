@@ -10,8 +10,11 @@ import { Icon } from '@/presentation/ui/icon';
 import { formatOffset } from '@/presentation/ui/time';
 import { rem } from '@/presentation/ui/units';
 import { matchesQuery } from '@/presentation/ui/search';
-import { organizationZones, zoneCity } from '@/presentation/ui/zones';
-import { zoneValue } from './format';
+import {
+  organizationZones,
+  zoneCity,
+  zoneLabel,
+} from '@/presentation/ui/zones';
 
 // TZ04: nothing in the list matches the search.
 export const noZonesMessage =
@@ -103,7 +106,7 @@ export function TimezoneField({
           : undefined)}
       >
         <Text id={valueId} as="span" flex="1" minW="0" textStyle="body.default">
-          {zoneValue(value, now())}
+          {zoneLabel(value, now())}
         </Text>
         <Icon src={chevronIcon} size={24} />
       </chakra.button>
@@ -227,7 +230,7 @@ export function TimezoneField({
                     </Text>
                     <Text
                       as="span"
-                      textStyle="mono.default"
+                      textStyle="numeric.default"
                       color="text.secondary"
                     >
                       {option}

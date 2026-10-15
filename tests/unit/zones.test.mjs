@@ -9,24 +9,25 @@ import {
 } from '../../src/presentation/ui/zones.ts';
 import { NOW } from './support/render-route.mjs';
 
-test('the section date names the weekday, the date and the zone', () => {
+test('the section date names the weekday, the day and the city', () => {
   assert.equal(
     formatSectionDate(NOW, 'Europe/Moscow'),
-    'Среда, 14 октября 2026 · Москва, UTC+3',
+    'Среда, 14 октября · Москва',
   );
   assert.equal(
     formatSectionDate(NOW, 'Europe/Berlin'),
-    'Среда, 14 октября 2026 · Берлин, UTC+2',
+    'Среда, 14 октября · Берлин',
   );
 });
 
 test('a zone without a Russian name keeps its IANA id', () => {
-  assert.equal(zoneLabel('Asia/Tokyo', NOW), 'Asia/Tokyo, UTC+9');
-  assert.equal(zoneLabel('Asia/Yekaterinburg', NOW), 'Екатеринбург, UTC+5');
+  assert.equal(zoneLabel('Asia/Tokyo', NOW), 'Asia/Tokyo (UTC+9)');
+  assert.equal(zoneLabel('Asia/Yekaterinburg', NOW), 'Екатеринбург (UTC+5)');
 });
 
-test('a stamp shows the date and time with seconds in the zone', () => {
-  assert.equal(formatStamp(NOW, 'Europe/Moscow'), '14.10.2026, 10:00:00 UTC+3');
+test('a stamp shows the day and the time in the zone, without seconds', () => {
+  assert.equal(formatStamp(NOW, 'Europe/Moscow'), '14 октября, 10:00');
+  assert.equal(formatStamp(NOW, 'Asia/Yekaterinburg'), '14 октября, 12:00');
 });
 
 test('a search matches any value, ignoring case and spaces at the ends', () => {

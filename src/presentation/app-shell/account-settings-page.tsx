@@ -835,7 +835,6 @@ export function AccountSettingsPage() {
           <ReadOnlyValue
             label="Почта"
             value={user.email ?? 'Не указана'}
-            mono={user.email !== undefined}
             note={emailNote(user.email)}
           />
           <Box h="1px" bg="border.default" />

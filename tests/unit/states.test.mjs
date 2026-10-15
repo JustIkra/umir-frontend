@@ -110,7 +110,7 @@ test('data alerts follow MN04, RS06 and W12', () => {
   assert.match(unavailable, /role="alert"/);
   assert.match(
     text(unavailable),
-    /Не удалось получить меню.*Повторить загрузку/,
+    /Не удалось получить меню.*Попробовать ещё раз/,
   );
   const unknown = renderElement(
     h(

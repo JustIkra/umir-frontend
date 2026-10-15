@@ -152,7 +152,7 @@ function TocList({
             >
               <Text
                 as="span"
-                textStyle="mono.body"
+                textStyle="numeric.body"
                 w="6"
                 flexShrink="0"
                 color={current ? 'text.action' : 'text.secondary'}

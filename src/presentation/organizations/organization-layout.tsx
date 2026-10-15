@@ -98,13 +98,12 @@ export function OrganizationHeader({
   organization: OrganizationAccess;
   section?: string;
 }) {
-  const { now } = useServices();
   return (
     <Stack gap="1">
       <BackLink to="/app/organizations">Все организации</BackLink>
       <PageHeader
         title={organization.name}
-        caption={organizationCaption(organization, now())}
+        caption={organizationCaption(organization)}
         documentTitle={
           section ? `${section} · ${organization.name}` : organization.name
         }

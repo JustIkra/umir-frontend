@@ -78,7 +78,7 @@ function ChangeItem({ row }: { row: ChangeRow }) {
         text={row.text}
         badge={
           <Flex align="center" gap="2" flexShrink="0">
-            <Text textStyle="mono.default">{row.change}</Text>
+            <Text textStyle="numeric.default">{row.change}</Text>
             {row.excluded ? (
               <Badge tone="error">Исключено</Badge>
             ) : (

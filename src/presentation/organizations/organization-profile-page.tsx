@@ -14,7 +14,8 @@ import { ServiceUnavailableAlert } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
 import { DeleteOrganizationDialog } from './delete-organization-dialog';
 import { DeletionNotice } from './deletion-notice';
-import { zoneLine, organizationPath } from './format';
+import { zoneLabel } from '@/presentation/ui/zones';
+import { organizationPath } from './format';
 import { type OrganizationRoute } from './loaders';
 import {
   OrganizationHeader,
@@ -65,7 +66,7 @@ export function zoneMessage(
     case 'saved':
       return {
         title: 'Часовой пояс сохранён',
-        text: `Даты во всех ресторанах организации отображаются в зоне ${zoneLine(state.timeZone, nowMs)}.`,
+        text: `Даты во всех ресторанах организации отображаются в зоне ${zoneLabel(state.timeZone, nowMs)}.`,
         tone: 'success',
       };
     case 'unsupported':
@@ -88,7 +89,7 @@ export function zoneMessage(
         text: `Другой администратор сохранил ${
           state.timeZone === undefined
             ? 'новую зону'
-            : `зону «${zoneLine(state.timeZone, nowMs)}»`
+            : `зону «${zoneLabel(state.timeZone, nowMs)}»`
         }. Проверьте выбор и сохраните повторно, если нужно.`,
         tone: 'error',
       };

@@ -213,24 +213,31 @@ const textStyles = defineTextStyles({
       },
     },
   },
-  mono: {
+  // Quantities, codes and times in tables: the body font with digits of one
+  // width, so columns line up without a typewriter look.
+  numeric: {
     default: {
       value: {
-        fontFamily: 'mono',
+        fontFamily: 'body',
         fontWeight: 'regular',
         fontSize: '0.875rem',
         lineHeight: '1.25rem',
+        fontVariantNumeric: 'tabular-nums',
       },
     },
     body: {
       value: {
-        fontFamily: 'mono',
+        fontFamily: 'body',
         fontWeight: 'regular',
         fontSize: '1rem',
         lineHeight: '1.5rem',
+        fontVariantNumeric: 'tabular-nums',
       },
     },
-    // Figma Code field value: the six digits of an email code.
+  },
+  mono: {
+    // Figma Code field value: the six digits of an email code, the only text
+    // in the monospace font.
     code: {
       value: {
         fontFamily: 'mono',

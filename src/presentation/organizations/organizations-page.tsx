@@ -11,7 +11,8 @@ import { ButtonLink } from '@/presentation/ui/actions';
 import { Card } from '@/presentation/ui/card';
 import { InfoNotice } from '@/presentation/ui/states';
 import { organizationDeletionNotice } from './deletion';
-import { organizationPath, restaurantCount, zoneLine } from './format';
+import { zoneLabel } from '@/presentation/ui/zones';
+import { organizationPath, restaurantCount } from './format';
 import {
   CardSkeletons,
   OrganizationLayout,
@@ -51,7 +52,7 @@ function OrganizationCard({
       </Text>
       {organization.admin && (
         <Text textStyle="caption.default" color="text.secondary">
-          {zoneLine(organization.settings.timeZone, now())}
+          {zoneLabel(organization.settings.timeZone, now())}
         </Text>
       )}
     </CardLink>

@@ -11,7 +11,7 @@ import {
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { UnknownOutcomeAlert } from '@/presentation/ui/states';
-import { zoneLine } from './format';
+import { zoneLabel } from '@/presentation/ui/zones';
 import { nameError, restaurantNameMessage } from './names';
 
 export type RestaurantState =
@@ -200,7 +200,7 @@ export function AddRestaurantDialog({
         <FieldMessage
           id="restaurant-name-hint"
           error={error && restaurantNameMessage(error)}
-          hint={`Часовой пояс — как у организации: ${zoneLine(timeZone, now())}.`}
+          hint={`Часовой пояс — как у организации: ${zoneLabel(timeZone, now())}.`}
         />
       </FieldGroup>
       {message &&

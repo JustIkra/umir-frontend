@@ -186,7 +186,7 @@ export function DishPage() {
                       <Td gridArea="name">{line.name}</Td>
                       <Td
                         gridArea="code"
-                        textStyle="mono.default"
+                        textStyle="numeric.default"
                         color="text.secondary"
                       >
                         <Text
@@ -200,7 +200,7 @@ export function DishPage() {
                       </Td>
                       <Td
                         gridArea="quantity"
-                        textStyle="mono.body"
+                        textStyle="numeric.body"
                         textAlign="end"
                         whiteSpace="nowrap"
                       >

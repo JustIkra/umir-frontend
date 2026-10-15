@@ -309,19 +309,16 @@ export function CodeInput({
   );
 }
 
-// Figma Read-only value: a label, a grey row with a lock and the value, then a
-// note. Logins and names are monospaced with a 16px lock; the zone in OG03
-// uses the body font and a 24px lock.
+// Figma Read-only value: a label, a grey row with a 16px lock and the value,
+// then a note.
 export function ReadOnlyValue({
   label,
   value,
   note,
-  mono = true,
 }: {
   label: string;
   value: string;
   note: string;
-  mono?: boolean;
 }) {
   return (
     <Stack gap="1">
@@ -329,13 +326,13 @@ export function ReadOnlyValue({
       <HStack
         gap="2"
         px="3"
-        py={mono ? '2.5' : '2'}
+        py="2.5"
         bg="bg.subtle"
         borderRadius="md"
-        textStyle={mono ? 'mono.body' : 'body.default'}
+        textStyle="body.default"
         color="text.primary"
       >
-        <Icon src={lockIcon} size={mono ? 16 : 24} />
+        <Icon src={lockIcon} size={16} />
         <Text as="span" minW="0" overflowWrap="anywhere">
           {value}
         </Text>

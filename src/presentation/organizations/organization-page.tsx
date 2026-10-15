@@ -9,7 +9,7 @@ import { ReadOnlyValue } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { AddRestaurantDialog } from './add-restaurant-dialog';
 import { restaurantDeletingTitle } from './deletion';
-import { zoneLine, zoneValue } from './format';
+import { zoneLabel } from '@/presentation/ui/zones';
 import { type OrganizationRoute } from './loaders';
 import {
   OrganizationHeader,
@@ -101,9 +101,8 @@ function StaffOrganization({
       <Card>
         <ReadOnlyValue
           label="Часовой пояс организации"
-          value={zoneValue(timeZone, now())}
-          note={`Часовой пояс организации: ${zoneLine(timeZone, now())}. Изменить его может администратор организации.`}
-          mono={false}
+          value={zoneLabel(timeZone, now())}
+          note={`Часовой пояс организации: ${zoneLabel(timeZone, now())}. Изменить его может администратор организации.`}
         />
       </Card>
       <ButtonLink

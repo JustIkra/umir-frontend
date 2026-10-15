@@ -346,7 +346,7 @@ function RecommendationsPanel({
               >
                 <Text textStyle="caption.strong">{reason.title}</Text>
                 <Flex align="center" gap="2" wrap="wrap">
-                  <Text textStyle="mono.default" color="text.secondary">
+                  <Text textStyle="numeric.default" color="text.secondary">
                     {reason.perPortion}
                   </Text>
                   <Badge tone="expiry">{reason.expires}</Badge>

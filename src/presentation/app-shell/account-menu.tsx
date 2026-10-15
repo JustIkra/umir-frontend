@@ -284,7 +284,7 @@ export function AccountMenu({
         </Box>
         <Stack gap="0.5" px="3" py="2">
           <Text textStyle="body.strong">{user?.displayName}</Text>
-          <Text textStyle="mono.default" color="text.secondary">
+          <Text textStyle="numeric.default" color="text.secondary">
             {user?.login}
           </Text>
         </Stack>

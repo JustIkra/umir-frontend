@@ -34,8 +34,9 @@ const tones = {
   },
 } as const;
 
-// Figma Diagnostic details 147:1833: for support only, focus stays on the
-// toggle and the content appears without a height animation.
+// Figma Diagnostic details 147:1833: the error code for support only, never
+// in the message itself. Focus stays on the toggle and the content appears
+// without a height animation.
 export function DiagnosticDetails({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const contentId = useId();
@@ -70,10 +71,10 @@ export function DiagnosticDetails({ children }: { children: ReactNode }) {
         id={contentId}
         hidden={!open}
         px="1.5"
-        textStyle="mono.default"
+        textStyle="numeric.default"
         color="text.secondary"
       >
-        {children}
+        Код ошибки: {children}
       </Text>
     </Stack>
   );

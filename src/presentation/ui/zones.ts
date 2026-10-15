@@ -28,27 +28,32 @@ export function zoneCity(timeZone: string): string {
   return zoneCities[timeZone] ?? timeZone;
 }
 
+// «Москва (UTC+3)»: where the zone itself is the subject, such as the
+// organization settings. The offset is the one at epochMs: it changes with
+// summer time.
 export function zoneLabel(timeZone: string, epochMs: number): string {
-  return `${zoneCity(timeZone)}, ${formatOffset(epochMs, timeZone)}`;
+  return `${zoneCity(timeZone)} (${formatOffset(epochMs, timeZone)})`;
 }
 
-// The caption under a section title: «Среда, 14 октября 2026 · Москва, UTC+3».
-export function formatSectionDate(epochMs: number, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('ru-RU', {
+const dayMonth = (epochMs: number, timeZone: string) =>
+  new Intl.DateTimeFormat('ru-RU', {
     timeZone,
-    weekday: 'long',
     day: 'numeric',
     month: 'long',
-    year: 'numeric',
-  }).formatToParts(epochMs);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((item) => item.type === type)?.value ?? '';
-  const weekday = part('weekday');
+  }).format(epochMs);
+
+// The caption under a section title: «Среда, 14 октября · Москва». The zone is
+// named once here, so the times on the page go without it.
+export function formatSectionDate(epochMs: number, timeZone: string): string {
+  const weekday = new Intl.DateTimeFormat('ru-RU', {
+    timeZone,
+    weekday: 'long',
+  }).format(epochMs);
   const capitalized = `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}`;
-  return `${capitalized}, ${part('day')} ${part('month')} ${part('year')} · ${zoneLabel(timeZone, epochMs)}`;
+  return `${capitalized}, ${dayMonth(epochMs, timeZone)} · ${zoneCity(timeZone)}`;
 }
 
-// «14.10.2026, 10:00:00 UTC+3»: when a read or a command was evaluated.
+// «14 октября, 10:00»: when data was read or an action was sent.
 export function formatStamp(epochMs: number, timeZone: string): string {
-  return `${formatInstant(epochMs, timeZone, 'date')}, ${formatInstant(epochMs, timeZone, 'timeSeconds')} ${formatOffset(epochMs, timeZone)}`;
+  return `${dayMonth(epochMs, timeZone)}, ${formatInstant(epochMs, timeZone, 'time')}`;
 }

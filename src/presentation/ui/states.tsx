@@ -77,7 +77,7 @@ export function ServiceUnavailableAlert({
       title={title}
       action={
         <Button variant="secondary" onClick={onRetry}>
-          Повторить загрузку
+          Попробовать ещё раз
         </Button>
       }
     >

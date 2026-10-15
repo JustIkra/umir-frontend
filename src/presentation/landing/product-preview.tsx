@@ -189,7 +189,7 @@ function BatchRow({
     >
       <Stack gap="0.5" flex="1" minW="10.5rem">
         <Text textStyle="body.default">{title}</Text>
-        <Text textStyle="mono.default" color="text.secondary">
+        <Text textStyle="numeric.default" color="text.secondary">
           {detail}
         </Text>
       </Stack>
@@ -442,7 +442,7 @@ function ProposalLine({
         <Text flex="1" textStyle="body.default">
           {name}
         </Text>
-        <Text textStyle="mono.default" whiteSpace="nowrap">
+        <Text textStyle="numeric.default" whiteSpace="nowrap">
           {quantity}
         </Text>
         {status === 'reduced' && <Badge tone="neutral">Сокращено</Badge>}
@@ -522,7 +522,7 @@ function BatchFragment() {
   return (
     <Fragment>
       <Flex align="center" gap="2">
-        <Text flex="1" textStyle="mono.default" color="text.secondary">
+        <Text flex="1" textStyle="numeric.default" color="text.secondary">
           Партия P-0142
         </Text>
         <Badge tone="expiry">Истекает через 6 ч</Badge>

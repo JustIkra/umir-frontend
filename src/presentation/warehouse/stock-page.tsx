@@ -67,13 +67,13 @@ function ProductBatches({
                     alignItems="start"
                   >
                     <Text
-                      textStyle="mono.default"
+                      textStyle="numeric.default"
                       color="text.secondary"
                       overflowWrap="anywhere"
                     >
                       Партия {batch.batchID}
                     </Text>
-                    <Text textStyle="mono.body" overflowWrap="anywhere">
+                    <Text textStyle="numeric.body" overflowWrap="anywhere">
                       {formatQuantity(batch.remainingQuantity, unit)}
                     </Text>
                     <Stack gridColumn={{ base: '1 / -1', sm: 'auto' }} gap="1">
@@ -206,7 +206,7 @@ export function StockPage() {
                           </Td>
                           <Td
                             gridArea="quantity"
-                            textStyle="mono.body"
+                            textStyle="numeric.body"
                             textAlign={{ sm: 'end' }}
                             overflowWrap="anywhere"
                           >
@@ -220,7 +220,7 @@ export function StockPage() {
                           </Td>
                           <Td
                             gridArea="pending"
-                            textStyle="mono.body"
+                            textStyle="numeric.body"
                             overflowWrap="anywhere"
                             color={
                               row.pendingWriteoffQuantity === '0'
@@ -240,7 +240,7 @@ export function StockPage() {
                           </Td>
                           <Td
                             gridArea="code"
-                            textStyle="mono.default"
+                            textStyle="numeric.default"
                             color="text.secondary"
                             overflowWrap="anywhere"
                           >

@@ -141,7 +141,7 @@ export function DishesPage() {
                 </Td>
                 <Td
                   gridArea="code"
-                  textStyle={{ base: 'mono.default', sm: 'mono.body' }}
+                  textStyle={{ base: 'numeric.default', sm: 'numeric.body' }}
                   color="text.secondary"
                 >
                   <Text

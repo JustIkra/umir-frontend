@@ -5,12 +5,11 @@ import {
   organizationPath,
   restaurantCount,
   rolesLine,
-  zoneLine,
-  zoneValue,
 } from '../../src/presentation/organizations/format.ts';
 import {
   organizationZones,
   zoneCity,
+  zoneLabel,
 } from '../../src/presentation/ui/zones.ts';
 import { NOW, ORG, R, sampleRestaurant } from './support/render-route.mjs';
 
@@ -33,12 +32,9 @@ test('rolesLine names one role or several', () => {
   assert.equal(rolesLine(['Waiter', 'Admin']), 'Ваша роль: Администратор');
 });
 
-test('the zone is written with a comma in captions and a dot in the field', () => {
-  assert.equal(zoneLine('Europe/Moscow', NOW), 'Москва — Europe/Moscow, UTC+3');
-  assert.equal(
-    zoneValue('Asia/Yekaterinburg', NOW),
-    'Екатеринбург — Asia/Yekaterinburg · UTC+5',
-  );
+test('the zone is the city with its offset, without the IANA id', () => {
+  assert.equal(zoneLabel('Europe/Moscow', NOW), 'Москва (UTC+3)');
+  assert.equal(zoneLabel('Asia/Yekaterinburg', NOW), 'Екатеринбург (UTC+5)');
   assert.equal(zoneCity('Etc/GMT-3'), 'Etc/GMT-3');
   assert.equal(zoneCity('Europe/Berlin'), 'Берлин');
 });
@@ -59,11 +55,11 @@ const organization = (admin, count) => ({
 
 test('the organization caption differs for the administrator and staff', () => {
   assert.equal(
-    organizationCaption(organization(true, 4), NOW),
-    'Администратор · 4 ресторана · Москва — Europe/Moscow, UTC+3',
+    organizationCaption(organization(true, 4)),
+    'Администратор · 4 ресторана · Москва',
   );
   assert.equal(
-    organizationCaption(organization(false, 2), NOW),
+    organizationCaption(organization(false, 2)),
     'Сотрудник · 2 ресторана',
   );
 });

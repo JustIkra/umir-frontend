@@ -82,7 +82,7 @@ export function CookieTable({ rows }: { rows: readonly CookieRow[] }) {
               borderColor="border.default"
             >
               <Cell>
-                <Text textStyle="mono.default" overflowWrap="anywhere">
+                <Text textStyle="numeric.default" overflowWrap="anywhere">
                   {row.name}
                 </Text>
                 <Text
@@ -107,7 +107,7 @@ export function CookieTable({ rows }: { rows: readonly CookieRow[] }) {
             borderTopWidth={index === 0 ? undefined : '1px'}
             borderColor="border.default"
           >
-            <Text textStyle="mono.default" overflowWrap="anywhere">
+            <Text textStyle="numeric.default" overflowWrap="anywhere">
               {row.name}
             </Text>
             <Stack as="dl" gap="2" mt="2">
@@ -115,7 +115,7 @@ export function CookieTable({ rows }: { rows: readonly CookieRow[] }) {
                 <Text textStyle="body.default">{row.purpose}</Text>
               </Field>
               <Field label="Хранилище">
-                <Text textStyle="mono.default">{row.storage}</Text>
+                <Text textStyle="numeric.default">{row.storage}</Text>
               </Field>
               <Field label="Срок">
                 <Text textStyle="body.default">{row.term}</Text>

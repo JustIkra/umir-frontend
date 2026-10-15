@@ -41,7 +41,7 @@ export function AllocationFacts({
               {product?.name ?? `Продукт ${row.productID}`} · партия{' '}
               {row.batchID}
             </Text>
-            <Text textStyle="mono.default" overflowWrap="anywhere">
+            <Text textStyle="numeric.default" overflowWrap="anywhere">
               {product === undefined
                 ? `${formatThousandths(row.quantity)} (единица из справочника недоступна)`
                 : formatQuantity(row.quantity, product.baseUnit)}
