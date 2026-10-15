@@ -335,3 +335,15 @@ test('the code step tells a new code that was not taken', async () => {
   assert.ok(plain.includes('Сервис не принял запрос нового кода.'));
   assert.ok(plain.includes('Подтвердить'));
 });
+
+test('the closed notice is shown on the code step and on the details step', async () => {
+  const closed = { kind: 'closed' };
+  const onCode = await pageText(code({ notice: closed }));
+  assert.ok(onCode.includes('Регистрация недоступна'));
+  assert.ok(onCode.includes('Доступ предоставляет администратор организации'));
+  const onDetails = await pageText(code({ step: 'details', notice: closed }));
+  assert.ok(onDetails.includes('Регистрация недоступна'));
+  assert.ok(
+    onDetails.includes('Доступ предоставляет администратор организации'),
+  );
+});
