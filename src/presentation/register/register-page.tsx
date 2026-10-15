@@ -122,8 +122,8 @@ function FormStep({
     <>
       <AuthTitle>Регистрация в «Ровном ходе»</AuthTitle>
       <AuthLead>
-        Создайте учётную запись: укажите имя, почту и пароль. Почту подтвердит
-        код из письма.
+        Создайте аккаунт: укажите имя, почту и пароль. Потом введите код из
+        письма.
       </AuthLead>
       <Unknown flow={flow} notice={notice} />
       <chakra.form
@@ -205,7 +205,7 @@ function FormStep({
         action={notice?.kind === 'email-taken' ? <AccountLinks /> : undefined}
       />
       <Text textStyle="body.default">
-        Уже есть учётная запись? <TextLink to="/login">Войти</TextLink>
+        Уже есть аккаунт? <TextLink to="/login">Войти</TextLink>
       </Text>
     </>
   );
@@ -223,7 +223,7 @@ function CodeStep({
       idPrefix="register"
       lead={
         <>
-          {`Если для адреса ${snapshot.email} ещё нет учётной записи, на него отправлен код. Он действует 10 минут. Уже зарегистрированы? `}
+          {`Если на почту ${snapshot.email} ещё нет аккаунта, мы отправили на неё код. Он действует 10 минут. Уже зарегистрированы? `}
           <TextLink to="/login">Войдите</TextLink> или{' '}
           <TextLink to="/password-reset">восстановите пароль</TextLink>.
         </>
@@ -275,8 +275,8 @@ function DetailsStep({
     <>
       <AuthTitle>Завершите регистрацию</AuthTitle>
       <AuthLead>
-        Почта подтверждена. Укажите имя и пароль: после перезагрузки страницы
-        они не сохраняются.
+        Почта подтверждена. Укажите имя и пароль. Не перезагружайте страницу,
+        пока не закончите.
       </AuthLead>
       <Unknown flow={flow} notice={notice} />
       <chakra.form
@@ -303,7 +303,7 @@ function DetailsStep({
           disabled={snapshot.busy || unknown}
           aria-busy={snapshot.busy}
         >
-          {snapshot.busy ? 'Создаём…' : 'Создать учётную запись'}
+          {snapshot.busy ? 'Создаём…' : 'Создать аккаунт'}
         </Button>
       </chakra.form>
       <Message notice={notice} nowMs={now} />
@@ -314,13 +314,13 @@ function DetailsStep({
 function DoneStep() {
   return (
     <>
-      <AuthTitle>Учётная запись создана</AuthTitle>
+      <AuthTitle>Аккаунт создан</AuthTitle>
       <AuthLead>
-        Вы вошли. Создайте своё предприятие или дождитесь приглашения от
-        администратора организации.
+        Вы вошли. Создайте свою организацию или дождитесь приглашения от
+        администратора.
       </AuthLead>
       <ButtonLink to="/app/organizations/new" w="full">
-        Создать предприятие
+        Создать организацию
       </ButtonLink>
       <ButtonLink to="/app" variant="secondary" w="full">
         Перейти к работе
@@ -333,7 +333,7 @@ const titles = {
   form: 'Регистрация',
   code: 'Введите код',
   details: 'Завершите регистрацию',
-  done: 'Учётная запись создана',
+  done: 'Аккаунт создан',
 } as const;
 
 // /register: the name, the email and the password, the code from the email,

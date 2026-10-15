@@ -588,10 +588,7 @@ test('a lost answer to every other action is checked the same way', async () => 
     kind: 'unknown',
     action: 'complete',
   });
-  assert.equal(
-    third.commands.getSnapshot()[0].label,
-    'создания учётной записи',
-  );
+  assert.equal(third.commands.getSnapshot()[0].label, 'создания аккаунта');
   await third.acceptance.check();
   assert.equal(third.fake.calls[2][2], 'cmd-3');
   assert.equal(third.fake.calls[3][2], 'cmd-3');

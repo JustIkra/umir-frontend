@@ -625,7 +625,7 @@ test('a lost answer to the creation of the account is repeated with the same com
     action: 'complete',
   });
   assert.equal(registration.getSnapshot().step, 'details');
-  assert.equal(commands.getSnapshot()[0].label, 'создания учётной записи');
+  assert.equal(commands.getSnapshot()[0].label, 'создания аккаунта');
   assert.equal(commands.getSnapshot()[0].key, registerKeys.complete);
   await registration.check();
   assert.equal(fake.calls[2][2], 'cmd-3');

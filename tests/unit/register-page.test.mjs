@@ -39,42 +39,39 @@ test('registerMessage words the notices of the registration', () => {
   assert.deepEqual(message({ kind: 'closed' }), {
     tone: 'error',
     title: 'Регистрация недоступна',
-    text: 'Сейчас создать учётную запись нельзя. Доступ предоставляет администратор организации по приглашению.',
+    text: 'Сейчас зарегистрироваться нельзя. Попросите администратора организации прислать приглашение.',
   });
   assert.deepEqual(message({ kind: 'email-taken' }), {
     tone: 'error',
-    title: 'Учётная запись уже есть',
-    text: 'Пользователь с этой почтой уже зарегистрирован. Войдите или восстановите пароль.',
+    title: 'Аккаунт уже есть',
+    text: 'На эту почту уже есть аккаунт. Войдите или восстановите пароль.',
   });
   assert.deepEqual(message({ kind: 'wrong-code' }), {
     tone: 'error',
     title: 'Неверный код',
     text: 'Проверьте код из последнего письма.',
   });
-  assert.equal(message({ kind: 'locked' }).title, 'Код заблокирован');
+  assert.equal(message({ kind: 'locked' }).title, 'Код больше не действует');
   assert.equal(message({ kind: 'expired' }).title, 'Срок действия кода истёк');
   assert.equal(message({ kind: 'resent' }).tone, 'success');
   assert.equal(message({ kind: 'resent' }).title, 'Новый код отправлен');
-  assert.equal(
-    message({ kind: 'proof-expired' }).title,
-    'Подтверждение устарело',
-  );
+  assert.equal(message({ kind: 'proof-expired' }).title, 'Время вышло');
   assert.deepEqual(message({ kind: 'not-sent' }), {
     tone: 'error',
     title: 'Код не отправлен',
-    text: 'Сервис не принял запрос нового кода. Повторите попытку через несколько минут.',
+    text: 'Не получилось отправить новый код. Попробуйте через пару минут.',
   });
   assert.equal(
     message({ kind: 'unavailable' }).title,
-    'Регистрация временно недоступна',
+    'Не получилось зарегистрироваться',
   );
 });
 
 test('registerMessage counts a wait down and leaves field and lost-answer notices', () => {
   const limited = { kind: 'limited', untilMs: NOW + 45_000 };
   const shown = registerMessage(limited, NOW);
-  assert.equal(shown.title, 'Отправка кода временно ограничена');
-  assert.ok(shown.text.includes('через 45 с.'));
+  assert.equal(shown.title, 'Слишком много запросов кода');
+  assert.ok(shown.text.includes('через 45 секунд.'));
   assert.equal(registerMessage(limited, NOW + 45_000), undefined);
   assert.equal(registerMessage(undefined, NOW), undefined);
   assert.equal(registerMessage({ kind: 'code-format' }, NOW), undefined);
@@ -101,14 +98,14 @@ test('a guest sees the registration form', async () => {
   const plain = text(html);
   assert.ok(
     plain.includes(
-      'Создайте учётную запись: укажите имя, почту и пароль. Почту подтвердит код из письма.',
+      'Создайте аккаунт: укажите имя, почту и пароль. Потом введите код из письма.',
     ),
   );
   assert.ok(plain.includes('Даю согласие на обработку персональных данных'));
   assert.ok(plain.includes('Текст согласия'));
   assert.ok(plain.includes('Политика конфиденциальности'));
   assert.ok(plain.includes('Получить код'));
-  assert.ok(plain.includes('Уже есть учётная запись? Войти'));
+  assert.ok(plain.includes('Уже есть аккаунт? Войти'));
   assert.ok(plain.includes('От 8 до 32 символов.'));
   const links = hrefs(html);
   for (const href of ['/consent', '/privacy', '/login']) {
@@ -231,22 +228,22 @@ test('the form shows the refusals of the code request', async () => {
     registerSnapshot({ notice: { kind: 'closed' } }),
   );
   assert.ok(closed.includes('Регистрация недоступна'));
-  assert.ok(closed.includes('Доступ предоставляет администратор организации'));
+  assert.ok(closed.includes('Попросите администратора организации'));
   const taken = await page(
     registerSnapshot({ notice: { kind: 'email-taken' } }),
   );
-  assert.ok(text(taken).includes('Учётная запись уже есть'));
+  assert.ok(text(taken).includes('Аккаунт уже есть'));
   assert.ok(hrefs(taken).includes('/password-reset'));
   assert.ok(hrefs(taken).filter((href) => href === '/login').length >= 2);
   const unknown = await pageText(
     registerSnapshot({ notice: { kind: 'unknown', action: 'begin' } }),
   );
-  assert.ok(unknown.includes('Результат запроса кода неизвестен'));
+  assert.ok(unknown.includes('Не знаем, отправлен ли код'));
   assert.ok(unknown.includes('Проверить результат'));
   const limited = await pageText(
     registerSnapshot({ notice: { kind: 'limited', untilMs: NOW + 30_000 } }),
   );
-  assert.ok(limited.includes('Отправка кода временно ограничена'));
+  assert.ok(limited.includes('Слишком много запросов кода'));
 });
 
 test('the code step asks for the code of the email', async () => {
@@ -255,7 +252,7 @@ test('the code step asks for the code of the email', async () => {
   const plain = text(html);
   assert.ok(
     plain.includes(
-      'Если для адреса i.kovaleva@example.test ещё нет учётной записи, на него отправлен код. Он действует 10 минут. Уже зарегистрированы? Войдите или восстановите пароль.',
+      'Если на почту i.kovaleva@example.test ещё нет аккаунта, мы отправили на неё код. Он действует 10 минут. Уже зарегистрированы? Войдите или восстановите пароль.',
     ),
   );
   const links = hrefs(html);
@@ -277,7 +274,7 @@ test('the code step turns into «expired» at the expiry time', async () => {
   assert.ok(plain.includes('Срок действия кода истёк'));
   assert.ok(plain.includes('Получить новый код'));
   const locked = await pageText(code({ notice: { kind: 'locked' } }));
-  assert.ok(locked.includes('Код заблокирован'));
+  assert.ok(locked.includes('Код больше не действует'));
   assert.ok(locked.includes('Получить новый код'));
   const wrong = await pageText(code({ notice: { kind: 'wrong-code' } }));
   assert.ok(wrong.includes('Неверный код'));
@@ -297,26 +294,26 @@ test('the details step asks for the name and the password again', async () => {
   ]);
   assert.ok(!labels(html).includes('Почта'));
   assert.ok(html.includes('value="Анна Смирнова"'));
-  assert.ok(text(html).includes('Создать учётную запись'));
+  assert.ok(text(html).includes('Создать аккаунт'));
   const lost = await pageText(
     code({
       step: 'details',
       notice: { kind: 'unknown', action: 'complete' },
     }),
   );
-  assert.ok(lost.includes('Создание учётной записи не подтверждено'));
+  assert.ok(lost.includes('Не знаем, создан ли аккаунт'));
 });
 
 test('the result offers to create an enterprise', async () => {
   const html = await page(registerSnapshot({ step: 'done' }));
-  assert.equal(h1(html), 'Учётная запись создана');
+  assert.equal(h1(html), 'Аккаунт создан');
   const plain = text(html);
   assert.ok(
     plain.includes(
-      'Вы вошли. Создайте своё предприятие или дождитесь приглашения от администратора организации.',
+      'Вы вошли. Создайте свою организацию или дождитесь приглашения от администратора.',
     ),
   );
-  assert.ok(plain.includes('Создать предприятие'));
+  assert.ok(plain.includes('Создать организацию'));
   assert.ok(plain.includes('Перейти к работе'));
   const links = hrefs(html);
   assert.ok(links.includes('/app/organizations/new'));
@@ -325,14 +322,14 @@ test('the result offers to create an enterprise', async () => {
 
 test('the sign-in page links to the registration', async () => {
   const html = await renderRoute('/login', { session: anonymous });
-  assert.ok(text(html).includes('Нет учётной записи? Зарегистрироваться'));
+  assert.ok(text(html).includes('Нет аккаунта? Зарегистрироваться'));
   assert.ok(hrefs(html).includes('/register'));
 });
 
 test('the code step tells a new code that was not taken', async () => {
   const plain = await pageText(code({ notice: { kind: 'not-sent' } }));
   assert.ok(plain.includes('Код не отправлен'));
-  assert.ok(plain.includes('Сервис не принял запрос нового кода.'));
+  assert.ok(plain.includes('Не получилось отправить новый код.'));
   assert.ok(plain.includes('Подтвердить'));
 });
 
@@ -340,10 +337,8 @@ test('the closed notice is shown on the code step and on the details step', asyn
   const closed = { kind: 'closed' };
   const onCode = await pageText(code({ notice: closed }));
   assert.ok(onCode.includes('Регистрация недоступна'));
-  assert.ok(onCode.includes('Доступ предоставляет администратор организации'));
+  assert.ok(onCode.includes('Попросите администратора организации'));
   const onDetails = await pageText(code({ step: 'details', notice: closed }));
   assert.ok(onDetails.includes('Регистрация недоступна'));
-  assert.ok(
-    onDetails.includes('Доступ предоставляет администратор организации'),
-  );
+  assert.ok(onDetails.includes('Попросите администратора организации'));
 });

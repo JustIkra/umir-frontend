@@ -14,6 +14,7 @@ import {
   TextInput,
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { plural } from '@/presentation/ui/plural';
 import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import { AuthLayout, AuthTitle } from './auth-layout';
 
@@ -38,8 +39,8 @@ export function signInMessage(
     case 'unknown':
       return {
         tone: 'unknown',
-        title: 'Результат входа неизвестен',
-        text: 'Ответ сервиса не получен. Вход мог быть выполнен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+        title: 'Не знаем, получилось ли войти',
+        text: 'Связь прервалась. Нажмите «Проверить результат» — входить заново не нужно.',
       };
     case 'reset':
       break;
@@ -57,7 +58,7 @@ export function signInMessage(
         return {
           tone: 'error',
           title: 'Слишком много попыток входа',
-          text: `Повторите вход через ${String(seconds)} с.`,
+          text: `Попробуйте через ${String(seconds)}\u00A0${plural(seconds, 'секунду', 'секунды', 'секунд')}.`,
           waitSeconds: seconds,
         };
       }
@@ -69,18 +70,18 @@ export function signInMessage(
   if (notice?.kind === 'password-unknown') {
     return {
       tone: 'error',
-      title: 'Вход не выполнен',
-      text: 'Действующий пароль пока не определён. Повторите вход через несколько минут.',
+      title: 'Не получилось войти',
+      text: 'Пока не знаем, какой пароль действует — старый или новый. Попробуйте войти через пару минут.',
     };
   }
   return {
     tone: 'error',
-    title: 'Вход не выполнен',
-    text: 'Сервис авторизации не отвечает. Повторите попытку через несколько минут.',
+    title: 'Не получилось войти',
+    text: 'Попробуйте через пару минут.',
   };
 }
 
-// L11, L13 and L10 after «Учётная запись» ended the session, and the notice
+// L11, L13 and L10 after «Аккаунт» ended the session, and the notice
 // after signing out on every device.
 export function noticeMessage(notice: SignInNotice): {
   readonly tone: 'success' | 'unknown';
@@ -92,25 +93,25 @@ export function noticeMessage(notice: SignInNotice): {
       return {
         tone: 'success',
         title: 'Пароль изменён',
-        text: 'Все сеансы завершены. Войдите с новым паролем.',
+        text: 'Вы вышли на всех устройствах. Войдите с новым паролем.',
       };
     case 'password-unknown':
       return {
         tone: 'unknown',
-        title: 'Результат изменения пароля неизвестен',
-        text: 'Если пароль изменился, войти можно только с новым. Попробуйте войти с ним — изменение повторно не отправляется.',
+        title: 'Не знаем, сменился ли пароль',
+        text: 'Если сменился, подойдёт только новый. Попробуйте войти с ним — менять пароль ещё раз не нужно.',
       };
     case 'password-limit':
       return {
         tone: 'unknown',
-        title: 'Сессия завершена',
-        text: 'Превышено число неверных попыток ввести текущий пароль. Войдите снова.',
+        title: 'Вы вышли из аккаунта',
+        text: 'Текущий пароль несколько раз ввели неверно. Войдите снова.',
       };
     case 'everywhere':
       return {
         tone: 'success',
         title: 'Вы вышли на всех устройствах',
-        text: 'Все сеансы учётной записи завершены, включая этот. Войдите снова.',
+        text: 'Включая это устройство. Войдите снова.',
       };
   }
 }
@@ -168,7 +169,7 @@ export function SignInPage() {
   return (
     <AuthLayout
       title="Вход"
-      help="Нет доступа к почте или учётной записи — обратитесь к администратору организации."
+      help="Нет доступа к почте или аккаунту — обратитесь к администратору организации."
     >
       <AuthTitle>Вход</AuthTitle>
       {shown && (
@@ -177,7 +178,7 @@ export function SignInPage() {
         </FormMessage>
       )}
       {expired && notice === undefined && !message && (
-        <FormMessage tone="unknown" title="Сессия завершена">
+        <FormMessage tone="unknown" title="Вы вышли из аккаунта">
           Войдите снова — после входа откроется та же страница.
         </FormMessage>
       )}
@@ -266,8 +267,7 @@ export function SignInPage() {
         )}
       </chakra.form>
       <Text textStyle="body.default">
-        Нет учётной записи?{' '}
-        <TextLink to="/register">Зарегистрироваться</TextLink>
+        Нет аккаунта? <TextLink to="/register">Зарегистрироваться</TextLink>
       </Text>
     </AuthLayout>
   );

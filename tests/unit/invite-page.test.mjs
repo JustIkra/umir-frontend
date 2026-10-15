@@ -43,22 +43,19 @@ test('acceptMessage words every notice of the invitee', () => {
     title: 'Неверный код',
     text: 'Проверьте код из последнего письма.',
   });
-  assert.equal(message({ kind: 'locked' }).title, 'Код заблокирован');
+  assert.equal(message({ kind: 'locked' }).title, 'Код больше не действует');
   assert.equal(message({ kind: 'expired' }).title, 'Срок действия кода истёк');
   assert.deepEqual(message({ kind: 'resent' }).tone, 'success');
   assert.equal(message({ kind: 'resent' }).title, 'Новый код отправлен');
-  assert.equal(
-    message({ kind: 'proof-expired' }).title,
-    'Подтверждение устарело',
-  );
+  assert.equal(message({ kind: 'proof-expired' }).title, 'Время вышло');
   assert.equal(
     message({ kind: 'unavailable' }).title,
-    'Приглашение временно недоступно',
+    'Не получилось продолжить',
   );
   assert.deepEqual(message({ kind: 'invitation-closed' }), {
     tone: 'error',
-    title: 'Приглашение недействительно',
-    text: 'Срок приглашения истёк, его отменили или уже приняли. Попросите администратора организации отправить новое.',
+    title: 'Приглашение больше не действует',
+    text: 'Срок приглашения истёк, его отменили или уже приняли. Попросите администратора организации прислать новое.',
   });
   assert.deepEqual(message({ kind: 'scope-closed' }), {
     tone: 'error',
@@ -67,26 +64,26 @@ test('acceptMessage words every notice of the invitee', () => {
   });
   assert.deepEqual(message({ kind: 'email-taken' }), {
     tone: 'error',
-    title: 'Учётная запись уже есть',
-    text: 'Пользователь с почтой из приглашения уже зарегистрирован. Войдите и примите приглашение.',
+    title: 'Аккаунт уже есть',
+    text: 'У вас уже есть аккаунт на эту почту. Войдите и примите приглашение.',
   });
   assert.deepEqual(message({ kind: 'other-email' }), {
     tone: 'error',
     title: 'Приглашение отправлено на другую почту',
-    text: 'Почта этой учётной записи не совпадает с почтой из приглашения. Войдите учётной записью, на почту которой пришло письмо.',
+    text: 'У этого аккаунта другая почта. Войдите в аккаунт с той почтой, на которую пришло приглашение.',
   });
   assert.deepEqual(message({ kind: 'not-accepted' }), {
     tone: 'error',
     title: 'Приглашение не принято',
-    text: 'Учётная запись уже состоит в этой организации или почта из приглашения принадлежит другой учётной записи.',
+    text: 'Вы уже состоите в этой организации, или почта из приглашения привязана к другому аккаунту.',
   });
 });
 
 test('acceptMessage counts a wait down and leaves field and lost-answer notices', () => {
   const limited = { kind: 'limited', untilMs: NOW + 45_000 };
   const shown = acceptMessage(limited, NOW);
-  assert.equal(shown.title, 'Отправка кода временно ограничена');
-  assert.ok(shown.text.includes('через 45 с.'));
+  assert.equal(shown.title, 'Слишком много запросов кода');
+  assert.ok(shown.text.includes('через 45 секунд.'));
   assert.equal(acceptMessage(limited, NOW + 45_000), undefined);
   assert.equal(acceptMessage(undefined, NOW), undefined);
   assert.equal(acceptMessage({ kind: 'code-format' }, NOW), undefined);
@@ -114,11 +111,11 @@ test('a guest sees the registration form of the invitation', async () => {
   const plain = text(html);
   assert.ok(
     plain.includes(
-      'Вас пригласили в организацию. Чтобы принять приглашение, создайте учётную запись: укажите имя и пароль, затем подтвердите почту кодом из письма.',
+      'Вас пригласили в организацию. Чтобы принять приглашение, создайте аккаунт: укажите имя и пароль, затем введите код из письма.',
     ),
   );
   assert.ok(plain.includes('Получить код'));
-  assert.ok(plain.includes('Уже есть учётная запись? Войти'));
+  assert.ok(plain.includes('Уже есть аккаунт? Войти'));
   assert.ok(
     html.includes('autoComplete="name"') ||
       html.includes('autocomplete="name"'),
@@ -180,11 +177,11 @@ test('a signed-in user gets the code for the invitation straight away', async ()
   const plain = text(html);
   assert.ok(
     plain.includes(
-      'Вы вошли как Марина Белова. Код подтверждения придёт на почту, указанную в приглашении.',
+      'Вы вошли как Марина Белова. Код придёт на почту из приглашения.',
     ),
   );
   assert.ok(plain.includes('Получить код'));
-  assert.ok(plain.includes('Войти другой учётной записью'));
+  assert.ok(plain.includes('Войти в другой аккаунт'));
   assert.ok(!labels(html).includes('Имя'));
 });
 
@@ -192,9 +189,9 @@ test('the start step shows the refusals of the code request', async () => {
   const closed = await pageText(
     inviteSnapshot({ notice: { kind: 'invitation-closed' } }),
   );
-  assert.ok(closed.includes('Приглашение недействительно'));
+  assert.ok(closed.includes('Приглашение больше не действует'));
   const taken = await page(inviteSnapshot({ notice: { kind: 'email-taken' } }));
-  assert.ok(text(taken).includes('Учётная запись уже есть'));
+  assert.ok(text(taken).includes('Аккаунт уже есть'));
   assert.ok(hrefs(taken).includes(`/login?return=%2Finvite%2F${INVITATION}`));
   const other = await pageText(
     inviteSnapshot({ notice: { kind: 'other-email' } }),
@@ -203,11 +200,11 @@ test('the start step shows the refusals of the code request', async () => {
     },
   );
   assert.ok(other.includes('Приглашение отправлено на другую почту'));
-  assert.equal(other.split('Войти другой учётной записью').length - 1, 1);
+  assert.equal(other.split('Войти в другой аккаунт').length - 1, 1);
   const unknown = await pageText(
     inviteSnapshot({ notice: { kind: 'unknown', action: 'begin' } }),
   );
-  assert.ok(unknown.includes('Результат запроса кода неизвестен'));
+  assert.ok(unknown.includes('Не знаем, отправлен ли код'));
   assert.ok(unknown.includes('Проверить результат'));
 });
 
@@ -217,7 +214,7 @@ test('the code step asks for the code of the email', async () => {
   const plain = text(html);
   assert.ok(
     plain.includes(
-      'Код отправлен на почту, указанную в приглашении. Он действует 10 минут.',
+      'Отправили код на почту из приглашения. Он действует 10 минут.',
     ),
   );
   assert.ok(labels(html).includes('Код из письма'));
@@ -237,7 +234,7 @@ test('the code step turns into «expired» at the expiry time', async () => {
   assert.ok(plain.includes('Срок действия кода истёк'));
   assert.ok(plain.includes('Получить новый код'));
   const locked = await pageText(code({ notice: { kind: 'locked' } }));
-  assert.ok(locked.includes('Код заблокирован'));
+  assert.ok(locked.includes('Код больше не действует'));
   assert.ok(locked.includes('Получить новый код'));
   const wrong = await pageText(code({ notice: { kind: 'wrong-code' } }));
   assert.ok(wrong.includes('Неверный код'));
@@ -256,7 +253,7 @@ test('the details step completes the registration or the acceptance', async () =
     'Повторите пароль',
   ]);
   assert.ok(register.includes('value="Анна Смирнова"'));
-  assert.ok(text(register).includes('Создать учётную запись'));
+  assert.ok(text(register).includes('Создать аккаунт'));
   const accept = await renderRoute(path, {
     session: activeSession,
     invite: code({ step: 'details', mode: 'accept' }),
@@ -287,7 +284,7 @@ test('the result lists the restaurants of the organization with their roles', as
   assert.ok(plain.includes('Склад, Официант'));
   assert.ok(hrefs(html).includes(`/app/r/${R}`));
   assert.ok(plain.includes('На Тверской'));
-  assert.ok(plain.includes('Подготавливается'));
+  assert.ok(plain.includes('Настраивается'));
   assert.ok(
     !hrefs(html).includes('/app/r/99999999-9999-4999-8999-999999999999'),
   );
@@ -302,7 +299,7 @@ test('the result of a registration says the account was created', async () => {
   });
   const plain = text(html);
   assert.equal(h1(html), 'Приглашение принято');
-  assert.ok(plain.includes('Учётная запись создана.'));
+  assert.ok(plain.includes('Аккаунт создан.'));
   assert.ok(hrefs(html).includes(`/app/r/${R}`));
 });
 

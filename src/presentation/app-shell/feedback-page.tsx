@@ -16,7 +16,7 @@ export function FeedbackPage() {
     <Stack gap="6" maxW="40rem">
       <PageHeader
         title="Обратная связь"
-        description="Расскажите о проблеме или предложите улучшение. Мы ответим на указанный email."
+        description="Расскажите о проблеме или предложите улучшение. Мы ответим на вашу почту."
       />
       <FeedbackForm
         key={`${restaurantID}/${user?.userID ?? ''}`}

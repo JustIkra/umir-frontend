@@ -147,7 +147,7 @@ const labels: Record<AcceptAction, string> = {
   begin: 'запроса кода',
   verify: 'проверки кода',
   resend: 'повторной отправки кода',
-  complete: 'создания учётной записи',
+  complete: 'создания аккаунта',
   accept: 'принятия приглашения',
 };
 

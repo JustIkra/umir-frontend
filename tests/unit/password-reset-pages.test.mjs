@@ -41,9 +41,7 @@ test('R01 asks for the email of the account', async () => {
   assert.ok(labels(html).includes('Почта'));
   assert.ok(!labels(html).includes('Логин'));
   const plain = text(html);
-  assert.ok(
-    plain.includes('Укажите почту учётной записи. Отправим на неё код.'),
-  );
+  assert.ok(plain.includes('Укажите почту от аккаунта. Отправим на неё код.'));
   assert.ok(plain.includes('Получить код'));
   assert.ok(
     plain.includes(
@@ -61,24 +59,24 @@ test('R01 keeps the email after «Запросить новый код» and sho
     '/password-reset',
     resetSnapshot({ notice: { kind: 'not-found' } }),
   );
-  assert.ok(notFound.includes('Учётной записи с такой почтой нет.'));
+  assert.ok(notFound.includes('Аккаунта с такой почтой нет.'));
   const limited = await page(
     '/password-reset',
     resetSnapshot({ notice: { kind: 'limited', untilMs: NOW + 45_000 } }),
   );
-  assert.ok(limited.includes('Отправка кода временно ограничена'));
-  assert.ok(limited.includes('Повторить запрос можно через 45 с.'));
+  assert.ok(limited.includes('Слишком много запросов кода'));
+  assert.ok(limited.includes('Попробуйте через 45 секунд.'));
   const unknown = await page(
     '/password-reset',
     resetSnapshot({ notice: { kind: 'unknown', action: 'request' } }),
   );
-  assert.ok(unknown.includes('Результат запроса неизвестен'));
+  assert.ok(unknown.includes('Не знаем, отправлен ли код'));
   assert.ok(unknown.includes('Проверить результат'));
   const proof = await page(
     '/password-reset',
     resetSnapshot({ notice: { kind: 'proof-expired' } }),
   );
-  assert.ok(proof.includes('Подтверждение устарело'));
+  assert.ok(proof.includes('Время вышло'));
 });
 
 test('R05 names the email and counts down to another code', async () => {
@@ -109,7 +107,7 @@ test('R05 states: wrong code, locked, expired, sent again', async () => {
     '/password-reset/code',
     code({ notice: { kind: 'locked' } }),
   );
-  assert.ok(locked.includes('Код заблокирован'));
+  assert.ok(locked.includes('Код больше не действует'));
   assert.ok(locked.includes('Запросить новый код'));
   const expired = await page(
     '/password-reset/code',
@@ -129,7 +127,7 @@ test('R08 says the new session starts at once and shows R09 and R11', async () =
   assert.equal(h1(html), 'Новый пароль');
   assert.ok(
     text(html).includes(
-      'После сохранения прежние сеансы завершатся, и вы сразу войдёте с новым паролем.',
+      'После сохранения вы выйдете на всех устройствах и сразу войдёте здесь с новым паролем.',
     ),
   );
   const fields = await page(
@@ -148,7 +146,7 @@ test('R08 says the new session starts at once and shows R09 and R11', async () =
     '/password-reset/new',
     password({ notice: { kind: 'unknown', action: 'complete' } }),
   );
-  assert.ok(unknown.includes('Сохранение пароля не подтверждено'));
+  assert.ok(unknown.includes('Не знаем, сохранился ли пароль'));
   assert.ok(unknown.includes('Проверить результат'));
   assert.ok(unknown.includes('Перейти ко входу'));
 });
@@ -185,7 +183,7 @@ test('texts of the notices', () => {
   assert.equal(resetMessage({ kind: 'limited', untilMs: NOW }, NOW), undefined);
   assert.equal(
     resetMessage({ kind: 'unavailable' }, NOW).title,
-    'Восстановление временно недоступно',
+    'Не получилось восстановить пароль',
   );
   assert.equal(resetMessage(undefined, NOW), undefined);
 });
@@ -197,7 +195,7 @@ test('R05 shows a refused renew of an expired code, not only the expiry', async 
       notice: { kind: 'limited', untilMs: NOW + 45_000 },
     }),
   });
-  assert.ok(text(limited).includes('Повторить запрос можно через 45 с.'));
+  assert.ok(text(limited).includes('Попробуйте через 45 секунд.'));
   const button = /<button[^>]*>\s*Отправить код ещё раз\s*<\/button>/.exec(
     limited,
   );
@@ -207,7 +205,7 @@ test('R05 shows a refused renew of an expired code, not only the expiry', async 
     '/password-reset/code',
     code({ expiresAtMs: NOW, notice: { kind: 'unavailable' } }),
   );
-  assert.ok(unavailable.includes('Восстановление временно недоступно'));
+  assert.ok(unavailable.includes('Не получилось восстановить пароль'));
 });
 
 const tags = (html, name) =>

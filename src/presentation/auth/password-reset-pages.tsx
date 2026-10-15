@@ -28,6 +28,7 @@ import {
   TextInput,
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { plural } from '@/presentation/ui/plural';
 import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import { AuthLayout, AuthLead, AuthTitle } from './auth-layout';
 
@@ -41,24 +42,23 @@ const stepPaths: Record<ResetStep, string> = {
 };
 
 const lostAnswer =
-  'Ответ сервиса не получен. Повторная отправка не требуется: проверка продолжит ту же попытку.';
+  'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.';
+const mayHaveSent =
+  'Связь прервалась, код мог уже прийти. Нажмите «Проверить результат» — повторно ничего не отправится.';
 const unknownTitles: Record<ResetAction, string> = {
-  request: 'Результат запроса неизвестен',
-  renew: 'Результат запроса неизвестен',
-  verify: 'Результат проверки кода неизвестен',
-  resend: 'Результат повторной отправки неизвестен',
-  complete: 'Сохранение пароля не подтверждено',
+  request: 'Не знаем, отправлен ли код',
+  renew: 'Не знаем, отправлен ли код',
+  verify: 'Не знаем, подошёл ли код',
+  resend: 'Не знаем, отправлен ли новый код',
+  complete: 'Не знаем, сохранился ли пароль',
 };
 const unknownTexts: Record<ResetAction, string> = {
-  request:
-    'Ответ сервиса не получен. Код мог быть отправлен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
-  renew:
-    'Ответ сервиса не получен. Код мог быть отправлен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+  request: mayHaveSent,
+  renew: mayHaveSent,
   verify: lostAnswer,
-  resend:
-    'Ответ сервиса не получен. Код мог быть отправлен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+  resend: mayHaveSent,
   complete:
-    'Ответ сервиса не получен, пароль мог измениться. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+    'Связь прервалась, пароль мог уже смениться. Нажмите «Проверить результат» — повторно ничего не отправится.',
 };
 
 export interface ResetMessage {
@@ -70,32 +70,32 @@ export interface ResetMessage {
 const fixedMessages: Partial<Record<ResetNotice['kind'], ResetMessage>> = {
   unavailable: {
     tone: 'error',
-    title: 'Восстановление временно недоступно',
-    text: 'Сервис восстановления не отвечает, пароль не изменён. Повторите попытку через несколько минут.',
+    title: 'Не получилось восстановить пароль',
+    text: 'Пароль остался прежним. Попробуйте через пару минут.',
   },
   expired: {
     tone: 'error',
     title: 'Срок действия кода истёк',
-    text: 'Запросите новый код: прежний больше не действует.',
+    text: 'Запросите новый код.',
   },
   resent: {
     tone: 'success',
     title: 'Новый код отправлен',
-    text: 'Предыдущий код больше не действует.',
+    text: 'Проверьте почту. Старый код больше не подойдёт.',
   },
   locked: {
     tone: 'error',
-    title: 'Код заблокирован',
-    text: 'Превышено число неверных попыток, код больше не действует. Запросите новый код.',
+    title: 'Код больше не действует',
+    text: 'Вы несколько раз ввели неверный код. Запросите новый.',
   },
   'proof-expired': {
     tone: 'error',
-    title: 'Подтверждение устарело',
-    text: 'Запросите новый код и повторите сброс пароля.',
+    title: 'Время вышло',
+    text: 'Запросите новый код и начните заново.',
   },
 };
 
-// R03, R04, R06b, R07, «Новый код отправлен» and «Подтверждение устарело».
+// R03, R04, R06b, R07, «Новый код отправлен» and «Время вышло».
 // A wait that has run out says nothing.
 export function resetMessage(
   notice: ResetNotice | undefined,
@@ -107,8 +107,8 @@ export function resetMessage(
     if (seconds === 0) return undefined;
     return {
       tone: 'error',
-      title: 'Отправка кода временно ограничена',
-      text: `Превышено число запросов кода. Повторить запрос можно через ${String(seconds)} с.`,
+      title: 'Слишком много запросов кода',
+      text: `Попробуйте через ${String(seconds)}\u00A0${plural(seconds, 'секунду', 'секунды', 'секунд')}.`,
     };
   }
   return fixedMessages[notice.kind];
@@ -119,7 +119,7 @@ export function emailError(
   notice: ResetNotice | undefined,
 ): string | undefined {
   if (notice?.kind === 'email-required') return 'Введите почту';
-  if (notice?.kind === 'not-found') return 'Учётной записи с такой почтой нет.';
+  if (notice?.kind === 'not-found') return 'Аккаунта с такой почтой нет.';
   if (notice?.kind === 'invalid-email') return 'Проверьте адрес почты.';
   return undefined;
 }
@@ -251,7 +251,7 @@ export function PasswordResetRequestPage() {
   return (
     <AuthLayout title="Восстановление пароля" help={help}>
       <AuthTitle>Восстановление пароля</AuthTitle>
-      <AuthLead>Укажите почту учётной записи. Отправим на неё код.</AuthLead>
+      <AuthLead>Укажите почту от аккаунта. Отправим на неё код.</AuthLead>
       <Unknown
         notice={reset.notice}
         onCheck={() => {
@@ -433,8 +433,8 @@ export function PasswordResetNewPage() {
     <AuthLayout title="Новый пароль" help={help}>
       <AuthTitle>Новый пароль</AuthTitle>
       <AuthLead>
-        После сохранения прежние сеансы завершатся, и вы сразу войдёте с новым
-        паролем.
+        После сохранения вы выйдете на всех устройствах и сразу войдёте здесь с
+        новым паролем.
       </AuthLead>
       <Unknown
         notice={reset.notice}

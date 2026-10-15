@@ -115,7 +115,7 @@ function Unknown({
   );
 }
 
-// «Войти другой учётной записью»: the session ends, then sign-in returns to
+// «Войти в другой аккаунт»: the session ends, then sign-in returns to
 // the invitation.
 function SwitchAccount({ invitationID }: { invitationID: string }) {
   const { session } = useServices();
@@ -134,11 +134,11 @@ function SwitchAccount({ invitationID }: { invitationID: string }) {
           });
         }}
       >
-        Войти другой учётной записью
+        Войти в другой аккаунт
       </Button>
       {failed && (
         <Text textStyle="caption.default" color="text.error" role="alert">
-          Не удалось завершить сеанс. Повторите попытку.
+          Не получилось выйти. Попробуйте ещё раз.
         </Text>
       )}
     </>
@@ -214,8 +214,7 @@ function StartStep({
         <AuthTitle>Приглашение в «Ровный ход»</AuthTitle>
         <AuthLead>
           Вас пригласили в организацию. Чтобы принять приглашение, создайте
-          учётную запись: укажите имя и пароль, затем подтвердите почту кодом из
-          письма.
+          аккаунт: укажите имя и пароль, затем введите код из письма.
         </AuthLead>
         <Unknown flow={flow} notice={notice} />
         <DetailsForm
@@ -234,7 +233,7 @@ function StartStep({
           }
         />
         <Text textStyle="body.default">
-          Уже есть учётная запись?{' '}
+          Уже есть аккаунт?{' '}
           <TextLink to={signInPath(invitationID)}>Войти</TextLink>
         </Text>
       </>
@@ -248,7 +247,7 @@ function StartStep({
     <>
       <AuthTitle>Приглашение в «Ровный ход»</AuthTitle>
       <AuthLead>
-        {`Вы вошли как ${name}. Код подтверждения придёт на почту, указанную в приглашении.`}
+        {`Вы вошли как ${name}. Код придёт на почту из приглашения.`}
       </AuthLead>
       <Unknown flow={flow} notice={notice} />
       <Button
@@ -298,7 +297,7 @@ function CodeStep({
   return (
     <CodeEntry
       idPrefix="invite"
-      lead="Код отправлен на почту, указанную в приглашении. Он действует 10 минут."
+      lead="Отправили код на почту из приглашения. Он действует 10 минут."
       state={snapshot}
       isExpired={(nowMs) => isAcceptCodeExpired(snapshot, nowMs)}
       notice={snapshot.notice}
@@ -334,14 +333,14 @@ function DetailsStep({
       <>
         <AuthTitle>Завершите регистрацию</AuthTitle>
         <AuthLead>
-          Почта подтверждена. Укажите имя и пароль: после перезагрузки страницы
-          они не сохраняются.
+          Почта подтверждена. Укажите имя и пароль. Не перезагружайте страницу,
+          пока не закончите.
         </AuthLead>
         <Unknown flow={flow} notice={snapshot.notice} />
         <DetailsForm
           snapshot={snapshot}
           submit={(input) => flow.completeDetails(input)}
-          label="Создать учётную запись"
+          label="Создать аккаунт"
           busyLabel="Создаём…"
         />
         <Message notice={snapshot.notice} nowMs={now} />
@@ -351,7 +350,7 @@ function DetailsStep({
   const unknown = snapshot.notice?.kind === 'unknown';
   return (
     <>
-      <AuthTitle>Завершите принятие приглашения</AuthTitle>
+      <AuthTitle>Примите приглашение</AuthTitle>
       <AuthLead>Почта подтверждена. Осталось принять приглашение.</AuthLead>
       <Unknown flow={flow} notice={snapshot.notice} />
       <Button
@@ -414,7 +413,7 @@ function RestaurantRows({
                   Открыть
                 </ButtonLink>
               ) : (
-                <Badge>Подготавливается</Badge>
+                <Badge>Настраивается</Badge>
               )}
             </Flex>
           )),
@@ -441,8 +440,8 @@ function DoneStep({ snapshot }: { snapshot: AcceptSnapshot }) {
       <AuthTitle>Приглашение принято</AuthTitle>
       <AuthLead>
         {snapshot.mode === 'register'
-          ? 'Учётная запись создана. Вы вошли и состоите в организации.'
-          : 'Вы состоите в организации.'}
+          ? 'Аккаунт создан. Вы вошли и теперь состоите в организации.'
+          : 'Теперь вы состоите в организации.'}
       </AuthLead>
       {listed && <RestaurantRows organizations={organizations} />}
       <ButtonLink to="/app" w="full">

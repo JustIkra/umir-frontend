@@ -32,7 +32,7 @@ test('a rate limit names the wait', () => {
     {
       tone: 'error',
       title: 'Слишком много попыток входа',
-      text: 'Повторите вход через 60 с.',
+      text: 'Попробуйте через 60 секунд.',
       waitSeconds: 60,
     },
   );
@@ -45,10 +45,10 @@ test('an unknown outcome continues the same attempt', () => {
     attempt: {},
   });
   assert.equal(message.tone, 'unknown');
-  assert.equal(message.title, 'Результат входа неизвестен');
+  assert.equal(message.title, 'Не знаем, получилось ли войти');
   assert.equal(
     message.text,
-    'Ответ сервиса не получен. Вход мог быть выполнен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+    'Связь прервалась. Нажмите «Проверить результат» — входить заново не нужно.',
   );
 });
 
@@ -57,8 +57,8 @@ test('any other refusal says the service did not answer', () => {
     signInMessage(rejected('AuthUnavailable', { status: 503 })),
     {
       tone: 'error',
-      title: 'Вход не выполнен',
-      text: 'Сервис авторизации не отвечает. Повторите попытку через несколько минут.',
+      title: 'Не получилось войти',
+      text: 'Попробуйте через пару минут.',
     },
   );
   assert.equal(signInMessage({ kind: 'committed', value: {} }), undefined);
@@ -71,8 +71,8 @@ test('under L13 a refused service reads as L14; wrong credentials stay L05', () 
     signInMessage(rejected('AuthUnavailable', { status: 503 }), unknownChange),
     {
       tone: 'error',
-      title: 'Вход не выполнен',
-      text: 'Действующий пароль пока не определён. Повторите вход через несколько минут.',
+      title: 'Не получилось войти',
+      text: 'Пока не знаем, какой пароль действует — старый или новый. Попробуйте войти через пару минут.',
     },
   );
   assert.equal(
@@ -87,18 +87,18 @@ test('notices of L11, L13 and L10', () => {
     {
       tone: 'success',
       title: 'Пароль изменён',
-      text: 'Все сеансы завершены. Войдите с новым паролем.',
+      text: 'Вы вышли на всех устройствах. Войдите с новым паролем.',
     },
   );
   assert.deepEqual(noticeMessage(unknownChange), {
     tone: 'unknown',
-    title: 'Результат изменения пароля неизвестен',
-    text: 'Если пароль изменился, войти можно только с новым. Попробуйте войти с ним — изменение повторно не отправляется.',
+    title: 'Не знаем, сменился ли пароль',
+    text: 'Если сменился, подойдёт только новый. Попробуйте войти с ним — менять пароль ещё раз не нужно.',
   });
   assert.deepEqual(noticeMessage({ kind: 'password-limit' }), {
     tone: 'unknown',
-    title: 'Сессия завершена',
-    text: 'Превышено число неверных попыток ввести текущий пароль. Войдите снова.',
+    title: 'Вы вышли из аккаунта',
+    text: 'Текущий пароль несколько раз ввели неверно. Войдите снова.',
   });
 });
 
@@ -106,7 +106,7 @@ test('the notice after signing out on every device', async () => {
   assert.deepEqual(noticeMessage({ kind: 'everywhere' }), {
     tone: 'success',
     title: 'Вы вышли на всех устройствах',
-    text: 'Все сеансы учётной записи завершены, включая этот. Войдите снова.',
+    text: 'Включая это устройство. Войдите снова.',
   });
   const html = await renderRoute('/login', {
     session: {
@@ -135,7 +135,7 @@ test('the sign-in page shows the notice and fills in the login', async () => {
       notice: { kind: 'password-limit' },
     },
   });
-  assert.ok(text(limit).includes('Превышено число неверных попыток'));
+  assert.ok(text(limit).includes('несколько раз ввели неверно'));
 });
 
 test('an expired session with the L13 notice shows L13, not the plain expiry', async () => {
@@ -144,9 +144,9 @@ test('an expired session with the L13 notice shows L13, not the plain expiry', a
     session: { status: 'anonymous', expired: true, notice: unknownChange },
   });
   const plain = text(html);
-  assert.ok(plain.includes('Результат изменения пароля неизвестен'));
+  assert.ok(plain.includes('Не знаем, сменился ли пароль'));
   assert.ok(html.includes('value="m.belova"'));
-  assert.ok(!plain.includes('Сессия завершена'));
+  assert.ok(!plain.includes('Вы вышли из аккаунта'));
   assert.ok(!plain.includes(plainExpiry));
   const changed = text(
     await renderRoute('/login?expired=1', {
@@ -158,13 +158,13 @@ test('an expired session with the L13 notice shows L13, not the plain expiry', a
     }),
   );
   assert.ok(changed.includes('Пароль изменён'));
-  assert.ok(!changed.includes('Сессия завершена'));
+  assert.ok(!changed.includes('Вы вышли из аккаунта'));
   assert.ok(!changed.includes(plainExpiry));
   const bare = text(
     await renderRoute('/login?expired=1', {
       session: { status: 'anonymous', expired: true },
     }),
   );
-  assert.ok(bare.includes('Сессия завершена'));
+  assert.ok(bare.includes('Вы вышли из аккаунта'));
   assert.ok(bare.includes(plainExpiry));
 });

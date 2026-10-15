@@ -8,7 +8,7 @@ import { AuthLayout, AuthTitle } from './auth-layout';
 type LogoutState = 'pending' | 'failed' | 'active';
 
 // Figma O03 and O05: until gateway confirms the sign-out, the data stays
-// hidden and the page offers to repeat it or to check the session.
+// hidden and the page offers to repeat it or to check the result.
 export function LogoutPage() {
   const { session } = useServices();
   const navigate = useNavigate();
@@ -40,33 +40,32 @@ export function LogoutPage() {
       <AuthLayout title="Выход">
         <AuthTitle>Выход</AuthTitle>
         <Text textStyle="body.default" color="text.secondary">
-          Завершаем сессию…
+          Выходим…
         </Text>
       </AuthLayout>
     );
   }
   if (state === 'active') {
     return (
-      <AuthLayout title="Сессия ещё активна">
-        <AuthTitle>Сессия ещё активна</AuthTitle>
+      <AuthLayout title="Вы ещё не вышли">
+        <AuthTitle>Вы ещё не вышли</AuthTitle>
         <Text textStyle="body.default" color="text.secondary">
-          Данные остаются скрытыми. Завершите выход, чтобы закрыть сессию на
-          этом устройстве.
+          Данные пока скрыты. Нажмите «Выйти», чтобы выйти на этом устройстве.
         </Text>
-        <Button onClick={again}>Завершить выход</Button>
+        <Button onClick={again}>Выйти</Button>
       </AuthLayout>
     );
   }
   return (
-    <AuthLayout title="Выход ещё не подтверждён">
-      <AuthTitle>Выход ещё не подтверждён</AuthTitle>
+    <AuthLayout title="Не знаем, получилось ли выйти">
+      <AuthTitle>Не знаем, получилось ли выйти</AuthTitle>
       <Text textStyle="body.default" color="text.secondary">
-        Данные скрыты. Ответ на запрос выхода не получен.
+        Связь прервалась. Данные пока скрыты.
       </Text>
       <Stack gap="2">
-        <Button onClick={again}>Повторить выход</Button>
+        <Button onClick={again}>Выйти ещё раз</Button>
         <Button variant="secondary" onClick={check}>
-          Проверить сессию
+          Проверить результат
         </Button>
       </Stack>
     </AuthLayout>

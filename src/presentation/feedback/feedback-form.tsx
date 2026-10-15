@@ -28,6 +28,7 @@ import {
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon } from '@/presentation/ui/icon';
+import { plural } from '@/presentation/ui/plural';
 
 type Status =
   | { kind: 'editing' }
@@ -39,17 +40,17 @@ function errorText(field: FeedbackField, error: FeedbackFieldError): string {
     case 'Required':
       return {
         name: 'Введите имя',
-        email: 'Введите email',
+        email: 'Введите почту',
         phone: 'Введите телефон',
         message: 'Напишите сообщение',
         consent: 'Нужно согласие на обработку персональных данных',
       }[field];
     case 'TooShort':
-      return 'Значение слишком короткое';
+      return 'Слишком коротко';
     case 'TooLong':
       return {
         name: 'Сократите имя до 100 символов',
-        email: 'Email не может быть длиннее 254 символов',
+        email: 'Адрес почты не может быть длиннее 254 символов',
         phone: 'Сократите телефон до 32 символов',
         message: `Сократите сообщение до ${String(feedbackMessageLimit)} символов`,
         consent: 'Нужно согласие на обработку персональных данных',
@@ -57,11 +58,11 @@ function errorText(field: FeedbackField, error: FeedbackFieldError): string {
     case 'InvalidFormat':
       return field === 'phone'
         ? 'Проверьте телефон: например, +7 900 000-00-00'
-        : 'Проверьте email: например, name@example.ru';
+        : 'Проверьте почту: например, name@example.ru';
     case 'InvalidCharacters':
       return field === 'phone'
-        ? 'В телефоне допустимы цифры, пробел, +, -, ( и )'
-        : 'Уберите служебные символы';
+        ? 'В телефоне можно писать только цифры, пробел, +, -, ( и )'
+        : 'Уберите лишние символы';
     case 'ConsentRequired':
       return 'Нужно согласие на обработку персональных данных';
     case 'ConsentOutdated':
@@ -79,8 +80,10 @@ const fieldsToCheck = (count: number) => {
   return `${String(count)} полей`;
 };
 
-const retryAfterText = (seconds: number) =>
-  `${String(Math.max(1, Math.ceil(seconds / 60)))}\u00A0мин.`;
+const retryAfterText = (seconds: number) => {
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  return `${String(minutes)}\u00A0${plural(minutes, 'минуту', 'минуты', 'минут')}`;
+};
 
 // Figma Feedback form 205:3747 with the states Default, Filled, Field errors,
 // Submitting, Sent, Rate limited, Unavailable and Unknown. The landing sends
@@ -209,7 +212,7 @@ export function FeedbackForm({
         <FieldMessage id={messageId('name')} error={error('name')} />
       </FieldGroup>
       <FieldGroup>
-        <FieldLabel htmlFor={fieldId('email')}>Email</FieldLabel>
+        <FieldLabel htmlFor={fieldId('email')}>Почта</FieldLabel>
         <TextInput
           ref={emailInput}
           id={fieldId('email')}
@@ -227,7 +230,7 @@ export function FeedbackForm({
         <FieldMessage
           id={messageId('email')}
           error={error('email')}
-          hint="Ответим на этот адрес."
+          hint="Ответим на эту почту."
         />
       </FieldGroup>
       <FieldGroup>
@@ -361,45 +364,43 @@ function Outcome({
     case 'sent':
       return (
         <FormMessage tone="success" title="Сообщение отправлено">
-          Мы ответим на указанный email.
+          Мы ответим на почту, которую вы указали.
         </FormMessage>
       );
     case 'rateLimited':
       return (
         <FormMessage tone="error" title="Слишком много сообщений">
-          Повторить отправку можно через{' '}
-          {retryAfterText(outcome.retryAfterSeconds)} Текст остался в форме.
+          Попробуйте через {retryAfterText(outcome.retryAfterSeconds)}. Текст
+          остался в форме.
         </FormMessage>
       );
     case 'unavailable':
       return (
         <FormMessage
           tone="error"
-          title="Сообщение не отправлено"
+          title="Не получилось отправить сообщение"
           details={outcome.diagnostics}
-          action={
-            <Button variant="secondary" onClick={retry}>
-              Повторить отправку
-            </Button>
-          }
-        >
-          Сервис временно недоступен. Текст остался в форме — повторите отправку
-          позже.
-        </FormMessage>
-      );
-    case 'unknown':
-      return (
-        <FormMessage
-          tone="unknown"
-          title="Не удалось подтвердить отправку"
           action={
             <Button variant="secondary" onClick={retry}>
               Отправить ещё раз
             </Button>
           }
         >
-          Ответ не получен. Повторная отправка безопасна — сообщение не
-          задвоится.
+          Текст остался в форме — попробуйте через пару минут.
+        </FormMessage>
+      );
+    case 'unknown':
+      return (
+        <FormMessage
+          tone="unknown"
+          title="Не знаем, дошло ли сообщение"
+          action={
+            <Button variant="secondary" onClick={retry}>
+              Отправить ещё раз
+            </Button>
+          }
+        >
+          Связь прервалась. Отправьте ещё раз — дубля не будет.
         </FormMessage>
       );
   }

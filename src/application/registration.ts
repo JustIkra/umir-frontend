@@ -148,7 +148,7 @@ const labels: Record<RegisterAction, string> = {
   begin: 'запроса кода',
   verify: 'проверки кода',
   resend: 'повторной отправки кода',
-  complete: 'создания учётной записи',
+  complete: 'создания аккаунта',
 };
 
 // The code turns into «expired» at expiresAt without a request.
