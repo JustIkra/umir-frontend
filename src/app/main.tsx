@@ -13,6 +13,7 @@ import {
   createOrderApi,
   createRestaurantReads,
 } from '@/adapters/api/restaurant-api';
+import { createInvitationApi } from '@/adapters/api/invitation-api';
 import { createRecoveryApi } from '@/adapters/api/recovery-api';
 import {
   createWarehouseApi,
@@ -25,6 +26,7 @@ import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
 import { createDeliveryStore } from '@/adapters/browser-storage/delivery-store';
 import { createOrderStore } from '@/adapters/browser-storage/order-store';
+import { createInvitationStore } from '@/adapters/browser-storage/invitation-store';
 import { createPasswordResetStore } from '@/adapters/browser-storage/password-reset-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
 import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender';
@@ -46,6 +48,7 @@ import { createLiveSync } from '@/application/live-sync';
 import { createModelRegistry } from '@/application/models';
 import { createOrderFlow } from '@/application/order-flow';
 import { createOrderFlowRegistry } from '@/application/order-flows';
+import { createInvitationAcceptance } from '@/application/invitation-acceptance';
 import { createOrganizationCommands } from '@/application/organization-commands';
 import { createOrganizationReads } from '@/application/organization-reads';
 import { createPasswordResetFlow } from '@/application/password-reset';
@@ -289,6 +292,14 @@ const passwordReset = createPasswordResetFlow({
   storage: createPasswordResetStore(browserSessionStorage()),
   now,
 });
+const invitationAcceptance = createInvitationAcceptance({
+  api: createInvitationApi(client),
+  commands,
+  session,
+  access,
+  storage: createInvitationStore(browserSessionStorage()),
+  now,
+});
 const accountSettings = createAccountSettings({
   api: accountApi,
   commands,
@@ -308,6 +319,7 @@ const services: PresentationServices = {
   commands,
   now,
   passwordReset,
+  invitationAcceptance,
   accountSettings,
   organizations: {
     reads: organizationReads,

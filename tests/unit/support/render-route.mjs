@@ -250,10 +250,23 @@ export const resetSnapshot = (overrides = {}) => ({
   ...overrides,
 });
 
+export const inviteSnapshot = (overrides = {}) => ({
+  invitationID: undefined,
+  mode: 'register',
+  step: 'start',
+  displayName: '',
+  expiresAtMs: undefined,
+  resendAtMs: undefined,
+  busy: false,
+  notice: undefined,
+  membership: undefined,
+  ...overrides,
+});
+
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
 // «Данные обновились» notice of models; data.stockReport is keyed by
-// riskHours; writeoff overrides confirm, check and pending of the write-off
+// riskHours; invite is the snapshot of the invitation page; writeoff overrides confirm, check and pending of the write-off
 // commands. organizations carries the snapshots of the organization models
 // (members, invitations, profile; loading by default), operations (the
 // followed preparations and deletions), pending (command keys without a known
@@ -269,6 +282,7 @@ export function fakeServices({
   attempts = [],
   notice,
   reset = resetSnapshot(),
+  invite = inviteSnapshot(),
   pending = { name: undefined, password: undefined },
   data = {},
   pendingProduct,
@@ -290,6 +304,18 @@ export function fakeServices({
       resend: () => Promise.resolve('stay'),
       complete: () => Promise.resolve('stay'),
       check: () => Promise.resolve('stay'),
+      restart: () => {},
+    },
+    invitationAcceptance: {
+      ...store(invite),
+      open: () => {},
+      register: () => Promise.resolve(),
+      requestCode: () => Promise.resolve(),
+      verify: () => Promise.resolve(),
+      resend: () => Promise.resolve(),
+      completeDetails: () => Promise.resolve(),
+      acceptInvitation: () => Promise.resolve(),
+      check: () => Promise.resolve(),
       restart: () => {},
     },
     accountSettings: {

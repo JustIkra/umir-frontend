@@ -6,6 +6,7 @@ import type { CommandRunner } from '@/application/commands';
 import type { CookieNoticeStore } from '@/application/cookie-notice';
 import type { DeliveryFlow } from '@/application/delivery-flow';
 import type { FeedbackSubmitter } from '@/application/feedback';
+import type { InvitationAcceptance } from '@/application/invitation-acceptance';
 import type { LifecycleTracker } from '@/application/lifecycles';
 import type { LiveSync } from '@/application/live-sync';
 import type { ModelRegistry } from '@/application/models';
@@ -31,6 +32,8 @@ export interface PresentationServices {
   // The clock of countdowns; render tests pass a fixed one.
   now: () => number;
   passwordReset: PasswordResetFlow;
+  // The invitee's page /invite/:id.
+  invitationAcceptance: InvitationAcceptance;
   accountSettings: AccountSettings;
   // Organization administration of Auth: the lists and profile per
   // organization, the commands and the follow-up of preparation and deletion.
