@@ -57,3 +57,13 @@ export function formatSectionDate(epochMs: number, timeZone: string): string {
 export function formatStamp(epochMs: number, timeZone: string): string {
   return `${dayMonth(epochMs, timeZone)}, ${formatInstant(epochMs, timeZone, 'time')}`;
 }
+
+export function formatAbsoluteStamp(epochMs: number, timeZone: string): string {
+  const date = new Intl.DateTimeFormat('ru-RU', {
+    timeZone,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(epochMs);
+  return `${date}, ${formatInstant(epochMs, timeZone, 'time')}`;
+}

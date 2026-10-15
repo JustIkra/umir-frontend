@@ -3,6 +3,7 @@ import { test } from 'bun:test';
 import { listText, plural } from '../../src/presentation/ui/plural.ts';
 import { matchesQuery } from '../../src/presentation/ui/search.ts';
 import {
+  formatAbsoluteStamp,
   formatSectionDate,
   formatStamp,
   zoneLabel,
@@ -61,4 +62,16 @@ test('a list of numbers ends with «и»', () => {
   assert.equal(listText([3]), '3');
   assert.equal(listText([5, 6]), '5 и 6');
   assert.equal(listText([1, 2, 4]), '1, 2 и 4');
+});
+
+test('absolute warehouse dates distinguish years and respect the organization zone', () => {
+  const first = Date.parse('2026-10-15T10:00:00+03:00');
+  const next = Date.parse('2027-10-15T10:00:00+03:00');
+  assert.match(formatAbsoluteStamp(first, 'Europe/Moscow'), /2026/);
+  assert.match(formatAbsoluteStamp(next, 'Europe/Moscow'), /2027/);
+  assert.notEqual(
+    formatAbsoluteStamp(first, 'Europe/Moscow'),
+    formatAbsoluteStamp(next, 'Europe/Moscow'),
+  );
+  assert.match(formatAbsoluteStamp(first, 'Asia/Yekaterinburg'), /12:00/);
 });

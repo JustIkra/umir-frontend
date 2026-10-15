@@ -4,7 +4,7 @@ import type { BaseUnit } from '@/domain/quantity';
 import { formatQuantity } from '@/domain/quantity';
 import chevronIcon from '@/presentation/assets/icons/chevron-right-24.svg';
 import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
-import { formatStamp } from '@/presentation/ui/zones';
+import { formatAbsoluteStamp } from '@/presentation/ui/zones';
 import { SearchInput } from '@/presentation/ui/form';
 import { Badge } from '@/presentation/ui/badge';
 import { Icon } from '@/presentation/ui/icon';
@@ -75,7 +75,7 @@ function ProductBatches({
                       <Flex gap="2" wrap="wrap" align="center">
                         <Text>
                           Годна до{' '}
-                          {formatStamp(
+                          {formatAbsoluteStamp(
                             batch.expiresAt.epochMs,
                             value.context.settings.timeZone,
                           )}
@@ -91,7 +91,7 @@ function ProductBatches({
                       </Flex>
                       <Text textStyle="caption.default" color="text.secondary">
                         Поступила{' '}
-                        {formatStamp(
+                        {formatAbsoluteStamp(
                           batch.receivedAt.epochMs,
                           value.context.settings.timeZone,
                         )}

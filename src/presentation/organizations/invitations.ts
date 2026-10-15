@@ -359,8 +359,8 @@ export interface InvitationNotice {
 }
 
 export const invitedNotice = (email: string): InvitationNotice => ({
-  title: `Приглашение для ${email} отправлено`,
-  text: 'В списке будет видно, дошло ли письмо.',
+  title: `Приглашение для ${email} готовим к отправке`,
+  text: 'Статус отправки появится в списке.',
 });
 
 // IN05.
@@ -370,8 +370,8 @@ export const cancelledNotice = (email: string): InvitationNotice => ({
 });
 
 export const resentNotice = (email: string): InvitationNotice => ({
-  title: `Ссылка для ${email} отправлена ещё раз`,
-  text: 'В списке будет видно, дошло ли письмо.',
+  title: `Ссылку для ${email} готовим к повторной отправке`,
+  text: 'Статус отправки появится в списке.',
 });
 
 const notResent = 'Ссылка не отправлена';

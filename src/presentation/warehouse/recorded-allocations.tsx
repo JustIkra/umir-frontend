@@ -3,7 +3,7 @@ import type { Order } from '@/application/restaurant';
 import { recordedAllocations } from '@/application/recorded-allocations';
 import { formatQuantity, formatThousandths } from '@/domain/quantity';
 import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
-import { formatStamp } from '@/presentation/ui/zones';
+import { formatAbsoluteStamp } from '@/presentation/ui/zones';
 
 export function AllocationFacts({
   order,
@@ -50,7 +50,7 @@ export function AllocationFacts({
                 ? history.loading
                   ? 'Узнаём срок годности…'
                   : 'Срок годности неизвестен.'
-                : `Годна до ${formatStamp(row.expiresAt.epochMs, timeZone)}`}
+                : `Годна до ${formatAbsoluteStamp(row.expiresAt.epochMs, timeZone)}`}
             </Text>
           </Stack>
         );

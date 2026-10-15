@@ -8,7 +8,7 @@ import { Badge } from '@/presentation/ui/badge';
 import { ListCard } from '@/presentation/ui/card';
 import { plural } from '@/presentation/ui/plural';
 import { SegmentChoice } from '@/presentation/ui/segment-choice';
-import { formatStamp } from '@/presentation/ui/zones';
+import { formatAbsoluteStamp } from '@/presentation/ui/zones';
 import { WarehouseLayout } from './warehouse-layout';
 import { WarehouseRead, warehouseStamp } from './warehouse-read';
 import { AllocationFacts } from './recorded-allocations';
@@ -133,7 +133,7 @@ export function HistoryPage() {
                           textStyle="caption.default"
                           color="text.secondary"
                         >
-                          {formatStamp(
+                          {formatAbsoluteStamp(
                             event.recordedAt.epochMs,
                             value.context.settings.timeZone,
                           )}

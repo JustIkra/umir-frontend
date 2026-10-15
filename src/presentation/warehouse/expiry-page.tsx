@@ -14,7 +14,7 @@ import { Button } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { ListCard } from '@/presentation/ui/card';
 import { FormMessage } from '@/presentation/ui/form-message';
-import { formatStamp } from '@/presentation/ui/zones';
+import { formatAbsoluteStamp } from '@/presentation/ui/zones';
 import { WarehouseLayout } from './warehouse-layout';
 import { WarehouseRead, warehouseStamp } from './warehouse-read';
 import { remainingTime } from './warehouse-time';
@@ -144,7 +144,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                     </Text>
                     <Text textStyle="caption.default" color="text.secondary">
                       Годна до{' '}
-                      {formatStamp(
+                      {formatAbsoluteStamp(
                         row.expiresAt.epochMs,
                         value.context.settings.timeZone,
                       )}
@@ -218,7 +218,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                       </Text>
                       <Text textStyle="caption.default" color="text.secondary">
                         Срок истёк{' '}
-                        {formatStamp(
+                        {formatAbsoluteStamp(
                           batch.expiresAt.epochMs,
                           value.context.settings.timeZone,
                         )}

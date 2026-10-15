@@ -440,8 +440,8 @@ test('pendingExpiry finds the pending invitation of the address', () => {
 
 test('the notices of the invitations name the address', () => {
   assert.deepEqual(invitedNotice('e.titova@restoran.example'), {
-    title: 'Приглашение для e.titova@restoran.example отправлено',
-    text: 'В списке будет видно, дошло ли письмо.',
+    title: 'Приглашение для e.titova@restoran.example готовим к отправке',
+    text: 'Статус отправки появится в списке.',
   });
   assert.deepEqual(cancelledNotice('o.lebedeva@restoran.example'), {
     title: 'Приглашение для o.lebedeva@restoran.example отменено',
@@ -473,8 +473,8 @@ test('resendResult says what the link did', () => {
   assert.deepEqual(result({ kind: 'done', value: {} }), {
     tone: 'success',
     notice: {
-      title: 'Ссылка для a@x.ru отправлена ещё раз',
-      text: 'В списке будет видно, дошло ли письмо.',
+      title: 'Ссылку для a@x.ru готовим к повторной отправке',
+      text: 'Статус отправки появится в списке.',
     },
   });
   assert.equal(
