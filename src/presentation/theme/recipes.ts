@@ -48,6 +48,20 @@ export const buttonRecipe = defineRecipe({
           _hover: { bg: 'bg.surface' },
         },
       },
+      // Irreversible actions (deleting a restaurant or an organization): the
+      // error colour of the theme, the same 48px box as the primary button.
+      danger: {
+        px: 'calc({spacing.6} - 1px)',
+        bg: 'text.error',
+        color: 'text.onAction',
+        _hover: { bg: 'text.error', filter: 'brightness(0.88)' },
+        _disabled: {
+          bg: 'bg.subtle',
+          color: 'text.disabled',
+          filter: 'none',
+          _hover: { bg: 'bg.subtle', filter: 'none' },
+        },
+      },
       link: {
         px: 'calc({spacing.1} - 1px)',
         color: 'text.action',

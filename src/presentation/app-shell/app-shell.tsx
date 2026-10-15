@@ -178,6 +178,11 @@ export function AppShell({
         user={user}
         organizations={organizations}
         currentID={currentID}
+        feedbackPath={
+          mode === 'restaurant' && currentID !== undefined && context.restaurant
+            ? restaurantPath(currentID, '/feedback')
+            : undefined
+        }
         onSwitch={onSwitch}
       />
       <NavigationDrawer

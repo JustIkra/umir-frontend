@@ -17,14 +17,20 @@ import {
   createOrderApi,
   createRestaurantReads,
 } from '@/adapters/api/restaurant-api';
+import { createInvitationApi } from '@/adapters/api/invitation-api';
+import { createRegistrationApi } from '@/adapters/api/registration-api';
 import { createRecoveryApi } from '@/adapters/api/recovery-api';
 import { createAccountApi } from '@/adapters/api/account-api';
+import { createOrganizationsApi } from '@/adapters/api/organizations-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
 import { createOrderStore } from '@/adapters/browser-storage/order-store';
+import { createInvitationStore } from '@/adapters/browser-storage/invitation-store';
+import { createRegistrationStore } from '@/adapters/browser-storage/registration-store';
 import { createPasswordResetStore } from '@/adapters/browser-storage/password-reset-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
+import { createAppFeedbackApiSender } from '@/adapters/feedback/app-feedback-sender';
 import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender';
 import { createGatewayClient } from '@/adapters/http/gateway-client';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
@@ -36,11 +42,19 @@ import {
 } from '@/application/catalog-commands';
 import { createCommandRunner } from '@/application/commands';
 import { createEpochRegistry } from '@/application/epochs';
-import { createFeedbackSubmitter } from '@/application/feedback';
+import {
+  createFeedbackSubmitter,
+  type FeedbackSubmitter,
+} from '@/application/feedback';
+import { createLifecycleTracker } from '@/application/lifecycles';
 import { createLiveSync } from '@/application/live-sync';
 import { createModelRegistry } from '@/application/models';
 import { createOrderFlow } from '@/application/order-flow';
 import { createOrderFlowRegistry } from '@/application/order-flows';
+import { createInvitationAcceptance } from '@/application/invitation-acceptance';
+import { createRegistration } from '@/application/registration';
+import { createOrganizationCommands } from '@/application/organization-commands';
+import { createOrganizationReads } from '@/application/organization-reads';
 import { createPasswordResetFlow } from '@/application/password-reset';
 import {
   createRestaurantData,
@@ -101,6 +115,20 @@ const commands = createCommandRunner({
 const access = createAccessStore(createAccessApi(client), {
   onUnauthenticated: () => session.check(),
 });
+const organizationsApi = createOrganizationsApi(client);
+const organizationReads = createOrganizationReads({
+  api: organizationsApi,
+  now,
+  createCancellation: () => new AbortController(),
+});
+const lifecycles = createLifecycleTracker({
+  api: organizationsApi,
+  scheduler,
+  now,
+  onSettled: () => {
+    void access.refresh();
+  },
+});
 const live = createLiveSync({
   feed: createEventSourceFeed((url) => new EventSource(url)),
   scheduler,
@@ -131,6 +159,7 @@ const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
 const restaurantData = new Map<string, RestaurantData>();
 const catalogCommands = new Map<string, CatalogCommands>();
+const restaurantFeedback = new Map<string, FeedbackSubmitter>();
 const orderFlows = createOrderFlowRegistry(
   (userID, restaurantID) =>
     createOrderFlow({
@@ -173,11 +202,17 @@ const session = createSessionStore({
     orderFlows.forget();
     catalogCommands.clear();
     warehouseCommands.clear();
+    restaurantFeedback.clear();
+    organizationReads.clear();
+    organizationCommands.clear();
+    lifecycles.clear();
     client.clearCsrfToken();
   },
   onExpired: () => {
     live.stop();
     models.clear();
+    organizationReads.clear();
+    lifecycles.clear();
     access.clear();
     client.clearCsrfToken();
   },
@@ -191,6 +226,10 @@ const session = createSessionStore({
     orderFlows.forget();
     catalogCommands.clear();
     warehouseCommands.clear();
+    restaurantFeedback.clear();
+    organizationReads.clear();
+    organizationCommands.clear();
+    lifecycles.clear();
     void access.refresh();
   },
   // L13: the server ended the session while a password change is pending,
@@ -204,11 +243,49 @@ const session = createSessionStore({
       : { kind: 'password-unknown', login: state.user.login };
   },
 });
+const organizationCommands = createOrganizationCommands({
+  api: organizationsApi,
+  commands,
+  accessChanged: () => {
+    void access.refresh();
+  },
+  membersChanged: (orgID) => {
+    organizationReads.members(orgID).refresh();
+  },
+  invitationsChanged: (orgID) => {
+    organizationReads.invitations(orgID).refresh();
+  },
+  profileChanged: (orgID) => {
+    organizationReads.profile(orgID).refresh();
+  },
+  started: (kind, name, lifecycle) => {
+    lifecycles.follow(kind, name, lifecycle);
+  },
+  onUnauthenticated: () => {
+    void session.check();
+  },
+});
 const passwordReset = createPasswordResetFlow({
   api: createRecoveryApi(client),
   commands,
   session,
   storage: createPasswordResetStore(browserSessionStorage()),
+  now,
+});
+const invitationAcceptance = createInvitationAcceptance({
+  api: createInvitationApi(client),
+  commands,
+  session,
+  access,
+  storage: createInvitationStore(browserSessionStorage()),
+  now,
+});
+const registration = createRegistration({
+  api: createRegistrationApi(client),
+  commands,
+  session,
+  access,
+  storage: createRegistrationStore(browserSessionStorage()),
   now,
 });
 const accountSettings = createAccountSettings({
@@ -222,6 +299,17 @@ const services: PresentationServices = {
   feedback: createFeedbackSubmitter(createFeedbackApiSender(client), () =>
     crypto.randomUUID(),
   ),
+  restaurantFeedback: (restaurantID) => {
+    let feedback = restaurantFeedback.get(restaurantID);
+    if (feedback === undefined) {
+      feedback = createFeedbackSubmitter(
+        createAppFeedbackApiSender(client, restaurantID),
+        () => crypto.randomUUID(),
+      );
+      restaurantFeedback.set(restaurantID, feedback);
+    }
+    return feedback;
+  },
   session,
   access,
   lastRestaurant: createLastRestaurantStore(browserLocalStorage()),
@@ -230,7 +318,14 @@ const services: PresentationServices = {
   commands,
   now,
   passwordReset,
+  invitationAcceptance,
+  registration,
   accountSettings,
+  organizations: {
+    reads: organizationReads,
+    commands: organizationCommands,
+    lifecycles,
+  },
   restaurantData: (restaurantID) => {
     let data = restaurantData.get(restaurantID);
     if (data === undefined) {

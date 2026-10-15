@@ -1,14 +1,18 @@
+import { normalizedLogin } from '@/application/credentials';
 import type { AccountApi } from '@/application/account';
 import type { GatewayClient } from '@/adapters/http/gateway-client';
 import type { components } from './backend-v2';
 import { decodeUser, decodeUserView } from './decode/account';
 import { decoded } from './decode/common';
+import { decodeDurableResult } from './decode/organizations';
 
 export const mePath = '/api/v2/me';
 export const sessionPath = '/api/v2/session';
+export const sessionsPath = '/api/v2/sessions';
 
 const readUser = decoded(decodeUserView, 'unavailable');
 const signedInUser = decoded(decodeUserView, 'unknown');
+const loggedOut = decoded(decodeDurableResult, 'unknown');
 const savedUser = decoded((body) => decodeUser(body), 'unknown');
 
 export function createAccountApi(
@@ -21,7 +25,7 @@ export function createAccountApi(
     async signIn({ login, password, rememberMe }, commandID) {
       // The password goes as typed: never trimmed or normalized.
       const body: components['schemas']['LoginRequestV2'] = {
-        login,
+        login: normalizedLogin(login),
         password,
         rememberMe,
         commandID,
@@ -48,6 +52,12 @@ export function createAccountApi(
         commandID,
       };
       await client.send('PATCH', `${mePath}/password`, { body });
+    },
+    async logoutAll(commandID) {
+      const body: components['schemas']['Command'] = { commandID };
+      loggedOut(
+        await client.send('POST', `${sessionsPath}/logout-all`, { body }),
+      );
     },
   };
 }

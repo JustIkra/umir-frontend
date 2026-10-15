@@ -9,6 +9,7 @@ import { ServicesProvider } from '../../src/presentation/services.tsx';
 import { system } from '../../src/presentation/theme/system.ts';
 import {
   NOW,
+  ORG,
   R,
   activeSession,
   failedRead,
@@ -16,13 +17,18 @@ import {
   h1,
   hrefs,
   instantOf,
+  invitationList,
   labels,
   loaded,
+  memberList,
   orderSnapshot,
+  organizationProfile,
   readyAccess,
   redirectOf,
   renderRoute,
   resetSnapshot,
+  sampleInvitationRow,
+  sampleMember,
   sampleRestaurant,
   text,
 } from './support/render-route.mjs';
@@ -57,6 +63,27 @@ const catalogDish = loaded({
   stateVersion: '1',
   dish: sampleDish,
 });
+// The member of the member card, read from Auth.
+const KOVALEVA = 'a2222222-2222-4222-8222-222222222222';
+// An organization the user administers.
+const administered = {
+  access: readyAccess([sampleRestaurant({ roles: ['Admin'] })], {
+    admin: true,
+  }),
+};
+
+const withKovaleva = {
+  ...administered,
+  organizations: {
+    members: memberList([
+      sampleMember({
+        displayName: 'Ирина Ковалёва',
+        membership: { membershipID: KOVALEVA },
+      }),
+    ]),
+  },
+};
+
 const catalogData = {
   data: {
     products: catalogProducts,
@@ -142,6 +169,43 @@ const pages = [
     'Учётная запись',
     ['Текущий пароль', 'Новый пароль', 'Повторите новый пароль'],
   ],
+  ['/app/organizations', 'Организации и рестораны', [], administered],
+  [
+    `/app/organizations/${ORG}`,
+    'Восток Фуд',
+    ['Название ресторана'],
+    administered,
+  ],
+  [`/app/organizations/${ORG}`, 'Восток Фуд', [], undefined],
+  [`/app/organizations/${ORG}/members`, 'Восток Фуд', [], administered],
+  [
+    `/app/organizations/${ORG}/members/${KOVALEVA}`,
+    'Ирина Ковалёва',
+    ['Склад', 'Официант'],
+    withKovaleva,
+  ],
+  [`/app/organizations/${ORG}/invitations`, 'Восток Фуд', [], administered],
+  [
+    `/app/organizations/${ORG}/invitations/new`,
+    'Пригласить участника',
+    ['Почта', 'Склад', 'Официант'],
+    administered,
+  ],
+  [
+    `/app/organizations/${ORG}/profile`,
+    'Восток Фуд',
+    ['Часовой пояс организации'],
+    { ...administered, organizations: { profile: organizationProfile() } },
+  ],
+  [
+    '/app/organizations/new',
+    'Создать предприятие',
+    [
+      'Название организации',
+      'Название первого ресторана',
+      'Часовой пояс организации',
+    ],
+  ],
   ['/app/no-restaurants', 'Нет доступных ресторанов', []],
 ];
 
@@ -165,6 +229,14 @@ test('internal links lead to existing pages', async () => {
     '/app',
     `/app/r/${R}`,
     '/app/settings',
+    '/app/organizations',
+    `/app/organizations/${ORG}`,
+    `/app/organizations/${ORG}/members`,
+    `/app/organizations/${ORG}/members/${KOVALEVA}`,
+    `/app/organizations/${ORG}/invitations`,
+    `/app/organizations/${ORG}/invitations/new`,
+    `/app/organizations/${ORG}/profile`,
+    '/app/organizations/new',
     '/app/no-restaurants',
     `/app/r/${R}/orders`,
     `/app/r/${R}/warehouse`,
@@ -186,7 +258,9 @@ test('internal links lead to existing pages', async () => {
           ? guest
           : source.includes('/catalog')
             ? catalogData
-            : {},
+            : source.includes('/organizations')
+              ? administered
+              : {},
       ),
     )) {
       if (!href.startsWith('/') || href.startsWith('//')) continue;
@@ -195,7 +269,14 @@ test('internal links lead to existing pages', async () => {
       checked.add(path);
       assert.notEqual(
         h1(
-          await renderRoute(path, path.includes('/catalog') ? catalogData : {}),
+          await renderRoute(
+            path,
+            path.includes('/catalog')
+              ? catalogData
+              : path.includes('/organizations')
+                ? administered
+                : {},
+          ),
         ),
         'Страница не найдена',
         `${source} → ${href}`,
@@ -253,18 +334,77 @@ const notFound = 'Страница не найдена';
 
 test('unimplemented prototype routes do not expose sample data', async () => {
   for (const path of [
-    '/app/organizations',
     '/app/organizations/yug',
     '/app/organizations/yug/members',
     '/app/organizations/yug/members/i-kovaleva',
     '/app/organizations/yug/invitations',
     '/app/organizations/yug/invitations/new',
     '/app/organizations/yug/profile',
-    '/app/organizations/new',
     `/app/r/${R}/menu`,
     `/app/r/${R}/analytics`,
   ])
     assert.equal(h1(await renderRoute(path)), notFound, path);
+  // The organization screens read Auth now: none shows the Figma sample.
+  for (const path of ['/app/organizations', '/app/organizations/new'])
+    assert.doesNotMatch(
+      text(await renderRoute(path)),
+      /Южного федерального округа|Уральская кухня|Восток Фуд Европа|Ковалёва/,
+      path,
+    );
+});
+
+test('unknown ids show the 404 page', async () => {
+  for (const path of [
+    '/app/organizations/nobody',
+    '/app/organizations/nobody/members',
+  ])
+    assert.equal(h1(await renderRoute(path)), notFound, path);
+});
+
+test('organization pages leave the sidebar without a current item', async () => {
+  const current = (html) => html.match(/aria-current="page"/g)?.length ?? 0;
+  assert.equal(current(await renderRoute('/app/organizations')), 0);
+  assert.equal(
+    current(await renderRoute(`/app/organizations/${ORG}`, administered)),
+    1,
+  );
+});
+
+test('the member page checks the roles of the member', async () => {
+  const html = await renderRoute(
+    `/app/organizations/${ORG}/members/${KOVALEVA}`,
+    withKovaleva,
+  );
+  assert.equal(
+    html.match(/<input[^>]*type="checkbox"[^>]*checked/g)?.length,
+    1,
+  );
+});
+
+test('invitation actions follow the status', async () => {
+  const row = (id, state) =>
+    sampleInvitationRow({
+      invitation: {
+        invitationID: id,
+        email: `${id}@example.test`,
+        state,
+        expiresAt: instantOf('2026-10-20T10:00:00+03:00'),
+      },
+    });
+  const html = await renderRoute(`/app/organizations/${ORG}/invitations`, {
+    ...administered,
+    organizations: {
+      invitations: invitationList([
+        row('p1', 'pending'),
+        row('p2', 'pending'),
+        row('e1', 'expired'),
+        row('a1', 'accepted'),
+      ]),
+    },
+  });
+  // Two pending rows and the submit button of the closed CX01 dialog.
+  assert.equal(html.match(/>Отменить приглашение</g)?.length, 2 + 1);
+  assert.equal(html.match(/>Пригласить повторно</g)?.length, 1);
 });
 
 const OTHER = '55555555-5555-4555-8555-555555555555';
@@ -305,10 +445,10 @@ const sectionLinks = (html) =>
       '',
   );
 
-test('the account menu lists real workplaces without prototype management links', async () => {
+test('the account menu lists workplaces and leads to organizations', async () => {
   const html = await renderRoute(`/app/r/${R}`, { access: twoOrganizations });
   const menu = accountMenu(html);
-  assert.ok(!hrefs(menu).some((path) => path.startsWith('/app/organizations')));
+  assert.ok(hrefs(menu).includes('/app/organizations'));
   assert.ok(menu.includes('Найти ресторан'));
   assert.equal(menu.match(/aria-current="true"/g)?.length, 1);
   assert.match(text(menu), /Марина Белова/);
@@ -325,7 +465,7 @@ test('without restaurants the shell has no sections and no workplaces', async ()
   });
   assert.ok(!hrefs(html).includes(`/app/r/${R}/orders`));
   assert.ok(!html.includes('Рабочее место'));
-  assert.ok(!hrefs(html).includes('/app/organizations/new'));
+  assert.ok(hrefs(html).includes('/app/organizations/new'));
 });
 
 test('an organization without restaurants adds no workplaces (W13)', async () => {
@@ -346,7 +486,7 @@ test('an organization without restaurants adds no workplaces (W13)', async () =>
 });
 
 test('outside a restaurant the menu marks no restaurant current', async () => {
-  for (const path of ['/app/settings']) {
+  for (const path of ['/app/settings', '/app/organizations']) {
     const menu = accountMenu(await renderRoute(path));
     assert.ok(menu.includes('Найти ресторан'), path);
     assert.equal(menu.match(/aria-current="true"/g)?.length ?? 0, 0, path);

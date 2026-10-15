@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
+import { FeedbackPage } from './app-shell/feedback-page';
 import {
   AppEntry,
   AppGate,
@@ -33,8 +34,23 @@ import {
   PersonalDataConsentPage,
   PrivacyPolicyPage,
 } from './documents/pages';
+import { InviteAcceptancePage, createInviteLoader } from './invite/invite-page';
+import { RegisterPage, createRegisterLoader } from './register/register-page';
 import { LandingPage } from './landing/landing-page';
+import {
+  createAdminLoader,
+  createMemberLoader,
+  createOrganizationLoader,
+} from './organizations/loaders';
 import { OrdersPage } from './orders/orders-page';
+import { InvitationsPage } from './organizations/invitations-page';
+import { InvitePage } from './organizations/invite-page';
+import { MemberPage } from './organizations/member-page';
+import { NewOrganizationPage } from './organizations/new-organization-page';
+import { OrganizationProfilePage } from './organizations/organization-profile-page';
+import { MembersPage } from './organizations/members-page';
+import { OrganizationPage } from './organizations/organization-page';
+import { OrganizationsPage } from './organizations/organizations-page';
 import { OverviewPage } from './overview/overview-page';
 import { DeliveryPage } from './warehouse/delivery-page';
 import { ExpiryPage } from './warehouse/expiry-page';
@@ -68,6 +84,7 @@ function Root() {
 // restaurant's rights (W14).
 const restaurantRoutes: RouteObject[] = [
   { index: true, element: <OverviewPage /> },
+  { path: 'feedback', element: <FeedbackPage /> },
   {
     path: 'orders',
     element: <SectionGate section="orders" />,
@@ -110,6 +127,12 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
           loader: createSignInLoader(services),
           element: <SignInPage />,
         },
+        {
+          path: '/register',
+          loader: createRegisterLoader(services),
+          element: <RegisterPage />,
+          errorElement: <NotFoundBoundary />,
+        },
         { path: '/logout', element: <LogoutPage /> },
         { path: '/password-reset', element: <PasswordResetRequestPage /> },
         {
@@ -121,6 +144,12 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
           path: '/password-reset/new',
           loader: createResetStepLoader(services, 'password'),
           element: <PasswordResetNewPage />,
+        },
+        {
+          path: '/invite/:invitationID',
+          loader: createInviteLoader(services),
+          element: <InviteAcceptancePage />,
+          errorElement: <NotFoundBoundary />,
         },
         {
           path: '/app',
@@ -143,6 +172,38 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
               element: <AppShell />,
               children: [
                 { path: 'settings', element: <AccountSettingsPage /> },
+                { path: 'organizations', element: <OrganizationsPage /> },
+                { path: 'organizations/new', element: <NewOrganizationPage /> },
+                {
+                  path: 'organizations/:org',
+                  loader: createOrganizationLoader(services),
+                  element: <OrganizationPage />,
+                },
+                {
+                  path: 'organizations/:org/members',
+                  loader: createAdminLoader(services),
+                  element: <MembersPage />,
+                },
+                {
+                  path: 'organizations/:org/members/:member',
+                  loader: createMemberLoader(services),
+                  element: <MemberPage />,
+                },
+                {
+                  path: 'organizations/:org/invitations',
+                  loader: createAdminLoader(services),
+                  element: <InvitationsPage />,
+                },
+                {
+                  path: 'organizations/:org/invitations/new',
+                  loader: createAdminLoader(services),
+                  element: <InvitePage />,
+                },
+                {
+                  path: 'organizations/:org/profile',
+                  loader: createAdminLoader(services),
+                  element: <OrganizationProfilePage />,
+                },
               ],
             },
             {

@@ -1,64 +1,27 @@
-import type { Challenge, ChallengeState } from '@/application/account';
-import type { Instant } from '@/application/api';
 import type { ResetRecord, ResetStorage } from '@/application/password-reset';
-import { isEntityId } from '@/domain/ids';
+import {
+  challengeOf,
+  isObject,
+  proofOf,
+  type KeyValue,
+} from './challenge-record';
 
 export const passwordResetKey = 'umir.passwordReset';
-
-type KeyValue = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
-
-const states: readonly ChallengeState[] = [
-  'pending',
-  'verified',
-  'completed',
-  'expired',
-  'locked',
-];
-
-const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-function instantOf(value: unknown): Instant | undefined {
-  if (!isObject(value)) return undefined;
-  const { iso, epochMs } = value;
-  return typeof iso === 'string' &&
-    typeof epochMs === 'number' &&
-    Number.isFinite(epochMs)
-    ? { iso, epochMs }
-    : undefined;
-}
-
-function challengeOf(value: unknown): Challenge | undefined {
-  if (!isObject(value)) return undefined;
-  const { challengeID } = value;
-  const expiresAt = instantOf(value.expiresAt);
-  const resendAvailableAt = instantOf(value.resendAvailableAt);
-  const state = states.find((item) => item === value.state);
-  if (
-    !isEntityId(challengeID) ||
-    expiresAt === undefined ||
-    resendAvailableAt === undefined ||
-    state === undefined
-  ) {
-    return undefined;
-  }
-  return { challengeID, expiresAt, resendAvailableAt, state };
-}
 
 // A record of another shape (an older build, a hand edit) counts as none.
 function recordOf(value: unknown): ResetRecord | undefined {
   if (!isObject(value)) return undefined;
-  const { email, proof } = value;
+  const { email } = value;
   const challenge = challengeOf(value.challenge);
-  if (typeof email !== 'string' || challenge === undefined) return undefined;
-  if (proof !== undefined && (typeof proof !== 'string' || proof === '')) {
+  const proof = proofOf(value.proof);
+  if (
+    typeof email !== 'string' ||
+    challenge === undefined ||
+    proof === undefined
+  ) {
     return undefined;
   }
-  return {
-    email,
-    challenge,
-    proof: typeof proof === 'string' ? proof : undefined,
-  };
+  return { email, challenge, proof: proof.proof };
 }
 
 // The reset step of this tab: a reload opens the same step. The proof works

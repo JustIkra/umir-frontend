@@ -131,3 +131,51 @@ test('a malformed saved user is unknown', async () => {
       error.failure.code === 'Malformed' && error.failure.outcome === 'unknown',
   );
 });
+
+test('logoutAll() posts the commandID and checks the durable result', async () => {
+  const fake = client({
+    outcome: 'committed',
+    commandID: 'cmd-9',
+    aggregateRevision: '4',
+    resourceID: '11111111-1111-4111-8111-111111111111',
+    mailJobs: [],
+  });
+  await createAccountApi(fake).logoutAll('cmd-9');
+  assert.deepEqual(fake.calls, [
+    [
+      'send',
+      'POST',
+      '/api/v2/sessions/logout-all',
+      { body: { commandID: 'cmd-9' } },
+    ],
+  ]);
+});
+
+test('logoutAll() leaves the outcome unknown for an answer off the schema', async () => {
+  await assert.rejects(
+    createAccountApi(client({})).logoutAll('cmd-9'),
+    (error) =>
+      error.failure.code === 'Malformed' && error.failure.outcome === 'unknown',
+  );
+});
+
+for (const [input, expected] of [
+  ['  Ma\u0301x@GMAIL.COM  ', 'Máx@gmail.com'],
+  ['Max@gmail.com', 'Max@gmail.com'],
+  ['Max@İ.INVALID', 'Max@i.invalid'],
+  ['Max@ΟΣ.INVALID', 'Max@οσ.invalid'],
+  ['foo..bar@EXAMPLE.COM', 'foo..bar@example.com'],
+  ['admin', 'admin'],
+  ['  admin  ', '  admin  '],
+  ['not@a-domain', 'not@a-domain'],
+]) {
+  test(`email-like sign-in canonicalizes ${JSON.stringify(input)} without changing other logins`, async () => {
+    const fake = client();
+    await createAccountApi(fake).signIn(
+      { login: input, password: ' pass word ', rememberMe: false },
+      'canonical-login',
+    );
+    assert.equal(fake.calls[0][3].body.login, expected);
+    assert.equal(fake.calls[0][3].body.password, ' pass word ');
+  });
+}

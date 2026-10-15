@@ -1,3 +1,4 @@
+import { isEntityId } from '@/domain/ids';
 import { failureOf, localFailure, type ApiFailure } from './api';
 import type {
   AccountApi,
@@ -15,11 +16,13 @@ import type {
 } from './live-sync';
 
 // What the sign-in page says after the account settings ended the session:
-// L11 (password changed), L13 (outcome unknown), L10 (too many attempts).
+// L11 (password changed), L13 (outcome unknown), L10 (too many attempts),
+// and after signing out on every device.
 export type SignInNotice =
   | { readonly kind: 'password-changed'; readonly login: string }
   | { readonly kind: 'password-unknown'; readonly login: string }
-  | { readonly kind: 'password-limit' };
+  | { readonly kind: 'password-limit' }
+  | { readonly kind: 'everywhere' };
 
 // unknown: not checked yet. anonymous.expired: the server ended a session
 // this tab had (the sign-in page then says so). unavailable: /me got no
@@ -44,6 +47,9 @@ export interface SessionStore extends SessionCheck {
   ensure(): Promise<SessionState>;
   signIn(input: SignInInput): Promise<CommandResult<User>>;
   signOut(notice?: SignInNotice): Promise<'done' | 'failed'>;
+  // Ends every session of the user, this one too. unknown: the attempt is
+  // kept, and a repeat sends it again with the same commandID.
+  signOutEverywhere(): Promise<'done' | 'unknown' | 'failed'>;
   // Password reset issued a new session: the same as a sign-in.
   adopt(view: UserView): void;
   // A saved display name; another user's profile is ignored.
@@ -77,6 +83,7 @@ export interface SessionOptions {
 }
 
 export const signInKey = 'session.sign-in';
+export const logoutAllKey = 'session.logout-all';
 // The background check runs this long after the idle deadline, when the
 // server has already ended an idle session.
 export const idleGraceMs = 1000;
@@ -88,12 +95,14 @@ export const idleRecheckMs = 30_000;
 // A background check without an answer is repeated after this long.
 export const lostCheckRetryMs = 60_000;
 
-// The sign-in page returns only to addresses inside the app.
+const invitationPath = /^\/invite\/([^/?#]+)$/;
+
+// The sign-in page returns only to addresses inside the app and to the page
+// of one invitation (/invite/:id).
 export function returnPath(raw: string | null): string {
-  if (raw === null || raw.includes('\\') || !/^\/app(?:[/?#]|$)/.test(raw)) {
-    return '/app';
-  }
-  return raw;
+  if (raw === null || raw.includes('\\')) return '/app';
+  if (/^\/app(?:[/?#]|$)/.test(raw)) return raw;
+  return isEntityId(invitationPath.exec(raw)?.[1]) ? raw : '/app';
 }
 
 export function createSessionStore({
@@ -245,6 +254,32 @@ export function createSessionStore({
         if (failureOf(error)?.status !== 401) return 'failed';
       }
       end(false, notice);
+      onSignedOut();
+      return 'done';
+    },
+    async signOutEverywhere() {
+      // A repeat of a lost answer: the attempt of the key is already kept.
+      const repeat = commands
+        .getSnapshot()
+        .some((attempt) => attempt.key === logoutAllKey);
+      const result = await commands.run({
+        key: logoutAllKey,
+        label: 'выхода на всех устройствах',
+        execute: (commandID) => api.logoutAll(commandID),
+      });
+      if (result.kind === 'unknown') return 'unknown';
+      if (result.kind === 'rejected' && result.failure.status === 401) {
+        // The sessions are already closed only when this is the repeat of an
+        // attempt that was sent before. A first 401 is this session alone
+        // gone: the other devices stay signed in, so the session is checked.
+        if (!repeat) {
+          await check();
+          return 'failed';
+        }
+      } else if (result.kind !== 'committed') {
+        return 'failed';
+      }
+      end(false, { kind: 'everywhere' });
       onSignedOut();
       return 'done';
     },

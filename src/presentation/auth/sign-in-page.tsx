@@ -80,7 +80,8 @@ export function signInMessage(
   };
 }
 
-// L11, L13 and L10 after «Учётная запись» ended the session.
+// L11, L13 and L10 after «Учётная запись» ended the session, and the notice
+// after signing out on every device.
 export function noticeMessage(notice: SignInNotice): {
   readonly tone: 'success' | 'unknown';
   readonly title: string;
@@ -104,6 +105,12 @@ export function noticeMessage(notice: SignInNotice): {
         tone: 'unknown',
         title: 'Сессия завершена',
         text: 'Превышено число неверных попыток ввести текущий пароль. Войдите снова.',
+      };
+    case 'everywhere':
+      return {
+        tone: 'success',
+        title: 'Вы вышли на всех устройствах',
+        text: 'Все сеансы учётной записи завершены, включая этот. Войдите снова.',
       };
   }
 }
@@ -258,6 +265,10 @@ export function SignInPage() {
           </FormMessage>
         )}
       </chakra.form>
+      <Text textStyle="body.default">
+        Нет учётной записи?{' '}
+        <TextLink to="/register">Зарегистрироваться</TextLink>
+      </Text>
     </AuthLayout>
   );
 }

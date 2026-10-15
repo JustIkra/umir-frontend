@@ -2712,17 +2712,35 @@ export interface components {
       commandID: components['schemas']['ClientCommandID'];
       email: components['schemas']['Email'];
       /** @enum {string} */
-      purpose: 'login' | 'password_reset';
+      purpose: 'login' | 'password_reset' | 'registration';
     };
-    EmailChallengeComplete: {
-      commandID: components['schemas']['ClientCommandID'];
-      challengeID: components['schemas']['EntityID'];
-      proof: string;
-      /** @enum {string} */
-      purpose: 'login' | 'password_reset';
-      rememberMe?: boolean;
-      newPassword?: string;
-    };
+    EmailChallengeComplete:
+      | {
+          commandID: components['schemas']['ClientCommandID'];
+          challengeID: components['schemas']['EntityID'];
+          proof: string;
+          /** @constant */
+          purpose: 'login';
+          rememberMe?: boolean;
+        }
+      | {
+          commandID: components['schemas']['ClientCommandID'];
+          challengeID: components['schemas']['EntityID'];
+          proof: string;
+          /** @constant */
+          purpose: 'password_reset';
+          newPassword: string;
+        }
+      | {
+          commandID: components['schemas']['ClientCommandID'];
+          challengeID: components['schemas']['EntityID'];
+          proof: string;
+          /** @constant */
+          purpose: 'registration';
+          displayName: string;
+          password: string;
+          rememberMe?: boolean;
+        };
     SessionIssued: {
       view: components['schemas']['UserView'];
       sessionToken: string;
