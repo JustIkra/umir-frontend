@@ -46,6 +46,10 @@ import {
   type CatalogCommands,
 } from '@/application/catalog-commands';
 import { createCommandRunner } from '@/application/commands';
+import {
+  inertCatalogCommands,
+  inertWarehouseCommands,
+} from '@/application/inert-commands';
 import { createEpochRegistry } from '@/application/epochs';
 import {
   createFeedbackSubmitter,
@@ -165,16 +169,16 @@ const warehouseCommands = new Map<string, WarehouseCommands>();
 const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
 const attemptStore = createAttemptStore(browserSessionStorage());
-// The user of the active session. The warehouse and catalog screens sit
-// behind the session gate, which sends everyone else to sign-in before they
-// render; a factory for nobody would write attempts under an empty user.
-const activeUserID = (): string => {
+// The user of the active session, or nobody. The warehouse and catalog
+// screens sit behind the session gate, but a screen can still call a factory
+// in the moment the session ends; it then gets inert commands that send and
+// save nothing, never a factory for nobody.
+const activeUserID = (): string | undefined => {
   const state = session.getSnapshot();
-  if (state.status !== 'active') {
-    throw new Error('Commands need a signed-in user');
-  }
-  return state.user.userID;
+  return state.status === 'active' ? state.user.userID : undefined;
 };
+const inertWarehouse = inertWarehouseCommands();
+const inertCatalog = inertCatalogCommands();
 const restaurantData = new Map<string, RestaurantData>();
 const catalogCommands = new Map<string, CatalogCommands>();
 const restaurantFeedback = new Map<string, FeedbackSubmitter>();
@@ -352,6 +356,7 @@ const services: PresentationServices = {
   },
   catalogCommands: (restaurantID) => {
     const userID = activeUserID();
+    if (userID === undefined) return inertCatalog;
     const key = `${userID}/${restaurantID}`;
     let catalog = catalogCommands.get(key);
     if (catalog === undefined) {
@@ -375,6 +380,7 @@ const services: PresentationServices = {
   },
   warehouseCommands: (restaurantID) => {
     const userID = activeUserID();
+    if (userID === undefined) return inertWarehouse;
     const key = `${userID}/${restaurantID}`;
     let value = warehouseCommands.get(key);
     if (value === undefined) {

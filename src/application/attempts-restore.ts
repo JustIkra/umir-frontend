@@ -52,7 +52,14 @@ export function restoreWhenActive(
     }
     if (restoredFor === state.user.userID) return;
     restoredFor = state.user.userID;
-    restore(state.user.userID);
+    // A failed restore costs only the early return of the attempts (their
+    // screens restore them on opening); it must not stop the other
+    // listeners of the session.
+    try {
+      restore(state.user.userID);
+    } catch {
+      // Nothing to do: the next sign-in tries again.
+    }
   };
   const stop = session.subscribe(check);
   check();

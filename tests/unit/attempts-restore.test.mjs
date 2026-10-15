@@ -133,3 +133,30 @@ test('a session that is already active restores at once; stopping detaches', () 
   session.set(active(OTHER));
   assert.deepEqual(restored, [U]);
 });
+
+test('a failing restore does not break the listeners of the session', () => {
+  const session = fakeSession();
+  const seen = [];
+  session.subscribe(() => seen.push('before'));
+  restoreWhenActive(session, () => {
+    throw new Error('restore failed');
+  });
+  session.subscribe(() => seen.push('after'));
+  assert.doesNotThrow(() => session.set(active(U)));
+  assert.deepEqual(seen, ['before', 'after']);
+});
+
+test('a restore that failed once runs again for the next sign-in', () => {
+  const session = fakeSession();
+  const restored = [];
+  let fail = true;
+  restoreWhenActive(session, (userID) => {
+    restored.push(userID);
+    if (fail) throw new Error('restore failed');
+  });
+  session.set(active(U));
+  fail = false;
+  session.set({ status: 'anonymous', expired: false });
+  session.set(active(U));
+  assert.deepEqual(restored, [U, U]);
+});

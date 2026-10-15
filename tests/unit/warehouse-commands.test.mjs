@@ -630,3 +630,63 @@ test('sign-out of A, B in, A back: the attempt of A is restored, B never sees it
   assert.equal(a2.commands.getSnapshot()[0].commandID, 'command-1');
   assert.equal(store.list(OTHER).entries.length, 0);
 });
+
+test('a settled record that could not be removed is removed before the next command', async () => {
+  const store = createMemoryAttemptStore();
+  const remove = store.remove;
+  let removable = false;
+  store.remove = (ref) => (removable ? remove(ref) : 'unavailable');
+  const calls = [];
+  const { value } = setup(
+    {
+      confirmWriteoff: async (...args) => {
+        calls.push(args);
+        return { context: {}, result: {} };
+      },
+    },
+    { store },
+  );
+  assert.equal((await value.confirmWriteoff('B', E)).kind, 'created');
+  assert.equal(store.load(writeoffRef).record.commandID, 'command-1');
+  // Still blocked: the leftover stays and the next command is refused.
+  assert.deepEqual(await value.confirmWriteoff('B', E), {
+    kind: 'refused',
+    code: 'AttemptUnresolved',
+  });
+  assert.equal(calls.length, 1);
+  // The storage works again: the settled record goes and the command is sent.
+  removable = true;
+  assert.equal((await value.confirmWriteoff('B', E)).kind, 'created');
+  assert.equal(calls.length, 2);
+  assert.equal(store.load(writeoffRef).status, 'absent');
+});
+
+test('a readable record of an unsettled command is not removed by the retry of the cleanup', async () => {
+  const store = createMemoryAttemptStore();
+  store.save({
+    kind: 'writeoff',
+    userID: U,
+    restaurantID: R,
+    commandID: 'foreign',
+    epoch: E,
+    startedAt: 1,
+    payload: { batchID: 'B' },
+  });
+  const removed = [];
+  const remove = store.remove;
+  store.remove = (ref) => {
+    removed.push(ref);
+    return remove(ref);
+  };
+  const { value, commands } = setup(
+    { confirmWriteoff: async () => ({ context: {}, result: {} }) },
+    { store },
+  );
+  commands.clear();
+  assert.deepEqual(await value.confirmWriteoff('B', E), {
+    kind: 'refused',
+    code: 'AttemptUnresolved',
+  });
+  assert.deepEqual(removed, []);
+  assert.equal(store.load(writeoffRef).record.commandID, 'foreign');
+});

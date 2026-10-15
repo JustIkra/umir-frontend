@@ -76,6 +76,10 @@ export function createDurableAttempts({
   const notSaved = new Set<string>();
   // The command and start time of the attempt sent from this tab.
   const begun = new Map<string, { commandID: string; startedAt: number }>();
+  // The command of a settled attempt whose record could not be removed: its
+  // answer is known, so it is the one readable record that may be removed
+  // later, before the next command of the operation is refused over it.
+  const leftover = new Map<string, string>();
   const listeners = new Set<() => void>();
 
   function announce(): void {
@@ -109,7 +113,15 @@ export function createDurableAttempts({
       }
       // A readable record is dropped only by the answer to its own command;
       // writing over it would lose the trace of a command that may be done.
-      throw new ApiError(localFailure(attemptUnresolvedCode, 'not_committed'));
+      // The one exception is a record of a settled command that could not be
+      // removed then: it is removed now, or the operation stays blocked.
+      const settled = leftover.get(key) === loaded.record.commandID;
+      if (!settled || store.remove(ref) !== 'ok') {
+        throw new ApiError(
+          localFailure(attemptUnresolvedCode, 'not_committed'),
+        );
+      }
+      leftover.delete(key);
     }
     const known = begun.get(key);
     const startedAt = known?.commandID === commandID ? known.startedAt : now();
@@ -130,8 +142,13 @@ export function createDurableAttempts({
   function release(ref: AttemptRef, commandID: string): void {
     const key = slot(ref);
     const loaded = store.load(ref);
-    if (loaded.status === 'ok' && loaded.record.commandID === commandID) {
-      store.remove(ref);
+    if (loaded.status === 'unavailable') leftover.set(key, commandID);
+    else if (
+      loaded.status === 'ok' &&
+      loaded.record.commandID === commandID &&
+      store.remove(ref) === 'unavailable'
+    ) {
+      leftover.set(key, commandID);
     }
     if (begun.get(key)?.commandID === commandID) {
       begun.delete(key);
