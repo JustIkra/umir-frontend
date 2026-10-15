@@ -178,7 +178,7 @@ export function FinalCtaSection() {
             id={titleId}
             textStyle={{ base: 'heading.h2', sm: 'display.l' }}
           >
-            Откройте рабочее место оператора
+            Войдите и начните работу
           </chakra.h2>
           <Text textStyle={{ base: 'body.default', sm: 'body.lead' }}>
             Склад, меню и заказы — в одном окне.

@@ -9,10 +9,8 @@ import {
 import type { ReactNode } from 'react';
 import menu20 from '@/presentation/assets/icons/menu-20.svg';
 import warehouse20 from '@/presentation/assets/icons/warehouse-20.svg';
-import analytics24 from '@/presentation/assets/icons/analytics-24.svg';
 import catalog24 from '@/presentation/assets/icons/catalog-24.svg';
 import chevron20 from '@/presentation/assets/icons/chevron-20.svg';
-import menu24 from '@/presentation/assets/icons/menu-24.svg';
 import orders24 from '@/presentation/assets/icons/orders-24.svg';
 import overview24 from '@/presentation/assets/icons/overview-24-active.svg';
 import userGlyph from '@/presentation/assets/icons/user-glyph.svg';
@@ -86,8 +84,6 @@ function Sidebar() {
           <NavItem icon={orders24} label="Заказы" />
           <NavItem icon={warehouse24} label="Склад" />
           <NavItem icon={catalog24} label="Справочники" />
-          <NavItem icon={menu24} label="Меню и рекомендации" />
-          <NavItem icon={analytics24} label="Аналитика" />
         </Stack>
       </Stack>
       <Stack gap="3" mt="auto" pb="1">
@@ -211,7 +207,7 @@ function SubHeader({ title, time }: { title: string; time: string }) {
 
 function WarehouseTile() {
   return (
-    <Tile icon={warehouse20} title="Склад" time="оценка 14:32">
+    <Tile icon={warehouse20} title="Склад" time="обновлено в 14:32">
       <Stack gap="3">
         <Flex wrap="wrap" align="center" columnGap="3" rowGap="2">
           <Flex gap="1" p="1" bg="bg.subtle" borderRadius="md">
@@ -239,13 +235,13 @@ function WarehouseTile() {
             ))}
           </Flex>
           <Text textStyle="caption.default" color="text.secondary">
-            Граница: 11.10.2026, 14:32 (Москва, UTC+3)
+            До 11 октября, 14:32
           </Text>
         </Flex>
         <Stack gap="0.5">
           <Text textStyle="heading.h2">4 партии</Text>
           <Text textStyle="caption.default" color="text.secondary">
-            с остатком и сроком до выбранной границы
+            истекают в ближайшие 24&nbsp;часа
           </Text>
         </Stack>
         <Box>
@@ -267,7 +263,7 @@ function WarehouseTile() {
           />
         </Box>
         <Text textStyle="caption.default" color="text.secondary">
-          Ещё 1 партия в окне
+          И ещё 1&nbsp;партия
         </Text>
       </Stack>
       <Flex wrap="wrap" gap="2">
@@ -294,7 +290,7 @@ function MenuTile() {
     <Tile icon={menu20} title="Меню и рекомендации">
       <Stack gap="3">
         <Stack gap="2">
-          <SubHeader title="Стоп-лист" time="оценка 14:32" />
+          <SubHeader title="Стоп-лист" time="обновлено в 14:32" />
           <Text textStyle="body.strong">2 блюда недоступны</Text>
           <StopListDish
             name="Паста карбонара"
@@ -307,12 +303,13 @@ function MenuTile() {
         </Stack>
         <Box h="1px" bg="border.default" />
         <Stack gap="2">
-          <SubHeader title="Рекомендуем продать" time="оценка 14:32" />
+          <SubHeader title="Рекомендуем продать" time="обновлено в 14:32" />
           <Text textStyle="body.strong">
             1. Ризотто с пармезаном и рукколой
           </Text>
           <Text textStyle="caption.default" color="text.secondary">
-            Ближайший срок партий одной порции — 10.10.2026, 20:30. Обе причины:
+            Два продукта в нём скоро истекут&nbsp;— ближайший срок
+            10&nbsp;октября, 20:30.
           </Text>
           <Box>
             <BatchRow
@@ -384,7 +381,7 @@ export function ProductWindow(props: FlexProps) {
             <Stack gap="1">
               <Text textStyle="heading.h1">Обзор</Text>
               <Text textStyle="caption.default" color="text.secondary">
-                Суббота, 10 октября 2026
+                Суббота, 10 октября · Москва
               </Text>
             </Stack>
             <ButtonLook>Собрать заказ</ButtonLook>
@@ -460,26 +457,26 @@ function OrderFragment() {
     <Fragment>
       <Flex gap="2" color="text.secondary">
         <Text flex="1" textStyle="caption.strong">
-          Предложение заказа
+          Состав заказа
         </Text>
-        <Text textStyle="caption.default">оценка 15:05:37 UTC+3</Text>
+        <Text textStyle="caption.default">обновлено в 15:05</Text>
       </Flex>
       <Box>
         <ProposalLine
           name="2 · Паста с лососем и шпинатом"
-          quantity="3 → 1"
+          quantity="3&nbsp;→&nbsp;1"
           status="reduced"
-          reason="Филе лосося: нужно 360 г, доступно для позиции 220 г"
+          reason="Филе лосося: нужно 360&nbsp;г, есть 220&nbsp;г"
         />
         <ProposalLine
           name="4 · Салат с лососем и киноа"
-          quantity="1 → 0"
+          quantity="1&nbsp;→&nbsp;0"
           status="excluded"
-          reason="Филе лосося: нужно 110 г, доступно для позиции 100 г"
+          reason="Филе лосося: нужно 110&nbsp;г, осталось 100&nbsp;г"
         />
         <ProposalLine
           name="1 · Тартар из лосося с авокадо"
-          quantity="2 → 2"
+          quantity="2&nbsp;→&nbsp;2"
           status="accepted"
           reason="Без изменений"
           last
@@ -488,7 +485,7 @@ function OrderFragment() {
       <Text textStyle="body.strong">Итог: 4 позиции, 6 порций</Text>
       <ButtonLook w="full">Оформить оставшиеся блюда</ButtonLook>
       <Text textStyle="caption.default" color="text.secondary">
-        Сокращение не принимается автоматически.
+        Без вашего подтверждения мы ничего не оформим.
       </Text>
     </Fragment>
   );
@@ -525,21 +522,24 @@ function BatchFragment() {
         <Text flex="1" textStyle="numeric.default" color="text.secondary">
           Партия P-0142
         </Text>
-        <Badge tone="expiry">Истекает через 6 ч</Badge>
+        <Badge tone="expiry">Истекает через 6&nbsp;ч</Badge>
       </Flex>
       <Stack gap="0.5">
         <Text textStyle="heading.h3">Сыр пармезан</Text>
         <Flex align="baseline" gap="2">
-          <Text textStyle="heading.h2">1 200 г</Text>
+          <Text textStyle="heading.h2">1&nbsp;200&nbsp;г</Text>
           <Text textStyle="caption.default" color="text.secondary">
             остаток
           </Text>
         </Flex>
       </Stack>
       <Box>
-        <Fact label="Годен до" value="10.10.2026, 20:30 UTC+3" />
-        <Fact label="Поставка" value="№ 1187 · строка 2" />
-        <Fact label="Расход на порцию" value="Ризотто с пармезаном — 40 г" />
+        <Fact label="Годен до" value="10 октября, 20:30" />
+        <Fact label="Поставка" value="№&nbsp;1187 · строка 2" />
+        <Fact
+          label="Расход на порцию"
+          value="Ризотто с пармезаном&nbsp;— 40&nbsp;г"
+        />
       </Box>
     </Fragment>
   );
@@ -551,7 +551,7 @@ export function ProductFragments(props: BoxProps) {
   return (
     <Box
       {...illustration(
-        'Пример интерфейса: предложение заказа с сокращённой и исключённой позицией и партия пармезана со сроком годности',
+        'Пример экрана: состав заказа с сокращённой и убранной позицией и партия пармезана со сроком годности',
       )}
       display="grid"
       gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr' }}

@@ -38,8 +38,7 @@ export function SiteFooter() {
         <Stack gap="3" flex="1" minW="0">
           <Wordmark />
           <Text textStyle="body.default" color="text.secondary">
-            Учёт продуктов, меню и заказов для единого учёта складской логистики
-            организации.
+            Склад, меню и заказы ваших ресторанов&nbsp;— в одном месте.
           </Text>
         </Stack>
         <Column title="Продукт">

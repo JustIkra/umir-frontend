@@ -74,7 +74,7 @@ export function CookieBanner() {
           alignSelf={{ sm: 'end' }}
           textStyle="body.strong"
         >
-          Мы используем только необходимые cookie
+          Мы используем только нужные cookie
         </Text>
         <Text
           gridArea="text"
@@ -82,8 +82,8 @@ export function CookieBanner() {
           textStyle="caption.default"
           color="text.secondary"
         >
-          Они обеспечивают вход в систему и сохранение незавершённой операции.
-          Аналитические и рекламные cookie не применяются.
+          Они нужны, чтобы вы оставались в аккаунте и не теряли начатый заказ.
+          Аналитики и рекламы нет.
         </Text>
         <Flex
           gridArea="actions"

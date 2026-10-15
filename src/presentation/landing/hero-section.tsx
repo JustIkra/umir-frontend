@@ -333,7 +333,7 @@ export function HeroSection() {
             color="text.action"
             css={enterMotion({ delay: 0.2, duration: 0.45, y: 12 })}
           >
-            Склад · меню · заказы для ресторанов организации
+            Склад · меню · заказы для ресторанов
           </Text>
           <chakra.h1
             id={titleId}
@@ -344,16 +344,16 @@ export function HeroSection() {
             }}
             css={enterMotion({ delay: 0.3, duration: 0.7, y: 24 })}
           >
-            Склад, меню и заказы ресторана&nbsp;— по фактическим партиям
+            Склад, меню и заказы ресторана&nbsp;— с точностью до партии
           </chakra.h1>
           <Text
             textStyle={{ base: 'body.default', sm: 'body.lead' }}
             color="text.secondary"
             css={enterMotion({ delay: 0.6, duration: 0.5, y: 16 })}
           >
-            «Ровный ход» ведёт партии и сроки годности, списывает ингредиенты по
-            FEFO, объясняет стоп-лист и подтверждает заказ только по ответу
-            сервера.
+            «Ровный ход» ведёт партии и сроки годности, сначала списывает
+            продукты с ближайшим сроком, показывает, почему блюдо в стоп-листе,
+            и не задваивает заказ, если пропала связь.
           </Text>
           <Flex
             direction={{ base: 'column', sm: 'row' }}
