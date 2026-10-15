@@ -27,11 +27,11 @@ import {
   FieldLabel,
   FieldMessage,
   QuantityInput,
-  SelectField,
   TextInput,
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
+import { SearchSelect } from '@/presentation/ui/search-select';
 import { rem } from '@/presentation/ui/units';
 import {
   conflictText,
@@ -124,6 +124,7 @@ export function NewDishPage() {
   const productOptions = products.map((product) => ({
     value: product.productID,
     label: product.name,
+    code: product.productID,
   }));
   const errors =
     shown === 'invalid'
@@ -424,17 +425,17 @@ export function NewDishPage() {
                           >
                             Продукт
                           </chakra.label>
-                          <SelectField
+                          <SearchSelect
                             id={productId}
                             placeholder="Выберите продукт"
                             options={productOptions}
                             value={row.productID}
                             invalid={productFault}
-                            aria-describedby={
-                              productFault ? errorId : undefined
-                            }
-                            onChange={(event) => {
-                              const productID = event.target.value;
+                            disabled={closed}
+                            {...(productFault
+                              ? { 'aria-describedby': errorId }
+                              : {})}
+                            onValueChange={(productID) => {
                               setLines((list) =>
                                 list.map((item) =>
                                   item.key === row.key
