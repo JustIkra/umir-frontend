@@ -59,6 +59,11 @@ test('registerMessage words the notices of the registration', () => {
     message({ kind: 'proof-expired' }).title,
     'Подтверждение устарело',
   );
+  assert.deepEqual(message({ kind: 'not-sent' }), {
+    tone: 'error',
+    title: 'Код не отправлен',
+    text: 'Сервис не принял запрос нового кода. Повторите попытку через несколько минут.',
+  });
   assert.equal(
     message({ kind: 'unavailable' }).title,
     'Регистрация временно недоступна',
@@ -322,4 +327,11 @@ test('the sign-in page links to the registration', async () => {
   const html = await renderRoute('/login', { session: anonymous });
   assert.ok(text(html).includes('Нет учётной записи? Зарегистрироваться'));
   assert.ok(hrefs(html).includes('/register'));
+});
+
+test('the code step tells a new code that was not taken', async () => {
+  const plain = await pageText(code({ notice: { kind: 'not-sent' } }));
+  assert.ok(plain.includes('Код не отправлен'));
+  assert.ok(plain.includes('Сервис не принял запрос нового кода.'));
+  assert.ok(plain.includes('Подтвердить'));
 });

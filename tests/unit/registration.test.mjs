@@ -705,3 +705,15 @@ test('subscribers hear every change', async () => {
   registration.restart();
   assert.equal(heard, before);
 });
+
+test('a new code that Auth does not take is a message on the code step', async () => {
+  const { registration, fake, storage } = await atCode();
+  fake.answers.begin.push(refused(400, 'InvalidArgument', 'not_committed'));
+  await registration.requestCode();
+  const snapshot = registration.getSnapshot();
+  assert.deepEqual(snapshot.notice, { kind: 'not-sent' });
+  // The code that was sent stays usable.
+  assert.equal(snapshot.step, 'code');
+  assert.equal(storage.box.record.challenge.challengeID, C1);
+  assert.equal(snapshot.busy, false);
+});

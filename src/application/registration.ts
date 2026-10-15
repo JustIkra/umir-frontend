@@ -1,9 +1,8 @@
 import type { Challenge, UserView, VerifiedChallenge } from './account';
 import type { AccessStore } from './access';
-import type { ApiFailure } from './api';
-import type { CommandResult, CommandRunner } from './commands';
+import { createChallengeFlow } from './challenge-flow';
+import type { CommandRunner } from './commands';
 import {
-  defaultWaitSeconds,
   emailProblem,
   nameProblem,
   normalizedCode,
@@ -56,6 +55,8 @@ export type RegisterNotice =
   | { readonly kind: 'resent' }
   // Registration is switched off in Auth.
   | { readonly kind: 'closed' }
+  // A new code was asked for on the code step and Auth did not take it.
+  | { readonly kind: 'not-sent' }
   | { readonly kind: 'proof-expired' }
   | { readonly kind: 'email-taken' }
   | { readonly kind: 'limited'; readonly untilMs: number }
@@ -140,8 +141,6 @@ const labels: Record<RegisterAction, string> = {
   complete: 'создания учётной записи',
 };
 
-type Refusal = Exclude<CommandResult<unknown>, { readonly kind: 'committed' }>;
-
 // The code turns into «expired» at expiresAt without a request.
 export function isRegisterCodeExpired(
   snapshot: RegisterSnapshot,
@@ -162,24 +161,14 @@ export function createRegistration({
   storage,
   now,
 }: RegisterOptions): Registration {
-  const listeners = new Set<() => void>();
-  let record = storage.load();
-  let email = record?.email ?? '';
-  let displayName = record?.displayName ?? '';
-  let finished = false;
-  let busy = false;
-  let notice: RegisterNotice | undefined;
-  // restart() and a dead attempt start a new generation; answers of an older
-  // one are dropped.
-  let generation = 0;
-  // The inputs of the last attempts live in memory only: «Проверить
-  // результат» repeats them, and a reload loses them.
-  let password = '';
-  let lastCode = '';
+  const initial = storage.load();
+  let email = initial?.email ?? '';
+  let displayName = initial?.displayName ?? '';
 
   function view(): RegisterSnapshot {
+    const { record } = core;
     let step: RegisterStep = 'form';
-    if (finished) step = 'done';
+    if (core.finished) step = 'done';
     else if (record !== undefined) {
       step = record.proof === undefined ? 'code' : 'details';
     }
@@ -189,131 +178,69 @@ export function createRegistration({
       displayName,
       expiresAtMs: record?.challenge.expiresAt.epochMs,
       resendAtMs: record?.challenge.resendAvailableAt.epochMs,
-      busy,
-      notice,
+      busy: core.busy,
+      notice: core.notice,
     };
-  }
-  let snapshot = view();
-
-  function show(next: RegisterNotice | undefined): void {
-    notice = next;
-    snapshot = view();
-    for (const listener of listeners) listener();
-  }
-
-  // Another challenge makes the attempts of the previous one meaningless.
-  function keep(next: RegisterRecord | undefined): void {
-    if (next?.challenge.challengeID !== record?.challenge.challengeID) {
-      commands.discard(registerKeys.verify);
-      commands.discard(registerKeys.resend);
-      commands.discard(registerKeys.complete);
-    }
-    record = next;
-    if (next === undefined) storage.clear();
-    else storage.save(next);
-  }
-
-  function forgetInputs(): void {
-    password = '';
-    lastCode = '';
   }
 
   // Back to the form, without a notification. The typed name and email stay
   // when the form is to be shown again.
   function clear(keepInputs: boolean): void {
-    generation += 1;
-    for (const key of Object.values(registerKeys)) commands.discard(key);
-    keep(undefined);
+    core.reset();
     if (!keepInputs) {
       email = '';
       displayName = '';
     }
-    forgetInputs();
-    finished = false;
-    busy = false;
   }
 
-  function dropped(own: number): boolean {
-    if (own === generation) return false;
-    show(notice);
-    return true;
-  }
-
-  // own is the generation of the action: a stale answer leaves busy to the
-  // newer action.
-  async function send<T>(
-    own: number,
-    action: RegisterAction,
-    execute: (commandID: string) => Promise<T>,
-  ): Promise<CommandResult<T>> {
-    busy = true;
-    show(undefined);
-    const result = await commands.run({
-      key: registerKeys[action],
-      label: labels[action],
-      execute,
-    });
-    if (own === generation) busy = false;
-    return result;
-  }
-
-  // Refusals every step shares. specific answers for the codes of the
-  // action; 401 means the session the code was bound to is gone.
-  function refused(
-    result: Refusal,
-    action: RegisterAction,
-    specific: (failure: ApiFailure) => RegisterNotice | 'silent' | undefined,
-  ): void {
-    if (result.kind === 'unknown') {
-      show({ kind: 'unknown', action });
-      return;
-    }
-    const { failure } = result;
-    if (failure.status === 401) {
+  const core = createChallengeFlow<
+    RegisterAction,
+    RegisterNotice,
+    RegisterRecord,
+    RegisterSnapshot
+  >({
+    commands,
+    now,
+    storage,
+    initial,
+    keys: registerKeys,
+    labels,
+    notices: {
+      unknown: (action) => ({ kind: 'unknown', action }),
+      limited: (untilMs) => ({ kind: 'limited', untilMs }),
+      unavailable: { kind: 'unavailable' },
+    },
+    view,
+    abandon: () => {
       clear(true);
-      show(undefined);
-      return;
-    }
-    const own = specific(failure);
-    if (own !== undefined) {
-      show(own === 'silent' ? undefined : own);
-      return;
-    }
-    if (failure.status === 429) {
-      const seconds = failure.retryAfterSeconds ?? defaultWaitSeconds;
-      show({ kind: 'limited', untilMs: now() + seconds * 1000 });
-      return;
-    }
-    show({ kind: 'unavailable' });
-  }
-
-  // The attempt is dead: back to the form with the reason.
-  function startOver(reason: RegisterNotice): RegisterNotice {
-    clear(true);
-    return reason;
-  }
+    },
+  });
+  const { memory } = core;
 
   async function begin(): Promise<void> {
     const address = email;
-    const own = generation;
-    const result = await send(own, 'begin', (commandID) =>
+    const own = core.generation;
+    const result = await core.send(own, 'begin', (commandID) =>
       api.begin(address, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
-      keep({
+      core.keep({
         email: address,
         displayName,
         challenge: result.value,
         proof: undefined,
       });
-      show(undefined);
+      core.show(undefined);
       return;
     }
-    refused(result, 'begin', ({ code }) => {
+    core.refused(result, 'begin', ({ code }) => {
       if (code === 'Forbidden') return { kind: 'closed' };
-      // Auth judges the address (or does not know the purpose yet).
       if (code === 'InvalidArgument') {
+        // The code step has no field to put the fault at: a new code that
+        // was not taken is told as a message.
+        if (core.record !== undefined) return { kind: 'not-sent' };
+        // Auth judges the address (or does not know the purpose yet).
         return {
           kind: 'fields',
           name: undefined,
@@ -359,14 +286,14 @@ export function createRegistration({
       emailProblem(email),
     );
     if (problem !== undefined) {
-      show(problem);
+      core.show(problem);
       return Promise.resolve();
     }
     if (!input.consent) {
-      show({ kind: 'consent' });
+      core.show({ kind: 'consent' });
       return Promise.resolve();
     }
-    password = input.password;
+    memory.password = input.password;
     return begin();
   }
 
@@ -375,18 +302,18 @@ export function createRegistration({
   }
 
   async function verify(input: string): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (current === undefined) return;
     if (now() >= current.challenge.expiresAt.epochMs) {
-      show({ kind: 'expired' });
+      core.show({ kind: 'expired' });
       return;
     }
     const code = normalizedCode(input);
     if (code === undefined) {
-      show({ kind: 'code-format' });
+      core.show({ kind: 'code-format' });
       return;
     }
-    lastCode = code;
+    memory.lastCode = code;
     await sendCode(current, code);
   }
 
@@ -397,30 +324,30 @@ export function createRegistration({
     current: RegisterRecord,
     code: string,
   ): Promise<void> {
-    const own = generation;
+    const own = core.generation;
     const { challengeID } = current.challenge;
-    const result = await send(own, 'verify', (commandID) =>
+    const result = await core.send(own, 'verify', (commandID) =>
       api.verify(challengeID, code, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       const next = {
         ...current,
         challenge: result.value.challenge,
         proof: result.value.proof,
       };
-      keep(next);
-      lastCode = '';
+      core.keep(next);
+      memory.lastCode = '';
       // The proof is spent at once if the scenario holds the password.
-      if (password !== '') {
-        busy = true;
+      if (memory.password !== '') {
+        core.hold();
         await completeNow(next);
       } else {
-        show(undefined);
+        core.show(undefined);
       }
       return;
     }
-    refused(result, 'verify', ({ code: refusal }) => {
+    core.refused(result, 'verify', ({ code: refusal }) => {
       // A wrong code is committed: the attempt counts against the five.
       if (refusal === 'InvalidArgument') return { kind: 'wrong-code' };
       if (refusal === 'ChallengeLocked') return { kind: 'locked' };
@@ -429,52 +356,52 @@ export function createRegistration({
   }
 
   async function resend(): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (current === undefined) return;
-    const own = generation;
-    const result = await send(own, 'resend', (commandID) =>
+    const own = core.generation;
+    const result = await core.send(own, 'resend', (commandID) =>
       api.resend(current.challenge.challengeID, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       // The previous code no longer works.
       commands.discard(registerKeys.verify);
-      keep({ ...current, challenge: result.value });
-      show({ kind: 'resent' });
+      core.keep({ ...current, challenge: result.value });
+      core.show({ kind: 'resent' });
       return;
     }
-    refused(result, 'resend', ({ code }) =>
-      code === 'NotFound' ? startOver({ kind: 'expired' }) : undefined,
+    core.refused(result, 'resend', ({ code }) =>
+      code === 'NotFound' ? core.startOver({ kind: 'expired' }) : undefined,
     );
   }
 
   async function completeNow(current: RegisterRecord): Promise<void> {
-    if (current.proof === undefined || password === '') return;
-    const own = generation;
+    if (current.proof === undefined || memory.password === '') return;
+    const own = core.generation;
     const user = {
       challengeID: current.challenge.challengeID,
       proof: current.proof,
-      password,
+      password: memory.password,
       displayName,
     };
-    const result = await send(own, 'complete', (commandID) =>
+    const result = await core.send(own, 'complete', (commandID) =>
       api.complete(user, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
-      generation += 1;
-      keep(undefined);
-      forgetInputs();
-      finished = true;
-      busy = false;
+      core.finish();
       session.adopt(result.value);
       void access.refresh();
-      show(undefined);
+      core.show(undefined);
       return;
     }
-    refused(result, 'complete', ({ code }) => {
-      if (code === 'NotFound') return startOver({ kind: 'proof-expired' });
-      if (code === 'CommandConflict') return startOver({ kind: 'email-taken' });
+    core.refused(result, 'complete', ({ code }) => {
+      if (code === 'NotFound') {
+        return core.startOver({ kind: 'proof-expired' });
+      }
+      if (code === 'CommandConflict') {
+        return core.startOver({ kind: 'email-taken' });
+      }
       if (code === 'Forbidden') {
         // Signed in meanwhile: nothing to register.
         clear(true);
@@ -494,26 +421,27 @@ export function createRegistration({
   }
 
   async function completeDetails(input: DetailsInput): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (current?.proof === undefined) return;
     const name = input.displayName.trim();
     const problem = passwordNotice(input, nameProblem(name), undefined);
     displayName = name;
     if (problem !== undefined) {
-      show(problem);
+      core.show(problem);
       return;
     }
-    password = input.password;
+    memory.password = input.password;
     await completeNow(current);
   }
 
   async function check(): Promise<void> {
+    const { notice, record } = core;
     if (notice?.kind !== 'unknown') return;
     switch (notice.action) {
       case 'begin':
         return begin();
       case 'verify':
-        if (record !== undefined) await sendCode(record, lastCode);
+        if (record !== undefined) await sendCode(record, memory.lastCode);
         return;
       case 'resend':
         return resend();
@@ -525,17 +453,12 @@ export function createRegistration({
 
   function restart(): void {
     clear(false);
-    show(undefined);
+    core.show(undefined);
   }
 
   return {
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    getSnapshot: () => snapshot,
+    subscribe: core.subscribe,
+    getSnapshot: core.getSnapshot,
     submit,
     requestCode,
     verify,
