@@ -849,3 +849,78 @@ test('clear forgets the remembered inputs', async () => {
   assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
   assert.equal(organizations.pendingOrganization(), undefined);
 });
+
+const R4 = '44444444-4444-4444-8444-444444444444';
+const A4 = '55555555-5555-4555-8555-555555555554';
+const fourAssignments = () =>
+  memberOf({
+    assignments: [
+      assignment(R1, A1, ['Warehouse'], '7'),
+      assignment(R2, A2, ['Waiter'], '8'),
+      assignment(R3, A3, ['Waiter'], '9'),
+      assignment(R4, A4, ['Waiter'], '3'),
+    ],
+  });
+const keepFourth = [{ restaurantID: R4, roles: ['Waiter'] }];
+const allRestaurants = new Set([R1, R2, R3, R4]);
+
+test('the check of a revoke plan retries the unknown step and then sends the unsent ones', async () => {
+  const { organizations, calls, events } = setup(
+    {},
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    {},
+    {},
+  );
+  const member = fourAssignments();
+  const first = await organizations.saveAssignments(
+    member,
+    keepFourth,
+    allRestaurants,
+  );
+  assert.equal(first.kind, 'unknown');
+  // A3 was never sent: only A2 is pending, the whole plan is remembered.
+  assert.equal(organizations.isPending(orgKeys.revokeAssignment(A3)), false);
+  // The member read again carries other versions; the plan is not made anew.
+  const reread = memberOf({
+    membershipVersion: '9',
+    assignments: [assignment(R4, A4, ['Waiter'], '3')],
+  });
+  const checked = await organizations.checkMembership(reread);
+  assert.deepEqual(checked, { kind: 'saved' });
+  assert.deepEqual(
+    calls.map((call) => [call[0], call[3], call[4], call.at(-1)]),
+    [
+      ['revokeAssignment', A1, '7', 'c1'],
+      ['revokeAssignment', A2, '8', 'c2'],
+      ['revokeAssignment', A2, '8', 'c2'],
+      ['revokeAssignment', A3, '9', 'c3'],
+    ],
+  );
+  assert.equal(events.at(-1)[0], 'members');
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+  assert.deepEqual(await organizations.checkMembership(reread), {
+    kind: 'unchanged',
+  });
+});
+
+test('a refusal of an unsent step on the check is returned and the list is read again', async () => {
+  const { organizations, calls, events } = setup(
+    {},
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    {},
+    refusal(409, 'CommandConflict'),
+  );
+  const member = fourAssignments();
+  await organizations.saveAssignments(member, keepFourth, allRestaurants);
+  events.length = 0;
+  assert.deepEqual(await organizations.checkMembership(member), {
+    kind: 'conflict',
+  });
+  assert.equal(calls.length, 4);
+  assert.equal(calls[3][3], A3);
+  assert.deepEqual(events, [['members', ORG]]);
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+  assert.deepEqual(await organizations.checkMembership(member), {
+    kind: 'unchanged',
+  });
+});

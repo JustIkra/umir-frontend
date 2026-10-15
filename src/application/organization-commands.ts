@@ -341,8 +341,49 @@ export function createOrganizationCommands({
       changes.set(membershipID, change);
     }
   }
+  // The revoke steps of a plan that are not done, in order, with the
+  // versions they were planned with. A check completes them and never plans
+  // anew from a membership read again.
+  const revokePlans = new Map<string, readonly Assignment[]>();
   function settled(membershipID: string, result: { kind: string }): void {
-    if (result.kind !== 'unknown') changes.delete(membershipID);
+    if (result.kind !== 'unknown') {
+      changes.delete(membershipID);
+      revokePlans.delete(membershipID);
+    }
+  }
+  // Revokes the assignments one by one on their own versions, stopping at the
+  // first step that is not done. A step with a pending attempt is sent again
+  // by the runner with its commandID. The steps left are kept for the check.
+  async function revokeSteps(
+    membership: Membership,
+    steps: readonly Assignment[],
+  ): Promise<{ result: Outcome<unknown>; committed: boolean }> {
+    let result: Outcome<unknown> = { kind: 'done', value: undefined };
+    let committed = false;
+    let left = steps;
+    revokePlans.set(membership.membershipID, left);
+    for (const assignment of steps) {
+      result = outcome(
+        await commands.run({
+          key: orgKeys.revokeAssignment(assignment.assignmentID),
+          label: 'снятия назначения',
+          execute: (commandID) =>
+            api.revokeAssignment(
+              membership.orgID,
+              membership.membershipID,
+              assignment.assignmentID,
+              assignment.assignmentVersion,
+              commandID,
+            ),
+        }),
+        'membership',
+      );
+      if (result.kind !== 'done') break;
+      committed = true;
+      left = left.slice(1);
+      revokePlans.set(membership.membershipID, left);
+    }
+    return { result, committed };
   }
 
   async function lifecycle(
@@ -459,26 +500,9 @@ export function createOrganizationCommands({
           'membership',
         );
       } else {
-        result = { kind: 'done', value: undefined };
-        for (const assignment of plan.assignments) {
-          result = outcome(
-            await commands.run({
-              key: orgKeys.revokeAssignment(assignment.assignmentID),
-              label: 'снятия назначения',
-              execute: (commandID) =>
-                api.revokeAssignment(
-                  membership.orgID,
-                  membership.membershipID,
-                  assignment.assignmentID,
-                  assignment.assignmentVersion,
-                  commandID,
-                ),
-            }),
-            'membership',
-          );
-          if (result.kind !== 'done') break;
-          committed = true;
-        }
+        const steps = await revokeSteps(membership, plan.assignments);
+        result = steps.result;
+        committed = steps.committed;
       }
       // A refusal may come from a membership that moved on: read it again.
       if (committed || result.kind === 'done' || result.kind === 'conflict') {
@@ -490,26 +514,25 @@ export function createOrganizationCommands({
     async checkMembership(member) {
       const { membership } = member;
       const change = pendingMembership(membership.membershipID);
-      let keys: readonly string[];
+      let result: Outcome<unknown>;
+      let committed = false;
       if (change?.kind === 'assignments') {
-        keys = [orgKeys.updateMembership(membership.membershipID)];
+        const again = commands.retry(
+          orgKeys.updateMembership(membership.membershipID),
+        );
+        if (again === undefined) return { kind: 'unchanged' };
+        result = outcome(await again, 'membership');
       } else if (change?.kind === 'revoke-assignments') {
-        keys = change.assignmentIDs
-          .map(orgKeys.revokeAssignment)
-          .filter(isPending);
+        const steps = await revokeSteps(
+          membership,
+          revokePlans.get(membership.membershipID) ?? [],
+        );
+        result = steps.result;
+        committed = steps.committed;
       } else {
         return { kind: 'unchanged' };
       }
-      let result: Outcome<unknown> = { kind: 'done', value: undefined };
-      let committed = false;
-      for (const key of keys) {
-        const again = commands.retry(key);
-        if (again === undefined) continue;
-        result = outcome(await again, 'membership');
-        if (result.kind !== 'done') break;
-        committed = true;
-      }
-      if (committed || result.kind === 'conflict') {
+      if (committed || result.kind === 'done' || result.kind === 'conflict') {
         membersChanged(membership.orgID);
       }
       settled(membership.membershipID, result);
@@ -635,6 +658,7 @@ export function createOrganizationCommands({
     clear() {
       unsettled.clear();
       changes.clear();
+      revokePlans.clear();
     },
   };
 }
