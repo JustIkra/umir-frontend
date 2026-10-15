@@ -81,6 +81,9 @@ export function TimeField({
         if (details.open)
           setHighlighted(nearestSlot(text) || nearestSlot(now) || null);
       }}
+      // The text is the source of truth: leaving a half hour by typing must not
+      // clear the input when the checked item goes away.
+      selectionBehavior="preserve"
       allowCustomValue
       openOnClick
       disabled={disabled}
