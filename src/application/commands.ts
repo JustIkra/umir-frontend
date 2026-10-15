@@ -39,6 +39,9 @@ export interface CommandRunner {
   // commandID, body and epoch) instead of the new spec.
   run<T>(spec: CommandSpec<T>): Promise<CommandResult<T>>;
   retry(key: string): Promise<CommandResult<unknown>> | undefined;
+  // True while a request of that key is on its way. An attempt without a
+  // known outcome that is not on its way is waiting for a check.
+  isInFlight(key: string): boolean;
   // A pending attempt saved outside the runner (the tab after a reload): kept
   // with its commandID, epoch and start time, not sent; retry or run of the
   // same key resends it.
@@ -145,6 +148,8 @@ export function createCommandRunner({
         publish();
       });
     inFlight.set(attempt.key, result);
+    // Listeners learn that the attempt is on its way, a resend included.
+    publish();
     return result;
   }
 
@@ -182,10 +187,10 @@ export function createCommandRunner({
         execute: spec.execute,
       };
       pending.set(spec.key, attempt);
-      publish();
       return send(attempt) as Promise<CommandResult<T>>;
     },
     retry: resend,
+    isInFlight: (key) => inFlight.has(key),
     restore(spec, saved) {
       if (pending.has(spec.key) || inFlight.has(spec.key)) return;
       pending.set(spec.key, {

@@ -69,14 +69,19 @@ export interface OrganizationAccess {
 }
 
 // unverified: /access was refused or lost (404 at the checkpoint,
-// AuthUnavailable). It never means «no access».
+// AuthUnavailable). It never means «no access». previous is the last ready
+// answer: rights and zone stay known while a refresh fails.
 export type AccessState =
   | { readonly status: 'loading' }
   | {
       readonly status: 'ready';
       readonly organizations: readonly OrganizationAccess[];
     }
-  | { readonly status: 'unverified'; readonly failure: ApiFailure };
+  | {
+      readonly status: 'unverified';
+      readonly failure: ApiFailure;
+      readonly previous?: readonly OrganizationAccess[];
+    };
 
 export interface AccessStore {
   readonly subscribe: (listener: () => void) => () => void;
@@ -140,6 +145,14 @@ export function organizationsFrom(
     });
   }
   return result.sort(byName);
+}
+
+// The organizations of the last ready answer; undefined when none was read.
+export function knownOrganizations(
+  state: AccessState,
+): readonly OrganizationAccess[] | undefined {
+  if (state.status === 'ready') return state.organizations;
+  return state.status === 'unverified' ? state.previous : undefined;
 }
 
 export function findRestaurant(
@@ -233,7 +246,12 @@ export function createAccessStore(
           if (failure.status === 401) {
             await onUnauthenticated?.().catch(() => undefined);
           }
-          return { status: 'unverified', failure };
+          const previous = knownOrganizations(state);
+          return {
+            status: 'unverified',
+            failure,
+            ...(previous === undefined ? {} : { previous }),
+          };
         },
       )
       .then((next) => {

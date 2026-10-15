@@ -5,6 +5,7 @@ import {
   chooseEntry,
   createAccessStore,
   findRestaurant,
+  knownOrganizations,
   organizationsFrom,
 } from '../../src/application/access.ts';
 import { createAccessApi } from '../../src/adapters/api/access-api.ts';
@@ -220,6 +221,31 @@ test('a refused access read is unverified, not empty', async () => {
     access: () => Promise.reject(new ApiError(failure)),
   });
   assert.deepEqual(await store.ensure(), { status: 'unverified', failure });
+});
+
+test('a failed refresh keeps the last ready organizations reachable', async () => {
+  const failure = localFailure('NotFound', 'not_committed', 404);
+  let fail = false;
+  const store = createAccessStore({
+    access: () =>
+      fail ? Promise.reject(new ApiError(failure)) : Promise.resolve(view),
+  });
+  const ready = await store.ensure();
+  fail = true;
+  const after = await store.refresh();
+  assert.equal(after.status, 'unverified');
+  assert.deepEqual(after.failure, failure);
+  assert.deepEqual(knownOrganizations(after), ready.organizations);
+  // A second failure keeps the same answer; nothing was ever read: none.
+  assert.deepEqual(
+    knownOrganizations(await store.refresh()),
+    ready.organizations,
+  );
+  assert.equal(
+    knownOrganizations({ status: 'unverified', failure }),
+    undefined,
+  );
+  assert.equal(knownOrganizations({ status: 'loading' }), undefined);
 });
 
 test('clear() drops the state and ignores a read still in flight', async () => {

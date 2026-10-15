@@ -314,3 +314,34 @@ test('restore keeps a saved attempt and a retry resends it with the saved id and
   assert.deepEqual(sent, [['saved-id', 'saved-epoch']]);
   assert.deepEqual(commands.getSnapshot(), []);
 });
+
+test('isInFlight: on its way is true, an unknown answer or a settled one is false', async () => {
+  const { runner } = setup();
+  const resolvers = [];
+  const execute = () =>
+    new Promise((resolve, reject) => {
+      resolvers.push({ resolve, reject });
+    });
+  let changes = 0;
+  runner.subscribe(() => {
+    changes += 1;
+  });
+  assert.equal(runner.isInFlight('k'), false);
+  const first = runner.run({ key: 'k', label: 'x', execute });
+  assert.equal(runner.isInFlight('k'), true);
+  assert.equal(runner.getSnapshot().length, 1);
+  resolvers[0].reject(timeout());
+  assert.equal((await first).kind, 'unknown');
+  assert.equal(runner.isInFlight('k'), false);
+  assert.equal(runner.getSnapshot().length, 1);
+
+  // A resend is on its way again, and listeners are told when it starts.
+  const before = changes;
+  const second = runner.retry('k');
+  assert.equal(runner.isInFlight('k'), true);
+  assert.ok(changes > before);
+  resolvers[1].resolve('ok');
+  assert.equal((await second).kind, 'committed');
+  assert.equal(runner.isInFlight('k'), false);
+  assert.deepEqual(runner.getSnapshot(), []);
+});
