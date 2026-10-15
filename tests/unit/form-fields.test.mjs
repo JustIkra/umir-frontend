@@ -25,7 +25,7 @@ test('the search select is a combobox with a hidden value, not a select', () => 
       name: 'product-1',
       options: products,
       defaultValue: 'arugula',
-      placeholder: 'Выберите продукт',
+      placeholder: 'Найти продукт',
     }),
   );
   assert.match(html, /role="combobox"/);
@@ -41,7 +41,7 @@ test('a value whose options arrive later shows the name once they do', () => {
       id: 'p',
       options: [],
       value: 'parmesan',
-      placeholder: 'Выберите продукт',
+      placeholder: 'Найти продукт',
     }),
   );
   assert.doesNotMatch(empty, /value="parmesan"/);
@@ -50,7 +50,7 @@ test('a value whose options arrive later shows the name once they do', () => {
       id: 'p',
       options: products,
       value: 'parmesan',
-      placeholder: 'Выберите продукт',
+      placeholder: 'Найти продукт',
     }),
   );
   assert.match(loaded, /value="Сыр пармезан"/);
@@ -61,7 +61,7 @@ test('a disabled search select disables its input and trigger', () => {
     h(SearchSelect, {
       id: 'p',
       options: products,
-      placeholder: 'Выберите продукт',
+      placeholder: 'Найти продукт',
       disabled: true,
     }),
   );

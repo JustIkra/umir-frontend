@@ -427,7 +427,7 @@ export function NewDishPage() {
                           </chakra.label>
                           <SearchSelect
                             id={productId}
-                            placeholder="Выберите продукт"
+                            placeholder="Найти продукт"
                             options={productOptions}
                             value={row.productID}
                             invalid={productFault}
