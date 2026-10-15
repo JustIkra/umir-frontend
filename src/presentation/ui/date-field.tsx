@@ -19,31 +19,44 @@ const weekday = (name: string) =>
 
 const two = (n: number) => String(n).padStart(2, '0');
 
-// Reports when the segments stop or start being a whole date. zag commits a
-// clear only when every segment is empty, so one emptied segment would leave
-// the old date as the value while the person sees «дд.10.2026».
+function isRealDate(iso: string): boolean {
+  const moment = new Date(`${iso}T00:00:00Z`);
+  return (
+    !Number.isNaN(moment.getTime()) && moment.toISOString().startsWith(iso)
+  );
+}
+
+// Reports how the segments stand: whole, half filled or all empty. zag
+// commits a clear only when every segment is empty, so one emptied segment
+// would leave the old date as the value while the person sees «дд.10.2026».
+type Standing = 'whole' | 'half' | 'empty';
+
 function Completeness({
-  onIncomplete,
-  onComplete,
+  onStanding,
 }: {
-  onIncomplete: () => void;
-  onComplete: (iso: string) => void;
+  onStanding: (standing: Standing, iso: string) => void;
 }) {
   const api = useDateInputContext();
   const parts = api
     .getSegments()
     .filter((part) => ['day', 'month', 'year'].includes(part.type));
-  const incomplete = parts.some((part) => part.isPlaceholder);
   const [day = 0, month = 0, year = 0] = ['day', 'month', 'year'].map(
     (type) => parts.find((part) => part.type === type)?.value ?? 0,
   );
   const iso = `${String(year).padStart(4, '0')}-${two(month)}-${two(day)}`;
-  const was = useRef(incomplete);
+  // A year still being typed shows as 2, 20, 202: not a date yet.
+  const standing: Standing = parts.every((part) => !part.isPlaceholder)
+    ? year >= 1000
+      ? 'whole'
+      : 'half'
+    : parts.every((part) => part.isPlaceholder)
+      ? 'empty'
+      : 'half';
+  const was = useRef(standing);
   useEffect(() => {
-    if (was.current === incomplete) return;
-    was.current = incomplete;
-    if (incomplete) onIncomplete();
-    else if (year >= 1000) onComplete(iso);
+    if (was.current === standing) return;
+    was.current = standing;
+    onStanding(standing, iso);
   });
   return null;
 }
@@ -90,6 +103,7 @@ export function DateField({
 }) {
   const [own, setOwn] = useState(defaultValue);
   const current = value ?? own;
+  // The last value given out, for dropping a repeat.
   const held = useRef(current);
   useEffect(() => {
     held.current = current;
@@ -97,27 +111,66 @@ export function DateField({
   // The date the segments hold. It follows the value, except while the person
   // has emptied a segment: the value is then «» but the other segments stay.
   const [prior, setPrior] = useState(current);
+  const [reported, setReported] = useState(current);
   const [shown, setShown] = useState(current);
+  // The segments are half filled (or half emptied): the value is «».
   const [partial, setPartial] = useState(false);
+  const partialNow = useRef(false);
+  useEffect(() => {
+    partialNow.current = partial;
+  }, [partial]);
+  // The segments are mounted afresh to take the value, when it is set from
+  // outside them while they are half filled: zag does not redraw a date it
+  // already holds.
+  const [epoch, setEpoch] = useState(0);
   if (current !== prior) {
     setPrior(current);
-    if (current !== '' || !partial) setShown(current);
+    setReported(current);
+    if (current !== reported && partial) {
+      setPartial(false);
+      setEpoch(epoch + 1);
+    }
+    if (current !== '' || !partial || current !== reported) setShown(current);
     if (current !== '') setPartial(false);
   }
   const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const form = trigger.current?.form;
+    if (!form) return;
+    const onReset = () => {
+      if (!partialNow.current) return;
+      setPartial(false);
+      setShown(held.current);
+      setEpoch((n) => n + 1);
+    };
+    form.addEventListener('reset', onReset);
+    return () => {
+      form.removeEventListener('reset', onReset);
+    };
+  }, []);
   const dates = current === '' ? [] : [parseDate(current)];
   const shownDates = shown === '' ? [] : [parseDate(shown)];
   const set = (next: string) => {
     if (next === held.current) return;
     held.current = next;
+    setReported(next);
     if (value === undefined) setOwn(next);
     onValueChange?.(next);
+  };
+  // The value is set from the calendar: half filled segments take it afresh.
+  const setFromCalendar = (next: string) => {
+    set(next);
+    if (partial) {
+      setPartial(false);
+      setShown(next);
+      setEpoch(epoch + 1);
+    }
   };
   return (
     <DatePicker.Root
       value={dates}
       onValueChange={(details) => {
-        set(details.value[0]?.toString() ?? '');
+        setFromCalendar(details.value[0]?.toString() ?? '');
       }}
       locale="ru-RU"
       startOfWeek={1}
@@ -128,6 +181,7 @@ export function DateField({
     >
       <DatePicker.Control data-invalid={invalid ? '' : undefined}>
         <DateInput.Root
+          key={epoch}
           value={shownDates}
           onValueChange={(details) => {
             set(details.value[0]?.toString() ?? '');
@@ -139,14 +193,14 @@ export function DateField({
           invalid={invalid}
         >
           <Completeness
-            onIncomplete={() => {
-              if (held.current === '') return;
-              setPartial(true);
-              set('');
-            }}
-            onComplete={(iso) => {
-              setPartial(false);
-              set(iso);
+            onStanding={(standing, iso) => {
+              setPartial(standing === 'half');
+              // A day the month does not have (31.11) is left to zag, which
+              // commits the nearest real day.
+              if (standing === 'whole') {
+                if (isRealDate(iso)) set(iso);
+              } else if (held.current !== '') set('');
+              if (standing === 'empty') setShown('');
             }}
           />
           <DateInput.Control>
@@ -211,7 +265,7 @@ export function DateField({
                     variant="secondary"
                     alignSelf="flex-start"
                     onClick={() => {
-                      set(today);
+                      setFromCalendar(today);
                       api.setOpen(false);
                       trigger.current?.focus();
                     }}
