@@ -69,5 +69,5 @@ export function recipeRows(
 }
 
 export function catalogStamp(epochMs: number, timeZone: string): string {
-  return `Справочник на ${formatStamp(epochMs, timeZone)}`;
+  return `Данные на ${formatStamp(epochMs, timeZone)}`;
 }

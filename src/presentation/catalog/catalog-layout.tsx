@@ -62,7 +62,7 @@ export function CatalogLayout({
         <EvaluationStamp
           text={
             shown === undefined
-              ? 'Получаем новую оценку…'
+              ? 'Обновляем…'
               : catalogStamp(
                   shown.result.evaluatedAt.epochMs,
                   shown.context.settings.timeZone,
@@ -89,14 +89,14 @@ export function StaleCatalog({
   return (
     <FormMessage
       tone="error"
-      title="Данные не обновлены"
+      title="Не удалось обновить"
       action={
         <Button variant="secondary" onClick={onRetry}>
-          Обновить ещё раз
+          Попробовать ещё раз
         </Button>
       }
     >
-      {`Показан ${stamp.charAt(0).toLowerCase()}${stamp.slice(1)}. Повторите чтение.`}
+      {`Показаны ${stamp.charAt(0).toLowerCase()}${stamp.slice(1)}.`}
     </FormMessage>
   );
 }

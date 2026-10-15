@@ -30,7 +30,7 @@ export function productErrors({
   const errors: ProductErrors = {};
   if (name.trim() === '') errors.name = 'Введите название';
   if (code.trim() === '') errors.code = 'Введите код продукта';
-  if (unit === undefined) errors.unit = 'Выберите единицу учёта';
+  if (unit === undefined) errors.unit = 'Выберите единицу измерения';
   return errors;
 }
 
@@ -61,7 +61,7 @@ export function quantityErrorText(
     case 'format':
       return 'Введите число, например 0,5';
     case 'precision':
-      return `Не больше трёх знаков после запятой: минимум 0,001 ${unitShort(unit ?? 'g')}.`;
+      return `Укажите количество с точностью до 0,001\u00a0${unitShort(unit ?? 'g')}.`;
     case 'zero':
       return 'Количество должно быть больше нуля';
   }
@@ -76,7 +76,7 @@ export function dishErrors(
   if (code.trim() === '') fields.code = 'Введите код блюда';
   if (lines.length === 0) {
     fields.recipe =
-      'Добавьте хотя бы один ингредиент: блюдо без рецептуры создать нельзя.';
+      'Добавьте хотя бы один ингредиент: блюдо без рецепта создать нельзя.';
   }
   const byID = new Map(products.map((product) => [product.productID, product]));
   const firstLine = new Map<string, number>();
@@ -91,7 +91,7 @@ export function dishErrors(
     if (earlier !== undefined) {
       errors.set(
         line.key,
-        `${product?.name ?? line.productID} уже есть в строке ${String(earlier)}. Один продукт — одна строка: измените количество там.`,
+        `${product?.name ?? line.productID} уже есть в строке ${String(earlier)}. Измените количество там, а эту строку удалите.`,
       );
       return;
     }
@@ -103,6 +103,8 @@ export function dishErrors(
   return { fields, lines: errors };
 }
 
+const kept = 'Ничего не сохранено, данные остались в форме.';
+
 export function fieldsSummary(
   count: number,
   withRecipe: boolean,
@@ -110,8 +112,8 @@ export function fieldsSummary(
   return {
     title: `Проверьте ${String(count)} ${plural(count, 'поле', 'поля', 'полей')}`,
     text: withRecipe
-      ? 'Ошибки отмечены у полей и в рецептуре. Ничего не записано.'
-      : 'Ошибки отмечены у полей. Ничего не записано.',
+      ? `Мы отметили ошибки у полей и в рецепте. ${kept}`
+      : `Мы отметили ошибки у полей. ${kept}`,
   };
 }
 
@@ -119,17 +121,16 @@ export function linesSummary(lineNos: readonly number[]): {
   readonly title: string;
   readonly text: string;
 } {
-  const kept = 'Ничего не записано, введённые значения сохранены.';
   if (lineNos.length === 1) {
     return {
       title: 'Проверьте 1 строку',
-      text: `Ошибка отмечена в строке ${listText(lineNos)}. ${kept}`,
+      text: `Мы отметили ошибку в строке ${listText(lineNos)}. ${kept}`,
     };
   }
   const count = lineNos.length;
   return {
     title: `Блюдо не создано: ошибки в ${String(count)} ${plural(count, 'строке', 'строках', 'строках')}`,
-    text: `Ошибки отмечены в строках ${listText(lineNos)}. ${kept}`,
+    text: `Мы отметили ошибки в строках ${listText(lineNos)}. ${kept}`,
   };
 }
 
@@ -151,7 +152,7 @@ export function createdProductText(
   const unitName = unitTitles[unit].split(',')[0] ?? unitTitles[unit];
   return {
     title: `Продукт «${name}» создан`,
-    text: `Код ${code}, единица — ${unitName}. Определение не изменяется; продукт уже можно выбрать в поставке и рецептуре.`,
+    text: `Код ${code}, единица — ${unitName}. Продукт уже можно выбрать в поставках и рецептах. Изменить его после создания нельзя.`,
   };
 }
 
@@ -162,7 +163,7 @@ export function createdDishText(
 ): { readonly title: string; readonly text: string } {
   return {
     title: `Блюдо «${name}» создано`,
-    text: `Код ${code}, ${String(ingredients)} ${plural(ingredients, 'ингредиент', 'ингредиента', 'ингредиентов')} на порцию. Блюдо появилось в каталоге; можно ли его заказать сейчас, зависит от остатков — это видно в меню и стоп-листе.`,
+    text: `Код ${code}, ${String(ingredients)} ${plural(ingredients, 'ингредиент', 'ингредиента', 'ингредиентов')} на порцию. Можно ли заказать блюдо сейчас, видно в меню в разделе «Заказы».`,
   };
 }
 
@@ -172,28 +173,31 @@ export function outcomeMessage(
 ): { readonly title: string; readonly text: string } {
   const product = kind === 'product';
   const notCreated = product ? 'Продукт не создан' : 'Блюдо не создано';
+  const unknownTitle = product
+    ? 'Не знаем, создан ли продукт'
+    : 'Не знаем, создано ли блюдо';
   switch (outcome) {
     case 'unknown':
       return {
-        title: 'Результат создания неизвестен',
+        title: unknownTitle,
         text: product
-          ? 'Ответ сервиса не получен — продукт мог быть создан. «Проверить результат» повторит тот же запрос с тем же номером команды: второй продукт не появится.'
-          : 'Ответ сервиса не получен — блюдо могло быть создано. «Проверить результат» повторит тот же запрос с тем же номером команды: второе блюдо не появится.',
+          ? 'Связь прервалась. Нажмите «Проверить результат» — второй продукт не появится.'
+          : 'Связь прервалась. Нажмите «Проверить результат» — второе блюдо не появится.',
       };
     case 'reset':
       return {
-        title: 'Результат создания неизвестен',
-        text: `Склад перезапустился, повторить проверку нельзя. Откройте список и проверьте, есть ли ${product ? 'продукт' : 'блюдо'}.`,
+        title: unknownTitle,
+        text: `Была короткая техническая пауза. Откройте список и проверьте, ${product ? 'появился ли продукт' : 'появилось ли блюдо'}.`,
       };
     case 'invalid':
       return {
         title: notCreated,
-        text: 'Сервис отклонил данные. Ничего не записано, введённые значения сохранены.',
+        text: `Проверьте поля и попробуйте ещё раз. ${kept}`,
       };
     case 'refused':
       return {
         title: notCreated,
-        text: 'Сервис склада недоступен. Ничего не записано, введённые значения сохранены. Повторите попытку.',
+        text: 'Не получилось сохранить. Данные остались в форме — попробуйте ещё раз.',
       };
   }
 }
@@ -206,14 +210,14 @@ export function footerCaption(
 ): string | undefined {
   if (status === 'sending') {
     return kind === 'product'
-      ? 'Ждём ответ сервиса. Повторное нажатие не создаст второй продукт.'
-      : 'Ждём ответ сервиса. Повторное нажатие не создаст второе блюдо.';
+      ? 'Создаём продукт. Повторное нажатие не создаст дубль.'
+      : 'Создаём блюдо. Повторное нажатие не создаст дубль.';
   }
   if (status === 'unknown') {
-    return 'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.';
+    return 'Пока вы не проверите результат, поля менять нельзя.';
   }
   if (status === 'reset') return undefined;
-  return 'Сервис проверит форму целиком; при ошибке ничего не записывается.';
+  return 'Если в форме ошибка, мы подскажем — ничего не сохранится.';
 }
 
 // What a create form hands to the list or the recipe page it returns to

@@ -61,7 +61,7 @@ test('rows: sorted by name, searched by name or code, recipe in the base unit', 
   ]);
   assert.equal(
     catalogStamp(NOW, 'Europe/Moscow'),
-    'Справочник на 14.10.2026, 10:00:00 UTC+3',
+    'Данные на 14 октября, 10:00',
   );
 });
 
@@ -73,8 +73,9 @@ test('the products list shows the read with counts, stamp and the zone caption',
   );
   assert.ok(plain.includes('Продукты · 3'));
   assert.ok(plain.includes('Блюда · 2'));
-  assert.ok(plain.includes('Справочник на 14.10.2026, 10:00:00 UTC+3'));
-  assert.ok(plain.includes('Среда, 14 октября 2026 · Москва, UTC+3'));
+  assert.ok(plain.includes('Данные на 14 октября, 10:00'));
+  assert.ok(plain.includes('Среда, 14 октября · Москва'));
+  assert.ok(!plain.includes('UTC'));
   assert.ok(plain.indexOf('Сливки 33%') < plain.indexOf('Филе лосося'));
   assert.ok(plain.includes('миллилитры, мл'));
 });
@@ -85,7 +86,7 @@ test('the products list: loading, empty, unavailable', async () => {
       data: { products: loadingRead },
     }),
   );
-  assert.ok(loading.includes('Получаем новую оценку…'));
+  assert.ok(loading.includes('Обновляем…'));
   assert.ok(loading.includes('Продукты · …'));
   const empty = text(
     await renderRoute(`/app/r/${R}/catalog`, {
@@ -99,13 +100,9 @@ test('the products list: loading, empty, unavailable', async () => {
       data: { products: failedRead('UpstreamUnavailable', 503) },
     }),
   );
-  assert.ok(failed.includes('Не удалось получить справочник продуктов'));
-  assert.ok(
-    failed.includes(
-      'Справочник сейчас недоступен — это не значит, что он пуст.',
-    ),
-  );
-  assert.ok(failed.includes('Повторить загрузку'));
+  assert.ok(failed.includes('Не удалось загрузить список продуктов'));
+  assert.ok(failed.includes('Попробуйте ещё раз.'));
+  assert.ok(failed.includes('Попробовать ещё раз'));
 });
 
 test('every dish links to its card', async () => {
@@ -116,7 +113,7 @@ test('every dish links to its card', async () => {
   assert.ok(hrefs(html).includes(`/app/r/${R}/catalog/dishes/201`));
 });
 
-test('the dish card shows the recipe in base units and the zone of the stamp', async () => {
+test('the dish card shows the recipe in base units and the stamp without a zone', async () => {
   const html = await renderRoute(`/app/r/${R}/catalog/dishes/206`, {
     data: {
       dish: loaded({ evaluatedAt, stateVersion: '1', dish }),
@@ -130,18 +127,22 @@ test('the dish card shows the recipe in base units and the zone of the stamp', a
     '120 г',
     '50 мл',
     '0,5 г',
-    'Москва, UTC+3',
-    'Рецептура одной порции · 3',
+    'Данные на',
+    '14 октября, 10:00',
+    'Рецепт на одну порцию · 3',
+    '«Заказы»',
   ])
     assert.ok(plain.includes(part), part);
+  assert.ok(!plain.includes('UTC'));
+  assert.ok(!plain.includes('Меню и рекомендации'));
 });
 
-test('the dish card shows its header and «Получаем новую оценку…» while the read loads', async () => {
+test('the dish card shows its header and «Загружаем блюдо…» while the read loads', async () => {
   const html = await renderRoute(`/app/r/${R}/catalog/dishes/206`, {
     data: { dish: loadingRead },
   });
   const plain = text(html);
-  assert.ok(plain.includes('Получаем новую оценку…'));
+  assert.ok(plain.includes('Загружаем блюдо…'));
   assert.ok(plain.includes('Справочники'));
   assert.ok(plain.includes('Блюда'));
 });

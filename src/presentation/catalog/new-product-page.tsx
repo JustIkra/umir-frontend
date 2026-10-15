@@ -173,7 +173,7 @@ export function NewProductPage() {
         ? {
             tone: 'error' as const,
             title: 'Продукт не создан',
-            text: 'Такой код уже есть в справочнике. Ничего не записано, введённые значения сохранены.',
+            text: 'Такой код уже занят. Укажите другой.',
           }
         : shown === 'unknown' || shown === 'reset'
           ? { tone: 'unknown' as const, ...outcomeMessage('product', shown) }
@@ -198,7 +198,7 @@ export function NewProductPage() {
         />
         <PageHeader
           title="Новый продукт"
-          description="Продукт — то, что принимается на склад и входит в рецептуры. Определение нельзя изменить после создания."
+          description="Продукт — то, что приходит на склад и идёт в блюда. После создания его нельзя изменить."
         />
       </Stack>
       {message !== undefined && (
@@ -256,7 +256,7 @@ export function NewProductPage() {
                 />
                 <FieldMessage
                   id="product-code-hint"
-                  hint="Постоянный код для поставок и рецептур, например артикул. Должен быть уникальным."
+                  hint="Например, артикул. Код не должен повторяться, и изменить его потом нельзя."
                   error={
                     shown === 'conflict'
                       ? conflictText('product', codeValue.trim(), conflictName)
@@ -266,7 +266,7 @@ export function NewProductPage() {
               </FieldGroup>
             </Stack>
             <RadioGroupField
-              legend="Единица учёта"
+              legend="Единица измерения"
               name="unit"
               options={unitOptions}
               value={unit ?? ''}
@@ -274,7 +274,7 @@ export function NewProductPage() {
                 setUnit(asUnit(value));
               }}
               error={errors.unit}
-              hint="В этой единице вводятся количества в поставках и рецептурах, до тысячных."
+              hint="В ней вы будете указывать количество в поставках и рецептах."
               hintId="product-unit-hint"
             />
           </SplitCardBody>

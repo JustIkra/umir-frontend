@@ -33,7 +33,7 @@ test('product fields: K06', () => {
   assert.deepEqual(productErrors({ name: ' ', code: '', unit: undefined }), {
     name: 'Введите название',
     code: 'Введите код продукта',
-    unit: 'Выберите единицу учёта',
+    unit: 'Выберите единицу измерения',
   });
   assert.deepEqual(
     productErrors({ name: 'Сыр бри', code: '133', unit: 'g' }),
@@ -41,13 +41,13 @@ test('product fields: K06', () => {
   );
   assert.deepEqual(fieldsSummary(3, false), {
     title: 'Проверьте 3 поля',
-    text: 'Ошибки отмечены у полей. Ничего не записано.',
+    text: 'Мы отметили ошибки у полей. Ничего не сохранено, данные остались в форме.',
   });
   assert.equal(fieldsSummary(1, true).title, 'Проверьте 1 поле');
   assert.equal(fieldsSummary(5, true).title, 'Проверьте 5 полей');
   assert.equal(
     fieldsSummary(2, true).text,
-    'Ошибки отмечены у полей и в рецептуре. Ничего не записано.',
+    'Мы отметили ошибки у полей и в рецепте. Ничего не сохранено, данные остались в форме.',
   );
 });
 
@@ -57,7 +57,7 @@ test('dish recipe: empty, duplicate product, precision, missing product', () => 
     name: 'Введите название',
     code: 'Введите код блюда',
     recipe:
-      'Добавьте хотя бы один ингредиент: блюдо без рецептуры создать нельзя.',
+      'Добавьте хотя бы один ингредиент: блюдо без рецепта создать нельзя.',
   });
   const lines = [
     { key: 10, productID: '125', quantity: '20' },
@@ -69,11 +69,11 @@ test('dish recipe: empty, duplicate product, precision, missing product', () => 
   assert.deepEqual(errors.fields, {});
   assert.equal(
     errors.lines.get(11),
-    'Не больше трёх знаков после запятой: минимум 0,001 мл.',
+    'Укажите количество с точностью до 0,001 мл.',
   );
   assert.equal(
     errors.lines.get(12),
-    'Сыр пармезан уже есть в строке 1. Один продукт — одна строка: измените количество там.',
+    'Сыр пармезан уже есть в строке 1. Измените количество там, а эту строку удалите.',
   );
   assert.equal(errors.lines.get(13), 'Выберите продукт');
   assert.equal(errors.lines.has(10), false);
@@ -88,18 +88,18 @@ test('dish recipe: empty, duplicate product, precision, missing product', () => 
   );
   assert.equal(
     quantityErrorText('precision', undefined),
-    'Не больше трёх знаков после запятой: минимум 0,001 г.',
+    'Укажите количество с точностью до 0,001 г.',
   );
 });
 
 test('line summaries: K17 and K18', () => {
   assert.deepEqual(linesSummary([5, 6]), {
     title: 'Блюдо не создано: ошибки в 2 строках',
-    text: 'Ошибки отмечены в строках 5 и 6. Ничего не записано, введённые значения сохранены.',
+    text: 'Мы отметили ошибки в строках 5 и 6. Ничего не сохранено, данные остались в форме.',
   });
   assert.deepEqual(linesSummary([6]), {
     title: 'Проверьте 1 строку',
-    text: 'Ошибка отмечена в строке 6. Ничего не записано, введённые значения сохранены.',
+    text: 'Мы отметили ошибку в строке 6. Ничего не сохранено, данные остались в форме.',
   });
 });
 
@@ -114,11 +114,11 @@ test('conflict, created and outcome texts', () => {
   );
   assert.deepEqual(createdProductText('Сыр бри', '133', 'g'), {
     title: 'Продукт «Сыр бри» создан',
-    text: 'Код 133, единица — граммы. Определение не изменяется; продукт уже можно выбрать в поставке и рецептуре.',
+    text: 'Код 133, единица — граммы. Продукт уже можно выбрать в поставках и рецептах. Изменить его после создания нельзя.',
   });
   assert.equal(
     createdDishText('Паста', '213', 5).text,
-    'Код 213, 5 ингредиентов на порцию. Блюдо появилось в каталоге; можно ли его заказать сейчас, зависит от остатков — это видно в меню и стоп-листе.',
+    'Код 213, 5 ингредиентов на порцию. Можно ли заказать блюдо сейчас, видно в меню в разделе «Заказы».',
   );
   assert.equal(
     createdDishText('Паста', '213', 1).text.startsWith(
@@ -127,13 +127,21 @@ test('conflict, created and outcome texts', () => {
     true,
   );
   assert.deepEqual(outcomeMessage('product', 'unknown'), {
-    title: 'Результат создания неизвестен',
-    text: 'Ответ сервиса не получен — продукт мог быть создан. «Проверить результат» повторит тот же запрос с тем же номером команды: второй продукт не появится.',
+    title: 'Не знаем, создан ли продукт',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — второй продукт не появится.',
   });
-  assert.equal(
-    outcomeMessage('dish', 'reset').text,
-    'Склад перезапустился, повторить проверку нельзя. Откройте список и проверьте, есть ли блюдо.',
-  );
+  assert.deepEqual(outcomeMessage('dish', 'reset'), {
+    title: 'Не знаем, создано ли блюдо',
+    text: 'Была короткая техническая пауза. Откройте список и проверьте, появилось ли блюдо.',
+  });
+  assert.deepEqual(outcomeMessage('product', 'invalid'), {
+    title: 'Продукт не создан',
+    text: 'Проверьте поля и попробуйте ещё раз. Ничего не сохранено, данные остались в форме.',
+  });
+  assert.deepEqual(outcomeMessage('dish', 'refused'), {
+    title: 'Блюдо не создано',
+    text: 'Не получилось сохранить. Данные остались в форме — попробуйте ещё раз.',
+  });
 });
 
 test('the product form shows the suggested code', async () => {
@@ -151,11 +159,9 @@ test('the product form stays closed for a pending create', async () => {
     pendingProduct: { productID: '133', name: 'Сыр бри', baseUnit: 'g' },
   });
   const plain = text(html);
-  assert.ok(plain.includes('Результат создания неизвестен'));
+  assert.ok(plain.includes('Не знаем, создан ли продукт'));
   assert.ok(
-    plain.includes(
-      'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.',
-    ),
+    plain.includes('Пока вы не проверите результат, поля менять нельзя.'),
   );
   assert.ok(plain.includes('Проверить результат'));
   assert.ok(html.includes('value="Сыр бри"'));
@@ -181,7 +187,7 @@ test('the dish form shows the suggested code and stays closed for a pending crea
       ingredients: [{ productID: '125', quantity: '20000', baseUnit: 'g' }],
     },
   });
-  assert.ok(text(closed).includes('блюдо могло быть создано'));
+  assert.ok(text(closed).includes('Не знаем, создано ли блюдо'));
   assert.match(closed, /<fieldset[^>]*disabled/);
 });
 
@@ -229,20 +235,20 @@ test('a pending input is restored into the drafts', () => {
 test('the form footer caption: waiting, locked, none after a reset, default', () => {
   assert.equal(
     footerCaption('product', 'sending'),
-    'Ждём ответ сервиса. Повторное нажатие не создаст второй продукт.',
+    'Создаём продукт. Повторное нажатие не создаст дубль.',
   );
   assert.equal(
     footerCaption('dish', 'sending'),
-    'Ждём ответ сервиса. Повторное нажатие не создаст второе блюдо.',
+    'Создаём блюдо. Повторное нажатие не создаст дубль.',
   );
   assert.equal(
     footerCaption('dish', 'unknown'),
-    'Поля заблокированы до результата: изменённые данные были бы уже другим запросом.',
+    'Пока вы не проверите результат, поля менять нельзя.',
   );
   assert.equal(footerCaption('product', 'reset'), undefined);
   assert.equal(
     footerCaption('product', 'idle'),
-    'Сервис проверит форму целиком; при ошибке ничего не записывается.',
+    'Если в форме ошибка, мы подскажем — ничего не сохранится.',
   );
 });
 

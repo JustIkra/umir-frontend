@@ -26,7 +26,7 @@ const RowLink = chakra(RouterLink, {
   },
 });
 
-// Figma K12 «Блюда»: every defined dish opens its card. On 390 a row reads
+// Figma K12 «Блюда»: every dish opens its card. On 390 a row reads
 // «Борщ… / Код 201».
 export function DishesPage() {
   const path = useRestaurantPath();
@@ -43,13 +43,12 @@ export function DishesPage() {
         <ReadFailure
           failure={failure}
           section="Справочники"
-          title="Не удалось получить каталог блюд"
+          title="Не удалось загрузить список блюд"
           onRetry={() => {
             model.refresh();
           }}
         >
-          Справочник сейчас недоступен — это не значит, что он пуст. Повторите
-          чтение; определения не меняются, пока вы ждёте.
+          Попробуйте ещё раз.
         </ReadFailure>
       </CatalogLayout>
     );
@@ -63,7 +62,7 @@ export function DishesPage() {
           tile="action"
           actions={<ButtonLink to={action.to}>Новое блюдо</ButtonLink>}
         >
-          Определите блюдо с рецептурой одной порции.
+          Добавьте первое блюдо и рецепт на одну порцию.
         </StateCard>
       </CatalogLayout>
     );
@@ -89,8 +88,8 @@ export function DishesPage() {
         }}
       />
       <Text textStyle="caption.default" color="text.secondary">
-        Полный список определённых блюд, в том числе тех, что сейчас недоступны
-        для заказа. Доступность — в разделе «Меню и рекомендации».
+        Все блюда, даже те, что сейчас нельзя заказать. Что можно заказать
+        сейчас, видно в меню в разделе «Заказы».
       </Text>
       <TableCard>
         <DataTable rows="tall" mobile="cards">

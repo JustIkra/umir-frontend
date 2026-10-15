@@ -17,13 +17,13 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import { StateCard } from '@/presentation/ui/states';
 import { DataTable, Td, Th } from '@/presentation/ui/table';
 import { rem } from '@/presentation/ui/units';
-import { formatStamp, zoneLabel } from '@/presentation/ui/zones';
+import { formatStamp } from '@/presentation/ui/zones';
 import { createdDishText, createdNoticeOf } from './catalog-forms';
 import { recipeRows } from './catalog-rows';
 
 const bareTh = { bg: 'transparent' } as const;
 
-// Figma K13 «Рецептура»: read-only code and stamp, the recipe of one portion.
+// Figma K13 «Рецепт»: read-only code and stamp, the recipe of one portion.
 // On 390 the fields, the recipe list and the footer are separate blocks.
 export function DishPage() {
   const path = useRestaurantPath();
@@ -47,7 +47,7 @@ export function DishPage() {
           />
           <PageHeader title="Блюдо" />
           <Text textStyle="caption.default" color="text.secondary">
-            Получаем новую оценку…
+            Загружаем блюдо…
           </Text>
         </Stack>
       );
@@ -64,7 +64,7 @@ export function DishPage() {
             <TextLink to={path('/catalog/dishes')}>К списку блюд</TextLink>
           }
         >
-          Такого блюда нет в каталоге этого ресторана.
+          В этом ресторане нет такого блюда.
         </StateCard>
       );
     }
@@ -72,13 +72,12 @@ export function DishPage() {
       <ReadFailure
         failure={failure}
         section="Справочники"
-        title="Не удалось получить блюдо"
+        title="Не удалось загрузить рецепт"
         onRetry={() => {
           model.refresh();
         }}
       >
-        Рецептура сейчас недоступна. Повторите чтение; определение блюда не
-        меняется, пока вы ждёте.
+        Попробуйте ещё раз.
       </ReadFailure>
     );
   }
@@ -102,7 +101,7 @@ export function DishPage() {
         />
         <PageHeader
           title={dish.name}
-          description="Рецептура одной порции. Определение блюда не изменяется после создания."
+          description="Рецепт на одну порцию. Блюдо нельзя изменить после создания."
         />
         {createdText !== undefined && (
           <FormMessage tone="success" title={createdText.title}>
@@ -121,14 +120,14 @@ export function DishPage() {
                 <ReadOnlyValue
                   label="Код блюда"
                   value={dish.dishID}
-                  note="Постоянный, не изменяется"
+                  note="Изменить нельзя"
                 />
               </Box>
               <Box w={{ sm: rem(360) }}>
                 <ReadOnlyValue
-                  label="Справочник на"
+                  label="Данные на"
                   value={formatStamp(epochMs, timeZone)}
-                  note={zoneLabel(timeZone, epochMs)}
+                  note="Когда мы загрузили рецепт"
                 />
               </Box>
             </Flex>
@@ -136,14 +135,14 @@ export function DishPage() {
           <Stack gap={{ base: '3', sm: '4' }}>
             <Flex justify="space-between" align="baseline" wrap="wrap" gap="2">
               <chakra.h2 textStyle="heading.h3">
-                {`Рецептура одной порции · ${String(recipe.length)}`}
+                {`Рецепт на одну порцию · ${String(recipe.length)}`}
               </chakra.h2>
               <Text
                 display={{ base: 'none', sm: 'block' }}
                 textStyle="caption.default"
                 color="text.secondary"
               >
-                Количество — в базовой единице продукта
+                Количество — в единице измерения продукта
               </Text>
             </Flex>
             <Box
@@ -215,8 +214,8 @@ export function DishPage() {
         </Stack>
         <CardFooter>
           <Text textStyle="caption.default" color="text.secondary">
-            Определение нельзя изменить. Сколько порций можно приготовить сейчас
-            — в разделе «Меню и рекомендации».
+            Сколько порций можно приготовить сейчас, видно в меню в разделе
+            «Заказы».
           </Text>
           <Flex
             direction={{ base: 'column-reverse', sm: 'row' }}

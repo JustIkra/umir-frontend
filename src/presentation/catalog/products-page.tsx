@@ -45,13 +45,12 @@ export function ProductsPage() {
         <ReadFailure
           failure={failure}
           section="Справочники"
-          title="Не удалось получить справочник продуктов"
+          title="Не удалось загрузить список продуктов"
           onRetry={() => {
             model.refresh();
           }}
         >
-          Справочник сейчас недоступен — это не значит, что он пуст. Повторите
-          чтение; определения не меняются, пока вы ждёте.
+          Попробуйте ещё раз.
         </ReadFailure>
       </CatalogLayout>
     );
@@ -66,8 +65,7 @@ export function ProductsPage() {
           tile="action"
           actions={<ButtonLink to={action.to}>Добавить продукт</ButtonLink>}
         >
-          Сначала добавьте продукты с базовой единицей учёта, затем определите
-          блюда с рецептурой одной порции.
+          Сначала добавьте продукты, потом — блюда с рецептами.
         </StateCard>
       </CatalogLayout>
     );

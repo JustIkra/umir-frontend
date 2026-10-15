@@ -230,7 +230,7 @@ export function NewDishPage() {
         ? {
             tone: 'error' as const,
             title: 'Блюдо не создано',
-            text: 'Такой код уже есть в каталоге. Ничего не записано, введённые значения сохранены.',
+            text: 'Такой код уже занят. Укажите другой.',
           }
         : shown === 'unknown' || shown === 'reset'
           ? { tone: 'unknown' as const, ...outcomeMessage('dish', shown) }
@@ -255,7 +255,7 @@ export function NewDishPage() {
         />
         <PageHeader
           title="Новое блюдо"
-          description="Рецептура — на одну порцию, количества в базовой единице продукта. Определение нельзя изменить после создания."
+          description="Рецепт — на одну порцию. После создания блюдо нельзя изменить."
         />
       </Stack>
       {message !== undefined && (
@@ -317,7 +317,7 @@ export function NewDishPage() {
                 />
                 <FieldMessage
                   id="dish-code-hint"
-                  hint="Постоянный код блюда для заказов и истории. Должен быть уникальным."
+                  hint="Код нужен для заказов и истории. Он не должен повторяться, и изменить его потом нельзя."
                   error={
                     shown === 'conflict'
                       ? conflictText('dish', codeValue.trim(), conflictName)
@@ -330,10 +330,10 @@ export function NewDishPage() {
           <Stack gap="3">
             <Flex justify="space-between" align="baseline" wrap="wrap" gap="2">
               <chakra.h2 textStyle="heading.h3">
-                {`Рецептура одной порции · ${String(rows.length)}`}
+                {`Рецепт на одну порцию · ${String(rows.length)}`}
               </chakra.h2>
               <Text textStyle="caption.default" color="text.secondary">
-                Количество — в единице продукта, до тысячных
+                Единица измерения — как у выбранного продукта
               </Text>
             </Flex>
             {rows.length === 0 ? (
