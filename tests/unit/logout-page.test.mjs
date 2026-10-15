@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'bun:test';
-import { createElement as h } from 'react';
+import { Children, createElement as h, isValidElement } from 'react';
 import {
   LogoutView,
   signOutOnPress,
 } from '../../src/presentation/auth/logout-page.tsx';
+import { Button, ButtonLink } from '../../src/presentation/ui/actions.tsx';
 import {
   h1,
   hrefs,
@@ -16,6 +18,18 @@ import {
 
 const none = () => {};
 
+// Without a DOM renderer: LogoutView has no hooks, so calling it gives the
+// tree of elements, where a button's onClick can be called as a click.
+const elements = (node) =>
+  Children.toArray(node).flatMap((child) =>
+    isValidElement(child) ? [child, ...elements(child.props.children)] : [],
+  );
+const labelOf = (element) => Children.toArray(element.props.children).join('');
+const controls = (props, type) =>
+  elements(LogoutView(props)).filter((element) => element.type === type);
+const buttonNamed = (props, name) =>
+  controls(props, Button).filter((element) => labelOf(element) === name);
+
 test('/logout with an active session sends nothing and asks first', async () => {
   const sessionCalls = { signOut: 0, check: 0 };
   const html = await renderRoute('/logout', { sessionCalls });
@@ -24,12 +38,45 @@ test('/logout with an active session sends nothing and asks first', async () => 
   assert.equal(await redirectOf('/logout'), undefined);
 });
 
-test('the question offers «Выйти» and «Остаться» that opens the app', async () => {
-  const html = await renderRoute('/logout');
-  assert.match(text(html), /Выйти/);
-  assert.match(text(html), /Остаться/);
+test('the question has the «Выйти» button and the «Остаться» link to the app', () => {
+  const props = { state: 'confirm', onSignOut: none, onCheck: none };
+  assert.equal(buttonNamed(props, 'Выйти').length, 1);
+  const stay = controls(props, ButtonLink).filter(
+    (element) => labelOf(element) === 'Остаться',
+  );
+  assert.equal(stay.length, 1);
+  assert.equal(stay[0].props.to, '/app');
+  const html = renderElement(h(LogoutView, props));
+  assert.equal(h1(html), 'Выйти из аккаунта?');
   assert.ok(hrefs(html).includes('/app'));
   assert.doesNotMatch(text(html), /Выходим/);
+});
+
+test('the «Выйти» button is wired to the sign-out and nothing else is', () => {
+  let signOuts = 0;
+  const props = {
+    state: 'confirm',
+    onSignOut: () => {
+      signOuts += 1;
+    },
+    onCheck: none,
+  };
+  assert.equal(signOuts, 0);
+  const [button] = buttonNamed(props, 'Выйти');
+  button.props.onClick();
+  assert.equal(signOuts, 1);
+  assert.equal(
+    controls(props, Button).filter((element) => element.props.onClick).length,
+    1,
+  );
+});
+
+test('the page has no effect that could sign out on its own', () => {
+  const source = readFileSync(
+    new URL('../../src/presentation/auth/logout-page.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(source, /useEffect|useLayoutEffect|useInsertionEffect/);
 });
 
 test('a guest goes to sign-in without any call', async () => {
@@ -52,25 +99,22 @@ test('a press signs out exactly once and a done answer leaves for sign-in', asyn
     },
   };
   const steps = [];
-  signOutOnPress(session, {
+  const done = signOutOnPress(session, {
     show: (state) => steps.push(state),
     leave: () => steps.push('login'),
   });
   assert.deepEqual(steps, ['pending']);
-  await Promise.resolve();
-  await Promise.resolve();
+  await done;
   assert.deepEqual(calls, ['signOut']);
   assert.deepEqual(steps, ['pending', 'login']);
 });
 
 test('a lost answer ends on «Не знаем, получилось ли выйти»', async () => {
   const steps = [];
-  signOutOnPress(
+  await signOutOnPress(
     { signOut: () => Promise.resolve('failed') },
     { show: (state) => steps.push(state), leave: none },
   );
-  await Promise.resolve();
-  await Promise.resolve();
   assert.deepEqual(steps, ['pending', 'failed']);
   const html = renderElement(
     h(LogoutView, { state: 'failed', onSignOut: none, onCheck: none }),

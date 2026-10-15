@@ -31,9 +31,9 @@ export function signOutOnPress(
     readonly show: (state: LogoutState) => void;
     readonly leave: () => void;
   },
-): void {
+): Promise<void> {
   to.show('pending');
-  void session.signOut().then((result) => {
+  return session.signOut().then((result) => {
     if (result === 'done') to.leave();
     else to.show('failed');
   });
@@ -47,7 +47,7 @@ export function LogoutPage() {
     void navigate('/login', { replace: true });
   };
   const signOut = () => {
-    signOutOnPress(session, { show: setState, leave });
+    void signOutOnPress(session, { show: setState, leave });
   };
   const check = () => {
     void session.check().then((status) => {
