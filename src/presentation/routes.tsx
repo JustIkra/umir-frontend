@@ -20,7 +20,7 @@ import {
   createResetStepLoader,
   PasswordResetRequestPage,
 } from './auth/password-reset-pages';
-import { LogoutPage } from './auth/logout-page';
+import { LogoutPage, createLogoutLoader } from './auth/logout-page';
 import { SignInPage } from './auth/sign-in-page';
 import { DishPage } from './catalog/dish-page';
 import { DishesPage } from './catalog/dishes-page';
@@ -133,7 +133,11 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
           element: <RegisterPage />,
           errorElement: <NotFoundBoundary />,
         },
-        { path: '/logout', element: <LogoutPage /> },
+        {
+          path: '/logout',
+          loader: createLogoutLoader(services),
+          element: <LogoutPage />,
+        },
         { path: '/password-reset', element: <PasswordResetRequestPage /> },
         {
           path: '/password-reset/code',

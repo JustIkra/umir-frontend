@@ -250,8 +250,9 @@ export const registerSnapshot = (overrides = {}) => ({
 
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
-// «Данные обновлены» notice of models; invite is the snapshot of the
-// invitation page; register the snapshot of the registration page.
+// «Данные обновлены» notice of models; sessionCalls counts the sign-outs and
+// checks of the session (signOutResult is what a sign-out answers); invite is
+// the snapshot of the invitation page; register the snapshot of the registration page.
 // organizations carries the snapshots of the organization models (members,
 // invitations, profile; loading by default), operations (the followed
 // preparations and deletions), pending (command keys without a known
@@ -265,6 +266,8 @@ export function fakeServices({
   access = readyAccess(),
   refreshed = access,
   accessCalls = { ensure: 0, refresh: 0 },
+  sessionCalls = { signOut: 0, check: 0 },
+  signOutResult = 'done',
   remembered,
   attempts = [],
   notice,
@@ -371,9 +374,15 @@ export function fakeServices({
     session: {
       ...store(session),
       ensure: () => Promise.resolve(session),
-      check: () => Promise.resolve('active'),
+      check: () => {
+        sessionCalls.check += 1;
+        return Promise.resolve('active');
+      },
       signIn: () => Promise.reject(new Error('no sign-in in render tests')),
-      signOut: () => Promise.resolve('done'),
+      signOut: () => {
+        sessionCalls.signOut += 1;
+        return Promise.resolve(signOutResult);
+      },
       signOutEverywhere: () => Promise.resolve('done'),
       adopt: () => {},
       updateUser: () => {},
