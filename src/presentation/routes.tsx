@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
+import { AnalyticsPage } from './analytics/analytics-page';
 import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
 import { FeedbackPage } from './app-shell/feedback-page';
@@ -110,6 +111,11 @@ const restaurantRoutes: RouteObject[] = [
       { path: 'dishes/:dish', loader: dishLoader, element: <DishPage /> },
       { path: 'products/new', element: <NewProductPage /> },
     ],
+  },
+  {
+    path: 'analytics',
+    element: <SectionGate section="analytics" />,
+    children: [{ index: true, element: <AnalyticsPage /> }],
   },
 ];
 

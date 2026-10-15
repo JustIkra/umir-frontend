@@ -58,7 +58,7 @@ test('W13, W15, W16 and W17 leave the sidebar empty with their captions', () => 
 test('without verified access a restaurant address keeps every section', () => {
   const context = shellContext(unverified, 'restaurant', R);
   assert.equal(context.caption, 'Не удалось загрузить рестораны');
-  assert.equal(context.sections.length, 4);
+  assert.equal(context.sections.length, 5);
 });
 
 test('organization pages without any restaurant show «Нет доступных ресторанов»', () => {
