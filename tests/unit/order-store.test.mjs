@@ -84,15 +84,31 @@ test('a damaged record is removed', () => {
   }
 });
 
-test('clear drops one order; clearAll drops every order and nothing else', () => {
+test('clear drops one order and nothing else', () => {
   const storage = memoryStorage([['umir.lastRestaurant', 'r1']]);
   const store = createOrderStore(storage);
   store.save(record('u1', 'r1'));
   store.save(record('u1', 'r2'));
   store.clear('u1', 'r1');
   assert.equal(store.load('u1', 'r1'), undefined);
-  store.clearAll();
-  assert.deepEqual([...storage.items.keys()], ['umir.lastRestaurant']);
+  assert.notEqual(store.load('u1', 'r2'), undefined);
+  assert.deepEqual(
+    [...storage.items.keys()].sort(),
+    ['umir.lastRestaurant', `${orderKeyPrefix}u1.r2`].sort(),
+  );
+  assert.equal('clearAll' in store, false);
+});
+
+test('save says whether the order was written', () => {
+  assert.equal(createOrderStore(memoryStorage()).save(record()), 'ok');
+  assert.equal(createOrderStore(undefined).save(record()), 'unavailable');
+  const full = {
+    ...memoryStorage(),
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+  };
+  assert.equal(createOrderStore(full).save(record()), 'unavailable');
 });
 
 test('blocked storage keeps nothing and never throws', () => {
@@ -112,9 +128,8 @@ test('blocked storage keeps nothing and never throws', () => {
     },
   };
   const store = createOrderStore(blocked);
-  store.save(record());
+  assert.equal(store.save(record()), 'unavailable');
   store.clear('u1', 'r1');
-  store.clearAll();
   assert.equal(store.load('u1', 'r1'), undefined);
   assert.equal(createOrderStore(undefined).load('u1', 'r1'), undefined);
 });

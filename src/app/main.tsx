@@ -38,6 +38,10 @@ import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createAccountSettings } from '@/application/account-settings';
 import { createAccessStore } from '@/application/access';
 import {
+  restoreAttempts,
+  restoreWhenActive,
+} from '@/application/attempts-restore';
+import {
   createCatalogCommands,
   type CatalogCommands,
 } from '@/application/catalog-commands';
@@ -155,40 +159,45 @@ const restaurantReads = {
 };
 const catalogApi = createCatalogApi(client);
 const warehouseApi = createWarehouseApi(client);
+// The factories of warehouse and catalog commands, one per user and
+// restaurant. Their saved attempts are not erased with them.
 const warehouseCommands = new Map<string, WarehouseCommands>();
 const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
 const attemptStore = createAttemptStore(browserSessionStorage());
-// Until the wiring of the next step: the user of the active session.
+// The user of the active session. The warehouse and catalog screens sit
+// behind the session gate, which sends everyone else to sign-in before they
+// render; a factory for nobody would write attempts under an empty user.
 const activeUserID = (): string => {
   const state = session.getSnapshot();
-  return state.status === 'active' ? state.user.userID : '';
+  if (state.status !== 'active') {
+    throw new Error('Commands need a signed-in user');
+  }
+  return state.user.userID;
 };
 const restaurantData = new Map<string, RestaurantData>();
 const catalogCommands = new Map<string, CatalogCommands>();
 const restaurantFeedback = new Map<string, FeedbackSubmitter>();
-const orderFlows = createOrderFlowRegistry(
-  (userID, restaurantID) =>
-    createOrderFlow({
-      api: orderApi,
-      commands,
-      epochs,
-      storage: orderStore,
-      scheduler,
-      now,
-      restaurantID,
-      userID,
-      onReset: () => {
-        models.reset(restaurantID);
-      },
-      onOrdered: () => {
-        models.markStale(restaurantID, ['orders', 'stock', 'menu']);
-      },
-      onUnauthenticated: () => {
-        void session.check();
-      },
-    }),
-  orderStore,
+const orderFlows = createOrderFlowRegistry((userID, restaurantID) =>
+  createOrderFlow({
+    api: orderApi,
+    commands,
+    epochs,
+    storage: orderStore,
+    scheduler,
+    now,
+    restaurantID,
+    userID,
+    onReset: () => {
+      models.reset(restaurantID);
+    },
+    onOrdered: () => {
+      models.markStale(restaurantID, ['orders', 'stock', 'menu']);
+    },
+    onUnauthenticated: () => {
+      void session.check();
+    },
+  }),
 );
 const accountApi = createAccountApi(client);
 const session = createSessionStore({
@@ -342,13 +351,15 @@ const services: PresentationServices = {
     return data;
   },
   catalogCommands: (restaurantID) => {
-    let catalog = catalogCommands.get(restaurantID);
+    const userID = activeUserID();
+    const key = `${userID}/${restaurantID}`;
+    let catalog = catalogCommands.get(key);
     if (catalog === undefined) {
       catalog = createCatalogCommands({
         api: catalogApi,
         commands,
         restaurantID,
-        userID: activeUserID(),
+        userID,
         attempts: attemptStore,
         now,
         markStale: (topics) => {
@@ -358,18 +369,20 @@ const services: PresentationServices = {
           void session.check();
         },
       });
-      catalogCommands.set(restaurantID, catalog);
+      catalogCommands.set(key, catalog);
     }
     return catalog;
   },
   warehouseCommands: (restaurantID) => {
-    let value = warehouseCommands.get(restaurantID);
+    const userID = activeUserID();
+    const key = `${userID}/${restaurantID}`;
+    let value = warehouseCommands.get(key);
     if (value === undefined) {
       value = createWarehouseCommands({
         api: warehouseApi,
         commands,
         restaurantID,
-        userID: activeUserID(),
+        userID,
         attempts: attemptStore,
         now,
         newID: () => crypto.randomUUID(),
@@ -380,7 +393,7 @@ const services: PresentationServices = {
           void session.check();
         },
       });
-      warehouseCommands.set(restaurantID, value);
+      warehouseCommands.set(key, value);
     }
     return value;
   },
@@ -391,6 +404,16 @@ const services: PresentationServices = {
       : undefined;
   },
 };
+// After sign-in the saved attempts of the user come back without an open
+// page: W11 lists them and they hold the restaurant switch.
+restoreWhenActive(session, (userID) => {
+  restoreAttempts({
+    store: attemptStore,
+    userID,
+    warehouseCommands: services.warehouseCommands,
+    catalogCommands: services.catalogCommands,
+  });
+});
 const router = createBrowserRouter(createRoutes(services));
 
 createRoot(root).render(

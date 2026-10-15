@@ -8,9 +8,7 @@ import type { DraftLine } from '@/domain/order-draft';
 
 export const orderKeyPrefix = 'umir.order.';
 
-type KeyValue = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key'> & {
-  readonly length: number;
-};
+type KeyValue = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 const states: readonly AttemptState[] = ['sent', 'pending', 'conflict'];
 const keyOf = (userID: string, restaurantID: string) =>
@@ -115,28 +113,20 @@ export function createOrderStore(storage: KeyValue | undefined): OrderStorage {
       return record;
     },
     save(record) {
+      if (storage === undefined) return 'unavailable';
       try {
-        storage?.setItem(
+        storage.setItem(
           keyOf(record.userID, record.restaurantID),
           JSON.stringify(record),
         );
+        return 'ok';
       } catch {
         // The order stays in memory only.
+        return 'unavailable';
       }
     },
     clear(userID, restaurantID) {
       remove(keyOf(userID, restaurantID));
-    },
-    clearAll() {
-      try {
-        if (storage === undefined) return;
-        for (let index = storage.length - 1; index >= 0; index -= 1) {
-          const key = storage.key(index);
-          if (key?.startsWith(orderKeyPrefix)) remove(key);
-        }
-      } catch {
-        // Blocked storage holds no orders.
-      }
     },
   };
 }
