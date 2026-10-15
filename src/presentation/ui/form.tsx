@@ -18,6 +18,7 @@ import eyeIcon from '@/presentation/assets/icons/eye-24.svg';
 import lockIcon from '@/presentation/assets/icons/lock-24.svg';
 import searchIcon from '@/presentation/assets/icons/search-24.svg';
 import { Icon } from './icon';
+import { sanitizeQuantity } from './masks';
 import { rem } from './units';
 
 // Figma Field 117:1418: label, control, then a hint or an error that says what
@@ -587,6 +588,13 @@ export function QuantityInput({
         _placeholder={{ color: 'text.secondary' }}
         _focusVisible={{ outline: 'none' }}
         {...props}
+        onChange={(event) => {
+          const clean = sanitizeQuantity(event.currentTarget.value);
+          if (clean !== event.currentTarget.value) {
+            event.currentTarget.value = clean;
+          }
+          props.onChange?.(event);
+        }}
       />
       <Text as="span" textStyle="body.default" color="text.secondary">
         {unit}

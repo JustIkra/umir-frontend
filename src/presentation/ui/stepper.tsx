@@ -1,9 +1,28 @@
 import { Flex, Text, chakra } from '@chakra-ui/react';
 import minusIcon from '@/presentation/assets/icons/minus-24.svg';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
-import { portionsValid } from '@/domain/order-draft';
 import { Icon } from './icon';
+import { countValid, sanitizeCount } from './masks';
 import { plural } from './plural';
+
+export interface StepperUnit {
+  readonly forms: readonly [string, string, string];
+  readonly less: string;
+  readonly more: string;
+  readonly field: string;
+}
+export const portionsUnit: StepperUnit = {
+  forms: ['порция', 'порции', 'порций'],
+  less: 'Меньше порций',
+  more: 'Больше порций',
+  field: 'Порции',
+};
+export const daysUnit: StepperUnit = {
+  forms: ['день', 'дня', 'дней'],
+  less: 'Меньше дней',
+  more: 'Больше дней',
+  field: 'Дни',
+};
 
 const StepButton = chakra(
   'button',
@@ -21,24 +40,30 @@ const StepButton = chakra(
   { defaultProps: { type: 'button' } },
 );
 
-// Figma Stepper in the order panel: «−», the portions field, «+» and «порции»
-// agreeing with the number. The field keeps what was typed (E11 shows the
-// error of an invalid value); «−» and «+» step a valid number by 1 down to 1,
-// «+» on an invalid one gives 1.
+// Figma Stepper: «−», the field, «+» and the unit agreeing with the number.
+// The field takes digits only and keeps what was typed (E11 shows the error of
+// an invalid value); «−» and «+» step a valid number by 1 down to 1, «+» on an
+// invalid one gives 1. With a name the field posts its value in a form.
 export function Stepper({
   value,
   label,
+  unit = portionsUnit,
+  id,
+  name,
   invalid = false,
   disabled = false,
   onChange,
 }: {
   value: string;
   label: string;
+  unit?: StepperUnit;
+  id?: string;
+  name?: string;
   invalid?: boolean;
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
-  const valid = portionsValid(value);
+  const valid = countValid(value);
   const step = (by: bigint) => {
     if (!valid) {
       if (by > 0n) onChange('1');
@@ -47,6 +72,7 @@ export function Stepper({
     const next = BigInt(value.trim()) + by;
     if (next >= 1n) onChange(next.toString());
   };
+  const [one, few, many] = unit.forms;
   return (
     <Flex align="center" gap="2">
       <Flex
@@ -57,7 +83,7 @@ export function Stepper({
         overflow="hidden"
       >
         <StepButton
-          aria-label={`Меньше порций: ${label}`}
+          aria-label={`${unit.less}: ${label}`}
           disabled={disabled}
           onClick={() => {
             step(-1n);
@@ -66,13 +92,15 @@ export function Stepper({
           <Icon src={minusIcon} size={20} />
         </StepButton>
         <chakra.input
+          id={id}
+          name={name}
           value={value}
           inputMode="numeric"
-          aria-label={`Порции: ${label}`}
+          aria-label={`${unit.field}: ${label}`}
           aria-invalid={invalid ? 'true' : undefined}
           disabled={disabled}
           onChange={(event) => {
-            onChange(event.target.value);
+            onChange(sanitizeCount(event.target.value));
           }}
           w="14"
           textAlign="center"
@@ -83,7 +111,7 @@ export function Stepper({
           _disabled={{ opacity: '0.5' }}
         />
         <StepButton
-          aria-label={`Больше порций: ${label}`}
+          aria-label={`${unit.more}: ${label}`}
           disabled={disabled}
           onClick={() => {
             step(1n);
@@ -93,7 +121,7 @@ export function Stepper({
         </StepButton>
       </Flex>
       <Text as="span" textStyle="caption.default" color="text.secondary">
-        {valid ? plural(value.trim(), 'порция', 'порции', 'порций') : 'порций'}
+        {valid ? plural(value.trim(), one, few, many) : many}
       </Text>
     </Flex>
   );

@@ -7,7 +7,9 @@ import {
   selectedTime,
   visibleTimes,
 } from '../../src/presentation/ui/masks.ts';
+import { QuantityInput } from '../../src/presentation/ui/form.tsx';
 import { SearchSelect } from '../../src/presentation/ui/search-select.tsx';
+import { Stepper, daysUnit } from '../../src/presentation/ui/stepper.tsx';
 import { TimeField } from '../../src/presentation/ui/time-field.tsx';
 import { renderElement } from './support/render-route.mjs';
 
@@ -184,4 +186,40 @@ test('the calendar header is the month and the year, capitalised once', () => {
   assert.equal(monthTitle('март 2027 г.'), 'Март 2027');
   assert.equal(monthTitle('Май 2026'), 'Май 2026');
   assert.equal(monthTitle(''), '');
+});
+
+test('the stepper names days and posts its value', () => {
+  const html = renderElement(
+    h(Stepper, {
+      id: 's1',
+      name: 'shelf-1',
+      value: '3',
+      label: 'строка 1',
+      unit: daysUnit,
+      invalid: false,
+      onChange: () => {},
+    }),
+  );
+  assert.match(
+    html,
+    /<input[^>]*name="shelf-1"[^>]*value="3"|<input[^>]*value="3"[^>]*name="shelf-1"/,
+  );
+  assert.match(html, /aria-label="Меньше дней: строка 1"/);
+  assert.match(html, />дня</);
+});
+
+test('the stepper still names portions by default', () => {
+  const html = renderElement(
+    h(Stepper, { value: '5', label: 'позиция 1', onChange: () => {} }),
+  );
+  assert.match(html, /aria-label="Больше порций: позиция 1"/);
+  assert.match(html, />порций</);
+});
+
+test('the quantity field asks for a decimal keyboard', () => {
+  const html = renderElement(
+    h(QuantityInput, { unit: 'г', defaultValue: '1,5' }),
+  );
+  assert.match(html, /inputMode="decimal"|inputmode="decimal"/);
+  assert.match(html, /value="1,5"/);
 });
