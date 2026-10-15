@@ -26,6 +26,10 @@ const server = http.createServer((request, response) => {
       httpVersion: request.httpVersion,
       connection: request.headers.connection ?? null,
       length: Buffer.concat(chunks).length,
+      // Forwarding headers as received: what Nginx tells gateway about the client.
+      xForwardedFor: request.headers['x-forwarded-for'] ?? null,
+      forwarded: request.headers.forwarded ?? null,
+      xRealIp: request.headers['x-real-ip'] ?? null,
     });
     if (url.startsWith('/api/drop') || url === `${live}?drop`) {
       request.socket.destroy();

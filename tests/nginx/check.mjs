@@ -4,16 +4,19 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { gunzipSync } from 'node:zlib';
 
 const port = Number(process.env.FRONTEND_PORT ?? 18090);
+// The second instance trusts no peer the test client can be.
+const untrustedPort = Number(process.env.FRONTEND_PORT_UNTRUSTED ?? 18191);
 const R = '33333333-3333-4333-8333-333333333333';
 const live = `/api/v2/r/${R}/live`;
 const feedbackPaths = ['/api/v2/feedback/anonymous', `/api/v2/r/${R}/feedback`];
 
-function send(method, path, { headers = {}, body } = {}) {
+function send(method, path, { headers = {}, body, to = port } = {}) {
   return new Promise((resolve, reject) => {
     const request = http.request(
-      { host: '127.0.0.1', port, method, path, headers },
+      { host: '127.0.0.1', port: to, method, path, headers },
       (response) => {
         const chunks = [];
         response.on('data', (chunk) => chunks.push(chunk));
@@ -22,6 +25,7 @@ function send(method, path, { headers = {}, body } = {}) {
             status: response.statusCode,
             headers: response.headers,
             rawHeaders: response.rawHeaders,
+            raw: Buffer.concat(chunks),
             body: Buffer.concat(chunks).toString(),
           });
         });
@@ -43,7 +47,8 @@ async function ready() {
     try {
       if (
         (await send('GET', '/healthz')).status === 200 &&
-        (await send('GET', '/api/__requests')).status === 200
+        (await send('GET', '/api/__requests')).status === 200 &&
+        (await send('GET', '/healthz', { to: untrustedPort })).status === 200
       ) {
         return;
       }
@@ -56,11 +61,11 @@ async function ready() {
 }
 
 // Reads a response to the end and notes when each chunk arrived.
-function stream(path, headers = {}) {
+function stream(path, headers = {}, to = port) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const request = http.request(
-      { host: '127.0.0.1', port, method: 'GET', path, headers },
+      { host: '127.0.0.1', port: to, method: 'GET', path, headers },
       (response) => {
         const chunks = [];
         response.on('data', (chunk) => {
@@ -114,6 +119,22 @@ function assertSecurityHeaders(response, referrer, where) {
 }
 
 const crossOrigin = 'strict-origin-when-cross-origin';
+
+// The text of the server block with every nested block (location, map-like braces) cut out.
+function serverLevel(config) {
+  const start = config.indexOf('server {');
+  assert.ok(start >= 0, 'no server block');
+  let depth = 0;
+  let level = '';
+  for (const char of config.slice(start)) {
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) break;
+    } else if (depth === 1) level += char;
+  }
+  return level;
+}
 
 function compose(...args) {
   return execFileSync('docker', ['compose', '-f', 'compose.yaml', ...args], {
@@ -395,9 +416,10 @@ const checks = {
         'utf8',
       );
       const include = 'include /etc/nginx/security-headers.conf;';
+      // The include must stand in the server itself, outside every location.
       assert.ok(
-        config.includes(include),
-        'the server does not include the file',
+        serverLevel(config).includes(include),
+        'the server does not include the file outside its locations',
       );
       const blocks = [...config.matchAll(/^\s*location [^{]*\{([^}]*)\}/gm)];
       assert.ok(blocks.length >= 10, 'could not read the location blocks');
@@ -414,6 +436,48 @@ const checks = {
       assert.ok(/location @api_timeout/.test(config));
     },
 
+  // A proxied answer takes the headers from the server level only: its location sets none.
+  'puts the security headers on a proxied API answer': async () => {
+    for (const path of ['/api/v2/session', `/api/v2/r/${R}/serving/menu`]) {
+      const response = await send('GET', path);
+      assert.equal(response.status, 200, path);
+      assertSecurityHeaders(response, crossOrigin, path);
+    }
+  },
+
+  'answers a sub-path of the status addresses with 404, not the page':
+    async () => {
+      for (const path of ['/readyz/x', '/healthz/x', '/readyz/', '/healthz/']) {
+        const response = await send('GET', path);
+        assert.equal(response.status, 404, path);
+        assert.ok(!response.body.includes('id="root"'), `${path} got the page`);
+        assertSecurityHeaders(response, crossOrigin, path);
+      }
+      assert.equal((await send('GET', '/readyz')).status, 200);
+      assert.equal((await send('GET', '/healthz')).status, 200);
+    },
+
+  'compresses the page on every route that serves it': async () => {
+    const id = '77777777-7777-4777-8777-777777777777';
+    const page = readFileSync(
+      new URL('./site/index.html', import.meta.url),
+      'utf8',
+    );
+    assert.ok(Buffer.byteLength(page) > 1024, 'the stand-in page is too small');
+    for (const path of ['/', '/index.html', '/login', `/invite/${id}`]) {
+      const response = await send('GET', path, {
+        headers: { 'Accept-Encoding': 'gzip' },
+      });
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers['content-encoding'], 'gzip', path);
+      assert.match(response.headers['vary'] ?? '', /Accept-Encoding/i, path);
+      assert.equal(gunzipSync(response.raw).toString(), page, path);
+      // Without the request header the page comes plain.
+      const plain = await send('GET', path);
+      assert.equal(plain.headers['content-encoding'], undefined, path);
+    }
+  },
+
   'does not compress API answers': async () => {
     const response = await send('GET', '/api/compressible', {
       headers: { 'Accept-Encoding': 'gzip' },
@@ -424,20 +488,152 @@ const checks = {
   },
 
   'logs a request without the client address, referrer and query': async () => {
-    const marker = `q${Date.now()}`;
-    const response = await send('GET', `/login?token=${marker}`, {
-      headers: { Referer: 'https://leak.example.test/from' },
-    });
-    assert.equal(response.status, 200);
-    await sleep(300);
-    const lines = compose('logs', '--no-log-prefix', 'frontend')
-      .split('\n')
-      .filter((line) => line.includes('/login'));
-    assert.ok(lines.length > 0, 'the request is not in the log');
-    for (const line of lines) {
-      assert.doesNotMatch(line, /\d{1,3}(\.\d{1,3}){3}/, `address in: ${line}`);
-      assert.ok(!line.includes(marker) && !line.includes('leak.example'), line);
+    // The trusting instance would log the forwarded address ($remote_addr), the other the socket's.
+    for (const [service, to] of [
+      ['frontend', port],
+      ['frontend-untrusted', untrustedPort],
+    ]) {
+      const marker = `q${Date.now()}`;
+      const response = await send('GET', `/login?token=${marker}`, {
+        headers: {
+          Referer: 'https://leak.example.test/from',
+          'X-Forwarded-For': '1.1.1.1, 10.9.9.9',
+        },
+        to,
+      });
+      assert.equal(response.status, 200);
+      await sleep(300);
+      const lines = compose('logs', '--no-log-prefix', service)
+        .split('\n')
+        .filter((line) => line.includes('/login'));
+      assert.ok(lines.length > 0, `${service}: the request is not in the log`);
+      for (const line of lines) {
+        assert.doesNotMatch(
+          line,
+          /\d{1,3}(\.\d{1,3}){3}/,
+          `address in: ${line}`,
+        );
+        assert.ok(
+          !line.includes(marker) && !line.includes('leak.example'),
+          line,
+        );
+      }
     }
+  },
+
+  'tells gateway the last X-Forwarded-For entry of a trusted proxy':
+    async () => {
+      const path = `/api/v2/forwarded?${Date.now()}`;
+      const headers = {
+        'X-Forwarded-For': '1.1.1.1, 10.9.9.9',
+        Forwarded: 'for=2.2.2.2',
+        'X-Real-IP': '3.3.3.3',
+      };
+      assert.equal((await send('GET', path, { headers })).status, 200);
+      const seen = (await recorded()).find((r) => r.url === path);
+      assert.equal(seen.xForwardedFor, '10.9.9.9');
+      assert.equal(seen.forwarded, null);
+      assert.equal(seen.xRealIp, null);
+    },
+
+  'takes the address from the last of several X-Forwarded-For lines':
+    async () => {
+      const path = `/api/v2/forwarded-lines?${Date.now()}`;
+      const headers = { 'X-Forwarded-For': ['1.1.1.1', '10.9.9.9'] };
+      assert.equal((await send('GET', path, { headers })).status, 200);
+      const seen = (await recorded()).find((r) => r.url === path);
+      assert.equal(seen.xForwardedFor, '10.9.9.9');
+    },
+
+  'tells gateway the peer address when nothing is forwarded': async () => {
+    for (const to of [port, untrustedPort]) {
+      const path = `/api/v2/forwarded-none?${to}.${Date.now()}`;
+      assert.equal((await send('GET', path, { to })).status, 200);
+      const seen = (await recorded()).find((r) => r.url === path);
+      assert.match(seen.xForwardedFor, /^\d{1,3}(\.\d{1,3}){3}$/);
+      assert.equal(seen.forwarded, null);
+      assert.equal(seen.xRealIp, null);
+    }
+  },
+
+  'ignores forwarding headers from a peer it does not trust': async () => {
+    const path = `/api/v2/forwarded-untrusted?${Date.now()}`;
+    const headers = {
+      'X-Forwarded-For': '1.1.1.1, 10.9.9.9',
+      Forwarded: 'for=2.2.2.2',
+      'X-Real-IP': '3.3.3.3',
+    };
+    const to = untrustedPort;
+    assert.equal((await send('GET', path, { headers, to })).status, 200);
+    const seen = (await recorded()).find((r) => r.url === path);
+    // One address, the peer's: nothing the client sent is in it.
+    assert.match(seen.xForwardedFor, /^\d{1,3}(\.\d{1,3}){3}$/);
+    assert.ok(!['1.1.1.1', '10.9.9.9'].includes(seen.xForwardedFor));
+    assert.equal(seen.forwarded, null);
+    assert.equal(seen.xRealIp, null);
+    // The peer address is the one the trusting instance sees without a header.
+    const none = `/api/v2/forwarded-peer?${Date.now()}`;
+    await send('GET', none);
+    const peer = (await recorded()).find((r) => r.url === none);
+    assert.equal(seen.xForwardedFor, peer.xForwardedFor);
+  },
+
+  'does not trust a garbled X-Forwarded-For of a trusted proxy': async () => {
+    const path = `/api/v2/forwarded-garbled?${Date.now()}`;
+    const headers = { 'X-Forwarded-For': 'not-an-address' };
+    assert.equal((await send('GET', path, { headers })).status, 200);
+    const seen = (await recorded()).find((r) => r.url === path);
+    assert.match(seen.xForwardedFor, /^\d{1,3}(\.\d{1,3}){3}$/);
+  },
+
+  'rewrites the forwarding headers on the live stream too': async () => {
+    const trusted = `${live}?trusted=${Date.now()}`;
+    const other = `${live}?untrusted=${Date.now()}`;
+    const headers = {
+      'X-Forwarded-For': '1.1.1.1, 10.9.9.9',
+      Forwarded: 'for=2.2.2.2',
+      'X-Real-IP': '3.3.3.3',
+    };
+    assert.equal((await stream(trusted, headers)).status, 200);
+    assert.equal((await stream(other, headers, untrustedPort)).status, 200);
+    const seen = await recorded();
+    const first = seen.find((r) => r.url === trusted);
+    const second = seen.find((r) => r.url === other);
+    assert.equal(first.xForwardedFor, '10.9.9.9');
+    assert.match(second.xForwardedFor, /^\d{1,3}(\.\d{1,3}){3}$/);
+    assert.ok(!['1.1.1.1', '10.9.9.9'].includes(second.xForwardedFor));
+    for (const r of [first, second]) {
+      assert.equal(r.forwarded, null);
+      assert.equal(r.xRealIp, null);
+    }
+  },
+
+  'builds the image from the template and trusts only the loopback': () => {
+    const image = readFileSync(
+      new URL('../../Dockerfile', import.meta.url),
+      'utf8',
+    );
+    assert.match(
+      image,
+      /^COPY (--link )?nginx\.conf \/etc\/nginx\/templates\/default\.conf\.template$/m,
+    );
+    assert.match(image, /^ENV NGINX_ENVSUBST_FILTER=\^UMIR_$/m);
+    assert.match(image, /^ENV UMIR_TRUSTED_PROXY=127\.0\.0\.1\/32$/m);
+    const config = readFileSync(
+      new URL('../../nginx.conf', import.meta.url),
+      'utf8',
+    );
+    assert.match(config, /^\s*set_real_ip_from \$\{UMIR_TRUSTED_PROXY\};$/m);
+    assert.match(config, /^\s*real_ip_header X-Forwarded-For;$/m);
+    assert.match(config, /^\s*real_ip_recursive off;$/m);
+    // Both proxy blocks (API and live stream) name the client from $remote_addr alone.
+    assert.ok(!config.includes('$proxy_add_x_forwarded_for'));
+    assert.equal(
+      config.match(/proxy_set_header X-Forwarded-For \$remote_addr;/g).length,
+      2,
+    );
+    assert.equal(config.match(/proxy_set_header Forwarded "";/g).length, 2);
+    assert.equal(config.match(/proxy_set_header X-Real-IP "";/g).length, 2);
   },
 
   // Nginx 1.30 already streams small chunks and speaks HTTP/1.1 upstream by
@@ -538,7 +734,7 @@ const checks = {
       assert.equal((await send('GET', '/healthz')).status, 200);
       await sleep(300);
       assert.ok(
-        !compose('logs', '--no-log-prefix', 'frontend').includes('/readyz'),
+        !/ \/readyz /.test(compose('logs', '--no-log-prefix', 'frontend')),
         'the probe is in the log',
       );
     } finally {

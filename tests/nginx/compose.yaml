@@ -6,13 +6,33 @@ services:
     command: ['node', '/check/gateway.mjs']
     volumes:
       - ./gateway.mjs:/check/gateway.mjs:ro
+  # The image's entrypoint turns the template into conf.d/default.conf (envsubst, USER 101), as in the
+  # built image; the Dockerfile's ENV lines are repeated here because this service runs the bare base image.
+  # "frontend" trusts every peer (test only): the client address is the last X-Forwarded-For entry.
   frontend:
     image: ${NGINX_IMAGE:?}
+    environment:
+      NGINX_ENVSUBST_FILTER: ^UMIR_
+      UMIR_TRUSTED_PROXY: 0.0.0.0/0
     volumes:
-      - ../../nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../../nginx.conf:/etc/nginx/templates/default.conf.template:ro
       - ../../security-headers.conf:/etc/nginx/security-headers.conf:ro
       - ./site:/usr/share/nginx/html:ro
     ports:
       - '127.0.0.1:${FRONTEND_PORT:-18090}:8080'
+    depends_on:
+      - gateway
+  # "frontend-untrusted" trusts a network the test client is not in: X-Forwarded-For is ignored.
+  frontend-untrusted:
+    image: ${NGINX_IMAGE:?}
+    environment:
+      NGINX_ENVSUBST_FILTER: ^UMIR_
+      UMIR_TRUSTED_PROXY: 192.0.2.0/24
+    volumes:
+      - ../../nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - ../../security-headers.conf:/etc/nginx/security-headers.conf:ro
+      - ./site:/usr/share/nginx/html:ro
+    ports:
+      - '127.0.0.1:${FRONTEND_PORT_UNTRUSTED:-18191}:8080'
     depends_on:
       - gateway
