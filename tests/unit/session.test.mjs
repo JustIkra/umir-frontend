@@ -695,6 +695,29 @@ test('a lost answer keeps the attempt; the check with the same commandID may mee
   );
 });
 
+test('a first sign-out everywhere answered with 401 is an expired session, not a success', async () => {
+  let me = Promise.resolve(view());
+  const { api, calls } = account({
+    me: () => me,
+    logoutAll: (commandID) => {
+      calls.push(['logoutAll', commandID]);
+      return Promise.reject(refused(401, 'Unauthenticated', 'not_committed'));
+    },
+  });
+  const { session, commands, events } = setup(api);
+  await session.ensure();
+  // The session of this tab ended on its own; the server says so on /me.
+  me = Promise.reject(refused(401, 'Unauthenticated', 'not_committed'));
+  assert.equal(await session.signOutEverywhere(), 'failed');
+  const state = session.getSnapshot();
+  assert.equal(state.status, 'anonymous');
+  assert.equal(state.expired, true);
+  assert.notDeepEqual(state.notice, { kind: 'everywhere' });
+  assert.equal(events.expired, 1);
+  assert.deepEqual(commands.getSnapshot(), []);
+  assert.equal(calls.filter(([name]) => name === 'logoutAll').length, 1);
+});
+
 test('another refusal of the sign-out everywhere keeps the session', async () => {
   const { api } = account({
     logoutAll: () =>

@@ -258,17 +258,27 @@ export function createSessionStore({
       return 'done';
     },
     async signOutEverywhere() {
+      // A repeat of a lost answer: the attempt of the key is already kept.
+      const repeat = commands
+        .getSnapshot()
+        .some((attempt) => attempt.key === logoutAllKey);
       const result = await commands.run({
         key: logoutAllKey,
         label: 'выхода на всех устройствах',
         execute: (commandID) => api.logoutAll(commandID),
       });
       if (result.kind === 'unknown') return 'unknown';
-      // 401: the sessions are already closed (a repeat after a lost answer).
-      const ended =
-        result.kind === 'committed' ||
-        (result.kind === 'rejected' && result.failure.status === 401);
-      if (!ended) return 'failed';
+      if (result.kind === 'rejected' && result.failure.status === 401) {
+        // The sessions are already closed only when this is the repeat of an
+        // attempt that was sent before. A first 401 is this session alone
+        // gone: the other devices stay signed in, so the session is checked.
+        if (!repeat) {
+          await check();
+          return 'failed';
+        }
+      } else if (result.kind !== 'committed') {
+        return 'failed';
+      }
       end(false, { kind: 'everywhere' });
       onSignedOut();
       return 'done';
