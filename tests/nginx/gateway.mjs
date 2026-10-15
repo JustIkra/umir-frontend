@@ -1,22 +1,29 @@
 // Gateway stand-in for the Nginx checks: records what the proxy forwards and answers on demand.
 import http from 'node:http';
+import os from 'node:os';
 
 const R = '33333333-3333-4333-8333-333333333333';
 const EPOCH = '44444444-4444-4444-8444-444444444444';
 const live = `/api/v2/r/${R}/live`;
 const requests = [];
+// Two replicas run this file; each names itself so a check can tell which one answered.
+const node = os.hostname();
 
 const server = http.createServer((request, response) => {
   const chunks = [];
   request.on('data', (chunk) => chunks.push(chunk));
   request.on('end', () => {
     const { url } = request;
+    response.setHeader('X-Stand-In', node);
     if (url === '/api/__requests') {
       response.writeHead(200, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify(requests));
       return;
     }
     requests.push({
+      // Wall-clock time in ms: the checks merge the lists of both replicas in arrival order.
+      at: performance.timeOrigin + performance.now(),
+      node,
       method: request.method,
       url,
       host: request.headers.host ?? null,

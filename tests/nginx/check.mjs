@@ -1,6 +1,7 @@
 // Checks the frontend Nginx API proxy against the gateway stand-in (gateway#8, gateway#10).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -36,10 +37,42 @@ function send(method, path, { headers = {}, body, to = port } = {}) {
   });
 }
 
+// The free local ports of the running stand-in replicas, read from Docker.
+let replicaPorts = null;
+function replicas() {
+  if (replicaPorts === null) {
+    const ids = compose('ps', '-q', 'gateway').split('\n').filter(Boolean);
+    replicaPorts = ids.map((id) => ({
+      id,
+      // The container's hostname, which the stand-in sends as X-Stand-In.
+      name: id.slice(0, 12),
+      port: Number(
+        compose(
+          'port',
+          '--index',
+          String(ids.indexOf(id) + 1),
+          'gateway',
+          '8080',
+        )
+          .trim()
+          .split(':')
+          .at(-1),
+      ),
+    }));
+  }
+  return replicaPorts;
+}
+
+// What every running replica received, in arrival order. The proxy reaches a replica of its own
+// choosing, so the lists are read from the replicas directly.
 async function recorded() {
-  const response = await send('GET', '/api/__requests');
-  assert.equal(response.status, 200, 'gateway stand-in is not reachable');
-  return JSON.parse(response.body);
+  const all = [];
+  for (const { port: to } of replicas()) {
+    const response = await send('GET', '/api/__requests', { to });
+    assert.equal(response.status, 200, 'gateway stand-in is not reachable');
+    all.push(...JSON.parse(response.body));
+  }
+  return all.sort((a, b) => a.at - b.at);
 }
 
 async function ready() {
@@ -47,13 +80,17 @@ async function ready() {
     try {
       if (
         (await send('GET', '/healthz')).status === 200 &&
-        (await send('GET', '/api/__requests')).status === 200 &&
-        (await send('GET', '/healthz', { to: untrustedPort })).status === 200
+        (await send('GET', '/healthz', { to: untrustedPort })).status === 200 &&
+        replicas().length === 2 &&
+        // Nginx looks the replicas up after it starts; until then a stream has no one to go to.
+        (await answeredBy('umir_operator_session=ready')).status === 200
       ) {
+        await recorded();
         return;
       }
     } catch {
       // Nginx or the stand-in is still starting.
+      replicaPorts = null;
     }
     await sleep(500);
   }
@@ -84,6 +121,39 @@ function stream(path, headers = {}, to = port) {
     request.end();
   });
 }
+
+// Which stand-in replica answered a live request (its X-Stand-In header). The stream is closed
+// as soon as the headers are in.
+function answeredBy(cookie, to = port) {
+  return new Promise((resolve, reject) => {
+    const headers = cookie === undefined ? {} : { Cookie: cookie };
+    const request = http.request(
+      { host: '127.0.0.1', port: to, method: 'GET', path: live, headers },
+      (response) => {
+        resolve({
+          status: response.statusCode,
+          node: response.headers['x-stand-in'],
+        });
+        response.on('error', () => {});
+        request.destroy();
+      },
+    );
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+// The replicas that answered a cookie list, one request each.
+async function nodesFor(cookies) {
+  const answers = await Promise.all(cookies.map((c) => answeredBy(c)));
+  for (const answer of answers) assert.equal(answer.status, 200);
+  return answers.map((answer) => answer.node);
+}
+
+const sessionCookieNames = [
+  'umir_operator_session',
+  '__Host-umir_operator_session',
+];
 
 function json(response) {
   assert.match(response.headers['content-type'] ?? '', /^application\/json/);
@@ -654,9 +724,28 @@ const checks = {
       'proxy_cache off;',
       'gzip off;',
       'proxy_read_timeout 60s;',
+      // The one block that is pinned to a replica and may try a second one.
+      'proxy_pass http://gateway_live;',
+      'proxy_next_upstream error timeout;',
+      'proxy_next_upstream_tries 2;',
     ]) {
       assert.ok(block.includes(directive), `missing ${directive}`);
     }
+    // Everything else stays on the dynamic name and never retries a request.
+    assert.equal(config.match(/proxy_pass \$gateway;/g).length, 2);
+    assert.equal(config.match(/proxy_pass http:\/\/gateway_live;/g).length, 1);
+    assert.equal(config.match(/proxy_next_upstream off;/g).length, 1);
+    assert.equal(config.match(/proxy_next_upstream error/g).length, 1);
+    // The session is read from the cookie by a map: the name with a hyphen has no $cookie_ variable.
+    assert.ok(!/\$cookie_/.test(config));
+    assert.ok(
+      config.includes(
+        '"~(?:^|;\\s*)(?:__Host-)?umir_operator_session=(?<sid>[^;\\s]+)" $sid;',
+      ),
+    );
+    assert.match(config, /hash \$umir_live_key;/);
+    assert.match(config, /server gateway:8080 resolve;/);
+    assert.match(config, /zone gateway_live 64k;/);
     assert.ok(
       !config.includes('location = /api/live'),
       'the v1 stream block is still there',
@@ -692,6 +781,108 @@ const checks = {
     assert.match(last.text, /"type":"change"/);
   },
 
+  'keeps one session on one gateway replica': async () => {
+    for (const name of sessionCookieNames) {
+      const value = randomUUID();
+      const nodes = await nodesFor(Array(10).fill(`${name}=${value}`));
+      assert.equal(new Set(nodes).size, 1, `${name}: ${nodes}`);
+      // Other cookies around it do not move the session.
+      const around = await nodesFor([
+        `theme=dark; ${name}=${value}; a=b`,
+        `a=b;${name}=${value}`,
+      ]);
+      assert.deepEqual(around, [nodes[0], nodes[0]], name);
+    }
+  },
+
+  'spreads different sessions over both gateway replicas': async () => {
+    const names = replicas().map((replica) => replica.name);
+    for (const name of sessionCookieNames) {
+      const cookies = Array.from(
+        { length: 40 },
+        () => `${name}=${randomUUID()}`,
+      );
+      const nodes = await nodesFor(cookies);
+      assert.deepEqual([...new Set(nodes)].sort(), [...names].sort(), name);
+    }
+  },
+
+  'treats both session cookie names as the same session': async () => {
+    const value = randomUUID();
+    const [plain, secure] = await nodesFor([
+      `umir_operator_session=${value}`,
+      `__Host-umir_operator_session=${value}`,
+    ]);
+    assert.equal(plain, secure);
+  },
+
+  'serves a stream without a session cookie, keyed by the client address':
+    async () => {
+      const bare = await nodesFor(Array(6).fill(undefined));
+      assert.equal(new Set(bare).size, 1, `${bare}`);
+      // These are not the session cookie: the stream falls back to the address as well.
+      const other = await nodesFor([
+        ...Array.from(
+          { length: 8 },
+          () => `x_umir_operator_session=${randomUUID()}`,
+        ),
+        ...Array.from(
+          { length: 8 },
+          () => `umir_operator_session_x=${randomUUID()}`,
+        ),
+        'umir_operator_session=',
+      ]);
+      assert.deepEqual([...new Set(other)], [bare[0]]);
+    },
+
+  'passes the stream cursor unchanged': async () => {
+    const path = `${live}?cursor=a%2Fb%2Bc`;
+    assert.equal((await stream(path)).status, 200);
+    assert.equal((await recorded()).filter((r) => r.url === path).length, 1);
+  },
+
+  // Stops one replica and starts it again; it comes before the last check.
+  'moves a session to the other gateway replica when its own is stopped':
+    async () => {
+      const [first, second] = replicas();
+      const name = '__Host-umir_operator_session';
+      let owned;
+      for (let i = 0; i < 40 && owned === undefined; i += 1) {
+        const cookie = `${name}=${randomUUID()}`;
+        if ((await answeredBy(cookie)).node === first.name) owned = cookie;
+      }
+      assert.ok(owned, 'no session of the first replica found');
+      execFileSync('docker', ['stop', '--time', '1', first.id]);
+      try {
+        // At once Nginx may still list the stopped replica: the second try reaches the other one.
+        const now = await answeredBy(owned);
+        assert.deepEqual([now.status, now.node], [200, second.name]);
+        // Docker drops the stopped replica from the name; Nginx notices within the resolver's 10 s.
+        await sleep(12000);
+        const cookies = Array.from(
+          { length: 20 },
+          () => `${name}=${randomUUID()}`,
+        );
+        assert.deepEqual([...new Set(await nodesFor(cookies))], [second.name]);
+      } finally {
+        execFileSync('docker', ['start', first.id]);
+        replicaPorts = null;
+      }
+      // The restarted replica is found again once the name is resolved anew.
+      const names = [];
+      for (let i = 0; i < 30 && names.length < 2; i += 1) {
+        await sleep(1000);
+        const cookies = Array.from(
+          { length: 30 },
+          () => `${name}=${randomUUID()}`,
+        );
+        names.splice(0, names.length, ...new Set(await nodesFor(cookies)));
+      }
+      assert.equal(names.length, 2, 'the restarted replica got no sessions');
+    },
+
+  // Both replicas drop the request, so Nginx counts a failure for each and leaves both out for its
+  // fail_timeout (10 s): no stream check may follow it.
   'answers a lost /api/live answer with the JSON error envelope': async () => {
     const before = (await recorded()).filter(
       (r) => r.url === `${live}?drop`,
@@ -704,16 +895,10 @@ const checks = {
       outcome: 'unavailable',
       retryable: true,
     });
-    const after = (await recorded()).filter(
-      (r) => r.url === `${live}?drop`,
-    ).length;
-    assert.equal(after, before + 1, 'the stream request was retried');
-  },
-
-  'passes the stream cursor unchanged': async () => {
-    const path = `${live}?cursor=a%2Fb%2Bc`;
-    assert.equal((await stream(path)).status, 200);
-    assert.equal((await recorded()).filter((r) => r.url === path).length, 1);
+    // A stream read is tried once more, on the other replica, and then given up.
+    const tried = (await recorded()).filter((r) => r.url === `${live}?drop`);
+    assert.equal(tried.length - before, 2, 'expected one try on each replica');
+    assert.notEqual(tried.at(-1).node, tried.at(-2).node);
   },
 
   // The last check: it stops the stand-in and starts it again.
@@ -739,6 +924,7 @@ const checks = {
       );
     } finally {
       compose('start', 'gateway');
+      replicaPorts = null;
     }
   },
 };

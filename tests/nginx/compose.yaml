@@ -1,9 +1,15 @@
 # Frontend Nginx configuration with a gateway stand-in; run.sh supplies the pinned images.
 name: umir-frontend-nginx-check
 services:
+  # Two replicas share the name "gateway", as the two Gateway instances do in the deployment. Each
+  # one also publishes its port on a free local port, so a check can read what one replica received.
   gateway:
     image: ${NODE_IMAGE:?}
     command: ['node', '/check/gateway.mjs']
+    deploy:
+      replicas: 2
+    ports:
+      - '127.0.0.1::8080'
     volumes:
       - ./gateway.mjs:/check/gateway.mjs:ro
   # The image's entrypoint turns the template into conf.d/default.conf (envsubst, USER 101), as in the
