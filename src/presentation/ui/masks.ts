@@ -29,12 +29,22 @@ export function countValid(text: string): boolean {
   return /^[1-9]\d{0,17}$/.test(text.trim());
 }
 
-// «1427» → «14:27». An hour digit that cannot start 00–23 gets a zero in front:
-// «930» → «09:30», «25» → «02:5».
+// «1427» → «14:27». A lone hour digit before a typed colon is the hour, so it
+// gets a zero in front («1:30» → «01:30», «1:» → «01:»). Without a colon, an
+// hour digit that cannot start 00–23 gets one too: «930» → «09:30», «25» → «02:5».
+// A colon typed right after two hour digits stays while no minute digit follows.
 export function maskTime(raw: string): string {
-  let digits = raw.replace(/\D/g, '');
+  const colon = raw.indexOf(':');
+  const onlyDigits = (text: string) => text.replace(/\D/g, '');
+  const hourDigits = colon < 0 ? '' : onlyDigits(raw.slice(0, colon));
+  const minuteDigits = colon < 0 ? '' : onlyDigits(raw.slice(colon + 1));
+  const lone = hourDigits.length === 1 ? '0' : '';
+  let digits =
+    colon < 0 ? onlyDigits(raw) : `${lone}${hourDigits}${minuteDigits}`;
   if (/^[3-9]/.test(digits) || /^2[4-9]/.test(digits)) digits = `0${digits}`;
   digits = digits.slice(0, 4);
+  if (digits.length === 2 && colon >= 0 && minuteDigits === '')
+    return `${digits}:`;
   return digits.length > 2
     ? `${digits.slice(0, 2)}:${digits.slice(2)}`
     : digits;

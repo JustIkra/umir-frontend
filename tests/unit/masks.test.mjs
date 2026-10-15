@@ -44,6 +44,11 @@ test('a time takes digits and puts the colon itself', () => {
   assert.equal(maskTime('25'), '02:5');
   assert.equal(maskTime('14ч30м'), '14:30');
   assert.equal(maskTime('143059'), '14:30');
+  assert.equal(maskTime('1:30'), '01:30');
+  assert.equal(maskTime('2:30'), '02:30');
+  assert.equal(maskTime('1:'), '01:');
+  assert.equal(maskTime('14:'), '14:');
+  assert.equal(maskTime('1:3'), '01:3');
 });
 
 test('a time is completed on blur or refused', () => {
@@ -51,6 +56,7 @@ test('a time is completed on blur or refused', () => {
   assert.equal(normalizeTime('9'), '09:00');
   assert.equal(normalizeTime('930'), '09:30');
   assert.equal(normalizeTime('14:2'), '14:02');
+  assert.equal(normalizeTime('1:30'), '01:30');
   assert.equal(normalizeTime('23:59'), '23:59');
   assert.equal(normalizeTime('14:75'), undefined);
 });
