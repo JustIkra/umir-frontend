@@ -69,7 +69,7 @@ function LoadingRows() {
       <Box as="li" aria-hidden="true" {...rowStyles} minH="16" />
       <Box as="li" {...rowStyles}>
         <Text textStyle="caption.default" color="text.secondary" role="status">
-          Получаем новую оценку…
+          Загружаем данные…
         </Text>
       </Box>
     </ListCard>
@@ -205,15 +205,14 @@ function MenuList({
   if (menu.dishes.length === 0) {
     return (
       <Empty
-        title="Нет блюд, доступных хотя бы для одной порции"
+        title="Сейчас нельзя приготовить ни одно блюдо"
         action={
           <Button variant="secondary" onClick={onOpenStopList}>
             Открыть стоп-лист
           </Button>
         }
       >
-        Причины недоступности — в стоп-листе. Пополнить остатки можно приёмом
-        поставки.
+        Почему — смотрите в стоп-листе. Чтобы блюда вернулись, примите поставку.
       </Empty>
     );
   }
@@ -282,8 +281,8 @@ function StopListPanel({
   if (stopList.dishes.length === 0) {
     return (
       <Empty title="Стоп-лист пуст">
-        На момент оценки всем блюдам хватает ингредиентов хотя бы на одну
-        порцию. Совместную доступность заказа проверяет подготовка.
+        Сейчас можно приготовить каждое блюдо. Хватит ли продуктов на весь
+        заказ, мы проверим перед оформлением.
       </Empty>
     );
   }
@@ -307,7 +306,7 @@ function RecommendationsPanel({
   if (rows.length === 0) {
     return (
       <Empty title="Рекомендаций нет">
-        Сейчас нет доступных блюд с ингредиентами, срок которых истекает в
+        Сейчас нет блюд из продуктов, у которых срок годности заканчивается в
         ближайшие 72 часа.
       </Empty>
     );
@@ -337,7 +336,7 @@ function RecommendationsPanel({
             </Stack>
             {item.reasons.map((reason) => (
               <Stack
-                key={reason.title}
+                key={reason.batchID}
                 gap="1"
                 ps="3"
                 py="0.5"
@@ -381,7 +380,7 @@ function RecommendationsPanel({
           textStyle="caption.default"
           color="text.secondary"
         >
-          {`Показаны ${String(shown.length)} из ${String(rows.length)}. Приоритет учитывает срок, долю рискованного остатка и спрос. Ориентир по порциям не гарантирует запас остальных ингредиентов.${recommendations.coverage.complete ? '' : ' История расхода неполная.'}`}
+          {`Показаны ${String(shown.length)} из ${String(rows.length)}. Сначала — блюда из продуктов, которые скоро испортятся.${recommendations.coverage.complete ? '' : ' Продаж пока мало — подсказки приблизительные.'}`}
         </Text>
         {!all && rows.length > shown.length && (
           <Button
@@ -437,7 +436,7 @@ export function MenuTabs({
       <EvaluationStamp
         text={
           stale
-            ? `Устарело: оценка ${formatStamp(menuValue.result.evaluatedAt.epochMs, timeZone)}`
+            ? `Данные на ${formatStamp(menuValue.result.evaluatedAt.epochMs, timeZone)} могли устареть`
             : evaluationText(menuValue.result.evaluatedAt.epochMs, timeZone)
         }
         icon="narrow"
@@ -459,20 +458,20 @@ export function MenuTabs({
               {stale && (
                 <FormMessage
                   tone="error"
-                  title="Данные не обновлены"
+                  title="Не удалось обновить меню"
                   action={
                     <Button variant="secondary" onClick={refreshAll}>
-                      Обновить ещё раз
+                      Попробовать ещё раз
                     </Button>
                   }
                 >
-                  {`Показана оценка ${formatStamp(menuValue.result.evaluatedAt.epochMs, timeZone)}. Не используйте её как актуальную: доступность всего заказа проверится при подготовке.`}
+                  {`Меню на ${formatStamp(menuValue.result.evaluatedAt.epochMs, timeZone)} может быть неточным. Перед оформлением мы всё проверим.`}
                 </FormMessage>
               )}
               <ReadPanel
                 read={menu}
-                failureTitle="Не удалось получить меню"
-                failureText="Склад сейчас не может подготовить остатки. Это не значит, что доступных блюд нет. Повторите чтение."
+                failureTitle="Не удалось загрузить меню"
+                failureText="Попробуйте ещё раз."
                 onRetry={refreshAll}
               >
                 {(result) => (
@@ -499,8 +498,8 @@ export function MenuTabs({
           content: (
             <ReadPanel
               read={stop}
-              failureTitle="Не удалось получить стоп-лист"
-              failureText="Это техническая ошибка, а не пустой стоп-лист: недоступные блюда сейчас не показаны. Повторите чтение."
+              failureTitle="Не удалось загрузить стоп-лист"
+              failureText="Попробуйте ещё раз."
               onRetry={() => {
                 stopModel.refresh();
               }}
@@ -525,8 +524,8 @@ export function MenuTabs({
           content: (
             <ReadPanel
               read={recommendations}
-              failureTitle="Не удалось получить рекомендации"
-              failureText="Это техническая ошибка, а не пустой список. Повторите чтение."
+              failureTitle="Не удалось загрузить рекомендации"
+              failureText="Попробуйте ещё раз."
               onRetry={() => {
                 recommendationsModel.refresh();
               }}

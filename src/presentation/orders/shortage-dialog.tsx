@@ -13,16 +13,16 @@ import { Button } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { Dialog } from '@/presentation/ui/dialog';
 import { Icon } from '@/presentation/ui/icon';
-import { formatInstant, formatOffset } from '@/presentation/ui/time';
+import { formatInstant } from '@/presentation/ui/time';
 import { rem } from '@/presentation/ui/units';
 import {
   acceptanceText,
   changeRows,
+  checkedText,
   finalText,
   previousRows,
   type ChangeRow,
 } from './order-messages';
-import { evaluationText } from './order-rows';
 
 // Groups are divided by a line; the first follows the stamp without one.
 function Group({
@@ -130,11 +130,12 @@ export function ShortageDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    // The native autofocus puts every opening, from the page or from «Проверить
-    // и подтвердить», on the heading (React does not render the attribute).
+    // The native autofocus puts every opening, from the page or from
+    // «Посмотреть и подтвердить», on the heading (React does not render the
+    // attribute).
     title.current?.setAttribute('autofocus', '');
     // Opened with the page, the dialog has no opener to return to: focus goes
-    // to «Проверить и подтвердить» instead of the start of the page.
+    // to «Посмотреть и подтвердить» instead of the start of the page.
     // Focus is then still on the closed heading or already on the body.
     const onClose = () => {
       const active = document.activeElement;
@@ -201,17 +202,15 @@ export function ShortageDialog({
             </chakra.h2>
             <Text textStyle="body.default" color="text.secondary">
               {empty
-                ? 'Остатки изменились после оценки меню. Измените состав и подготовьте заказ заново.'
+                ? 'Остатков стало меньше после обновления меню. Измените состав и проверьте заказ заново.'
                 : previous === undefined
-                  ? 'Блюда используют общие ингредиенты, поэтому часть заказа сократилась. Подтвердите итоговый состав.'
-                  : 'Предыдущее предложение больше не оформляется. Подтвердите новый состав.'}
+                  ? 'У блюд есть общие продукты, и на весь заказ их не хватает. Подтвердите итоговый состав.'
+                  : 'Продуктов стало меньше. Подтвердите новый состав.'}
             </Text>
             {previous !== undefined && (
               <Text textStyle="body.default" color="text.secondary">
-                Пока вы подтверждали, доступность снова уменьшилась. Заказ не
-                оформлен: склад пересчитал состав в{' '}
-                {formatInstant(at, timeZone, 'timeSeconds')}{' '}
-                {formatOffset(at, timeZone)}.
+                Пока вы подтверждали, мы пересчитали состав в{' '}
+                {formatInstant(at, timeZone, 'time')}. Заказ ещё не оформлен.
               </Text>
             )}
             <Flex
@@ -221,7 +220,7 @@ export function ShortageDialog({
               color="text.secondary"
             >
               <Icon src={clockIcon} size={16} />
-              {evaluationText(at, timeZone)}
+              {checkedText(at, timeZone)}
             </Flex>
           </Stack>
           <Group title="Что изменилось" first>
@@ -237,7 +236,7 @@ export function ShortageDialog({
             </Group>
           )}
           {missing.length > 0 && (
-            <Group title="Не хватает ингредиентов">
+            <Group title="Не хватает продуктов">
               {missing.map((row) => (
                 <Stack key={row.lineNo} gap="0.5">
                   <Text textStyle="caption.strong">{row.title}</Text>
@@ -249,13 +248,13 @@ export function ShortageDialog({
                 </Stack>
               ))}
               <Text textStyle="caption.default" color="text.secondary">
-                Доступное количество учитывает позиции выше по порядку заказа.
+                Продукты сначала идут на блюда, добавленные раньше.
               </Text>
             </Group>
           )}
           <Group title={finalText(proposal)}>
             <Text textStyle="caption.default" color="text.secondary">
-              При оформлении склад проверит состав ещё раз.
+              При оформлении мы проверим состав ещё раз.
             </Text>
           </Group>
         </Stack>
@@ -269,7 +268,7 @@ export function ShortageDialog({
         >
           <Text textStyle="body.strong">
             {empty
-              ? 'Итоговый состав пуст — оформить заказ нельзя.'
+              ? 'В заказе ничего не осталось — оформить его нельзя.'
               : acceptanceText(proposal, previous !== undefined)}
           </Text>
           <Flex direction={{ base: 'column', sm: 'row' }} gap="3">
@@ -279,13 +278,11 @@ export function ShortageDialog({
                 aria-busy={confirming ? 'true' : undefined}
                 onClick={onConfirm}
               >
-                {confirming
-                  ? 'Отправляем подтверждение…'
-                  : 'Оформить оставшиеся блюда'}
+                {confirming ? 'Оформляем…' : 'Оформить оставшиеся блюда'}
               </Button>
             )}
             <Button variant="secondary" disabled={confirming} onClick={onEdit}>
-              Вернуться к изменению заказа
+              Изменить заказ
             </Button>
           </Flex>
         </Stack>

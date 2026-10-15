@@ -1,6 +1,6 @@
-// The order the waiter assembles before «Подготовить заказ». Each added dish
-// is its own position (Figma 02: «Повтор блюда из поз. 3 — отдельная
-// позиция»); positions are numbered in order and renumbered on removal.
+// The order the waiter assembles before «Проверить заказ». Each added dish
+// is its own position, a repeated dish too (Figma 02); positions are numbered
+// in order and renumbered on removal.
 export interface DraftLine {
   readonly lineNo: number;
   readonly dishID: string;

@@ -104,32 +104,39 @@ test('the shortage dialog: cut and excluded positions with their deficits', () =
   assert.deepEqual(changeRows(proposal, names, products), [
     {
       lineNo: '2',
-      title: 'Поз. 2 · Паста с лососем и шпинатом',
-      text: 'Запрошено 3 порции, доступна 1',
+      title: 'Позиция 2 · Паста с лососем и шпинатом',
+      text: 'Заказано 3 порции, можно приготовить 1',
       change: '3 → 1',
       excluded: false,
       deficits: [
-        'Филе лосося: на 3 порции нужно 360 г, доступно для позиции 220 г',
+        'Филе лосося: на 3 порции нужно 360 г, для этой позиции осталось 220 г',
       ],
     },
     {
       lineNo: '3',
-      title: 'Поз. 3 · Салат с лососем',
-      text: 'Запрошена 1 порция, доступно 0 — позиция исключена',
+      title: 'Позиция 3 · Салат с лососем',
+      text: 'Заказана 1 порция, не хватает ни на одну — позиция исключена',
       change: '1 → 0',
       excluded: true,
       deficits: [
-        'Филе лосося: на 1 порцию нужно 110 г, доступно для позиции 100 г',
+        'Филе лосося: на 1 порцию нужно 110 г, для этой позиции осталось 100 г',
       ],
     },
   ]);
+  // Names and products not loaded yet never show their IDs.
+  const [unnamed] = changeRows(proposal, new Map(), new Map());
+  assert.equal(unnamed.title, 'Позиция 2 · блюдо');
+  assert.equal(
+    unnamed.deficits[0],
+    'Продукт: на 3 порции нужно 360, для этой позиции осталось 220',
+  );
   assert.equal(
     acceptanceText(proposal, false),
-    'Принято 2 из 3 позиций, 3 из 6 порций. Сокращение не принимается автоматически.',
+    'Осталось 2 из 3 позиций, 3 из 6 порций. Подтвердите, если вас устраивает такой заказ.',
   );
   assert.equal(
     acceptanceText(proposal, true),
-    'Принято 2 из 3 позиций, 3 из 6 порций. Нужно новое подтверждение.',
+    'Осталось 2 из 3 позиций, 3 из 6 порций. Подтвердите новый состав.',
   );
 });
 
@@ -151,9 +158,9 @@ test('the requested participle agrees with the number', () => {
       names,
       products,
     )[0].text;
-  assert.equal(rows('1'), 'Запрошена 1 порция, доступна 1');
-  assert.equal(rows('21'), 'Запрошена 21 порция, доступна 1');
-  assert.equal(rows('5'), 'Запрошено 5 порций, доступна 1');
+  assert.equal(rows('1'), 'Заказана 1 порция, можно приготовить 1');
+  assert.equal(rows('21'), 'Заказана 21 порция, можно приготовить 1');
+  assert.equal(rows('5'), 'Заказано 5 порций, можно приготовить 1');
 });
 
 test('the shortage dialog follows frame 04: reduced, excluded, missing, final', async () => {
@@ -167,9 +174,10 @@ test('the shortage dialog follows frame 04: reduced, excluded, missing, final', 
   for (const part of [
     'Что изменилось',
     'Исключённые позиции',
-    'Не хватает ингредиентов',
-    'Доступное количество учитывает позиции выше по порядку заказа.',
+    'Не хватает продуктов',
+    'Продукты сначала идут на блюда, добавленные раньше.',
     'Итоговый состав · 2 позиции, 3 порции',
+    'Проверено 14 октября, 15:06',
   ])
     assert.ok(html.includes(part), part);
   const again = text(
@@ -187,8 +195,14 @@ test('the shortage dialog follows frame 04: reduced, excluded, missing, final', 
       }),
     }),
   );
-  assert.ok(!again.includes('Что было в прошлом предложении'));
-  assert.ok(again.includes('В прошлом предложении 3 порции'));
+  assert.ok(!again.includes('В прошлом предложении'));
+  assert.ok(again.includes('В прошлом составе 3 порции'));
+  assert.ok(
+    again.includes(
+      'Пока вы подтверждали, мы пересчитали состав в 15:06. Заказ ещё не оформлен.',
+    ),
+  );
+  assert.doesNotMatch(again, /15:06:10|UTC/);
 });
 
 test('a new proposal is compared with the previous one', () => {
@@ -204,8 +218,8 @@ test('a new proposal is compared with the previous one', () => {
   assert.deepEqual(
     previousRows(proposal, previous, names).map((row) => row.text),
     [
-      'В прошлом предложении 3 порции, доступна 1',
-      'В прошлом предложении 1 порция, доступно 0 — позиция исключена',
+      'В прошлом составе 3 порции, можно приготовить 1',
+      'В прошлом составе 1 порция, не хватает ни на одну — позиция исключена',
     ],
   );
 });
@@ -215,39 +229,46 @@ test('attempt messages: D2, D3, D4, F5', () => {
     { kind: 'unknown', attempt, checking: false },
     'Europe/Moscow',
   );
-  assert.equal(lost.title, 'Результат оформления неизвестен');
+  assert.equal(lost.title, 'Не знаем, оформлен ли заказ');
   assert.equal(
     lost.text,
-    'Ответ сервиса заказов не получен. Продажа могла быть записана. Не оформляйте заказ повторно: проверка продолжит ту же попытку.',
+    'Связь прервалась. Не оформляйте заказ заново — нажмите «Проверить результат», заказ не задвоится.',
   );
-  assert.equal(lost.stamp, 'Попытка от 14.10.2026, 15:06:24 UTC+3');
-  assert.equal(lost.footer, 'Новый заказ — после результата этой попытки.');
+  assert.equal(lost.stamp, 'Отправлено 14 октября, 15:06');
+  assert.equal(
+    lost.footer,
+    'Новый заказ можно начать, когда станет ясно, прошёл ли этот.',
+  );
   assert.equal(
     attemptMessage(
       { kind: 'unknown', attempt, checking: true },
       'Europe/Moscow',
     ).text,
-    'Проверяем эту же попытку — вторая продажа не создаётся.',
+    'Проверяем результат. Второй раз заказ не оформится.',
   );
+  const pending = attemptMessage(
+    { kind: 'pending', attempt, checking: false },
+    'Europe/Moscow',
+  );
+  assert.equal(pending.title, 'Заказ ещё обрабатывается');
   assert.equal(
-    attemptMessage(
-      { kind: 'pending', attempt, checking: false },
-      'Europe/Moscow',
-    ).title,
-    'Оформление ожидает результата',
+    pending.text,
+    'Проверьте результат через минуту — заказ не задвоится.',
   );
   const conflict = attemptMessage(
     { kind: 'conflict', attempt, checking: false },
     'Europe/Moscow',
   );
-  assert.equal(conflict.title, 'Запрос отклонён: номер попытки уже занят');
+  assert.equal(conflict.title, 'Похоже, этот заказ уже отправляли');
   assert.equal(
-    conflict.stamp,
-    'Попытка от 14.10.2026, 15:06:24 UTC+3 · CommandConflict',
+    conflict.text,
+    'Повторная отправка не прошла, по ней ничего не списано. Проверьте результат или загляните в историю склада, прежде чем оформлять снова.',
   );
+  // No code in the visible stamp.
+  assert.equal(conflict.stamp, 'Отправлено 14 октября, 15:06');
   assert.equal(
     conflict.footer,
-    'Новый заказ — после того, как результат попытки установлен.',
+    'Новый заказ можно начать, когда станет ясно, прошёл ли этот.',
   );
 });
 
@@ -258,7 +279,7 @@ test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
       { kind: 'not-found', afterAttempt: false, checkedAt: undefined },
       tz,
     ).title,
-    'Предложение больше не найдено',
+    'Проверьте заказ заново',
   );
   assert.deepEqual(
     outcomeMessage(
@@ -271,9 +292,9 @@ test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
     ),
     {
       tone: 'info',
-      title: 'Предложение больше не действует',
-      stamp: 'Проверено 14.10.2026, 15:31:05 UTC+3',
-      text: 'Сервис заказов ответил на ту же попытку: предложение больше не действует, а записана ли продажа, он не подтверждает. Прежде чем оформлять заново, проверьте по истории склада, не списаны ли продукты по этой попытке.',
+      title: 'Данные заказа устарели',
+      stamp: 'Проверено 14 октября, 15:31',
+      text: 'Мы не можем подтвердить, оформлен ли заказ. Прежде чем оформлять снова, загляните в историю склада — не списаны ли уже продукты.',
     },
   );
   assert.equal(
@@ -281,27 +302,31 @@ test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
       { kind: 'refused', code: 'InventoryUnavailable', proposal },
       tz,
     ).text,
-    'Сервис склада не подготовил актуальные остатки. Продажа не записана, продукты не списаны.',
+    'Не получилось проверить остатки. Ничего не списано — попробуйте ещё раз.',
   );
   assert.equal(
     outcomeMessage(
       { kind: 'refused', code: 'UpstreamUnavailable', proposal },
       tz,
     ).text,
-    'Сервис заказов не принял оформление. Продажа не записана, продукты не списаны.',
+    'Заказ не прошёл. Ничего не списано — попробуйте ещё раз.',
   );
   assert.deepEqual(outcomeMessage({ kind: 'reset' }, tz), {
     tone: 'unknown',
-    title: 'Результат оформления неизвестен',
-    text: 'Сервис заказов перезапустился, проверить эту попытку нельзя. Перед новым заказом убедитесь, что продажа не записана.',
+    title: 'Не знаем, оформлен ли заказ',
+    text: 'Была короткая техническая пауза, проверить заказ нельзя. Загляните в историю склада перед новым заказом.',
   });
-  assert.equal(
-    outcomeMessage({ kind: 'superseded', replacement: proposal }, tz).text,
-    'Состав предложения пересчитан, сохранено новое предложение от 15:06:10. Прежнее предложение оформить нельзя, продажа по нему не записана.',
+  assert.deepEqual(
+    outcomeMessage({ kind: 'superseded', replacement: proposal }, tz),
+    {
+      tone: 'info',
+      title: 'Состав заказа обновился',
+      text: 'Мы пересчитали заказ, прежний вариант не оформлен. Подтвердите обновлённый заказ.',
+    },
   );
   assert.equal(
     outcomeMessage({ kind: 'superseded', replacement: undefined }, tz).title,
-    'Предложение больше не найдено',
+    'Проверьте заказ заново',
   );
   assert.equal(
     outcomeMessage({ kind: 'empty', proposal: undefined }, tz).title,
@@ -310,16 +335,22 @@ test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
   assert.deepEqual(noticeMessage({ kind: 'prepare-failed' }), {
     tone: 'error',
     title: 'Не удалось проверить заказ',
-    text: 'Сервис заказов не ответил. Состав сохранён, повторите проверку.',
+    text: 'Блюда в заказе сохранены. Попробуйте ещё раз через пару минут.',
+  });
+  assert.deepEqual(noticeMessage({ kind: 'portions', lines: [2] }), {
+    tone: 'error',
+    title: 'Проверьте количество порций',
+    text: 'В позиции 2 укажите целое число порций — 1 или больше.',
   });
   assert.equal(
-    noticeMessage({ kind: 'portions', lines: [2] }).text,
-    'Исправьте количество в поз. 2: допустимо только целое число порций больше 0. Введённое значение сохранено.',
+    noticeMessage({ kind: 'portions', lines: [2, 3] }).text,
+    'В позициях 2 и 3 укажите целое число порций — 1 или больше.',
   );
-  assert.equal(
-    noticeMessage({ kind: 'check-failed' }).text,
-    'Не удалось проверить. Повторите позже.',
-  );
+  assert.deepEqual(noticeMessage({ kind: 'check-failed' }), {
+    tone: 'error',
+    title: 'Не удалось проверить результат',
+    text: 'Попробуйте ещё раз через минуту.',
+  });
 });
 
 test('a placed order names the time of the service and the composition', () => {
@@ -331,8 +362,8 @@ test('a placed order names the time of the service and the composition', () => {
     placedAt: instantOf('2026-10-14T15:06:31+03:00'),
   };
   assert.deepEqual(confirmedLines(order, 'Europe/Moscow'), {
-    stamp: 'Записан сервисом 14.10.2026, 15:06:31 UTC+3',
-    composition: 'Оформленный состав · 2 позиции, 3 порции',
+    stamp: 'Оформлен 14 октября, 15:06',
+    composition: 'В заказе · 2 позиции, 3 порции',
   });
 });
 
@@ -340,16 +371,16 @@ test('the panel follows the phase of the order', async () => {
   const render = async (order) =>
     text(await renderRoute(`/app/r/${R}/orders`, { order }));
   assert.ok((await render(orderSnapshot())).includes('Заказ пуст'));
-  assert.ok(
-    (
-      await render(
-        orderSnapshot({
-          phase: { kind: 'unknown', attempt, checking: false },
-          locked: true,
-        }),
-      )
-    ).includes('Проверить результат'),
+  const unknown = await render(
+    orderSnapshot({
+      phase: { kind: 'unknown', attempt, checking: false },
+      locked: true,
+    }),
   );
+  assert.ok(unknown.includes('Проверить результат'));
+  assert.ok(unknown.includes('В заказе · 2 позиции, 3 порции'));
+  // The IDs of the command and the proposal stay out of the page.
+  assert.doesNotMatch(unknown, /7f3c9e21|prp-1|commandID|proposalID/);
   assert.ok(
     (
       await render(
@@ -358,7 +389,16 @@ test('the panel follows the phase of the order', async () => {
           locked: true,
         }),
       )
-    ).includes('Оформление ожидает результата'),
+    ).includes('Заказ ещё обрабатывается'),
+  );
+  assert.doesNotMatch(
+    await render(
+      orderSnapshot({
+        phase: { kind: 'conflict', attempt, checking: false },
+        locked: true,
+      }),
+    ),
+    /CommandConflict/,
   );
   assert.ok(
     (
@@ -371,7 +411,7 @@ test('the panel follows the phase of the order', async () => {
           },
         }),
       )
-    ).includes('Проверено 14.10.2026, 15:31:05 UTC+3'),
+    ).includes('Проверено 14 октября, 15:31'),
   );
   assert.ok(
     (
@@ -380,7 +420,7 @@ test('the panel follows the phase of the order', async () => {
           phase: { kind: 'refused', code: 'InventoryUnavailable', proposal },
         }),
       )
-    ).includes('Повторить оформление'),
+    ).includes('Оформить ещё раз'),
   );
   assert.ok(
     (
@@ -393,7 +433,7 @@ test('the panel follows the phase of the order', async () => {
           },
         }),
       )
-    ).includes('Подтвердить состав'),
+    ).includes('Оформить заказ'),
   );
   const placed = await render(
     orderSnapshot({
@@ -412,5 +452,7 @@ test('the panel follows the phase of the order', async () => {
     }),
   );
   assert.ok(placed.includes('Заказ оформлен'));
-  assert.ok(placed.includes('ord-1'));
+  assert.ok(placed.includes('Продукты списаны: сначала — с ближайшим сроком'));
+  // The order ID is not shown.
+  assert.ok(!placed.includes('ord-1'));
 });

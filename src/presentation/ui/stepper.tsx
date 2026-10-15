@@ -3,6 +3,7 @@ import minusIcon from '@/presentation/assets/icons/minus-24.svg';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
 import { portionsValid } from '@/domain/order-draft';
 import { Icon } from './icon';
+import { plural } from './plural';
 
 const StepButton = chakra(
   'button',
@@ -20,9 +21,10 @@ const StepButton = chakra(
   { defaultProps: { type: 'button' } },
 );
 
-// Figma Stepper in the order panel: «−», the portions field, «+». The field
-// keeps what was typed (E11 shows the error of an invalid value); «−» and
-// «+» step a valid number by 1 down to 1, «+» on an invalid one gives 1.
+// Figma Stepper in the order panel: «−», the portions field, «+» and «порции»
+// agreeing with the number. The field keeps what was typed (E11 shows the
+// error of an invalid value); «−» and «+» step a valid number by 1 down to 1,
+// «+» on an invalid one gives 1.
 export function Stepper({
   value,
   label,
@@ -91,7 +93,7 @@ export function Stepper({
         </StepButton>
       </Flex>
       <Text as="span" textStyle="caption.default" color="text.secondary">
-        порц.
+        {valid ? plural(value.trim(), 'порция', 'порции', 'порций') : 'порций'}
       </Text>
     </Flex>
   );

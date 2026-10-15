@@ -7,15 +7,15 @@ import type {
 } from '@/application/restaurant';
 import { linesOf, type Draft } from '@/domain/order-draft';
 import { formatQuantity, formatThousandths } from '@/domain/quantity';
-import { listText } from '@/presentation/ui/plural';
+import { listText, plural } from '@/presentation/ui/plural';
 import { matchesQuery } from '@/presentation/ui/search';
-import { formatInstant } from '@/presentation/ui/time';
 import { formatStamp } from '@/presentation/ui/zones';
 
-// Figma 02: «В заказе: поз. 3 и 5» next to the menu dish.
+// Figma 02: «В заказе: позиции 3 и 5» next to the menu dish.
 export function inDraftText(draft: Draft, dishID: string): string | undefined {
   const lines = linesOf(draft, dishID);
-  return lines.length === 0 ? undefined : `В заказе: поз. ${listText(lines)}`;
+  if (lines.length === 0) return undefined;
+  return `В заказе: ${lines.length === 1 ? 'позиция' : 'позиции'} ${listText(lines)}`;
 }
 
 export interface MenuRow {
@@ -68,8 +68,7 @@ export function deficitText(
   products: ReadonlyMap<string, Product>,
 ): string {
   const product = products.get(deficit.productID);
-  const name =
-    product === undefined ? deficit.productID : inSentence(product.name);
+  const name = product === undefined ? 'продукт' : inSentence(product.name);
   return `${name} — нужно ${amount(deficit.requiredQuantity, product)}, есть ${amount(deficit.availableQuantity, product)}`;
 }
 
@@ -96,6 +95,8 @@ export function stopRows(
 }
 
 export interface ReasonRow {
+  // The key of the row, never shown.
+  readonly batchID: string;
   readonly title: string;
   readonly perPortion: string;
   readonly expires: string;
@@ -112,10 +113,8 @@ export interface RecommendationRow {
   readonly reasons: readonly ReasonRow[];
 }
 
-const dateTime = (epochMs: number, timeZone: string) =>
-  `${formatInstant(epochMs, timeZone, 'date')}, ${formatInstant(epochMs, timeZone, 'time')}`;
-
-// E05: the order of the service, the nearest expiry and every reason.
+// E05: the order of the service, the nearest expiry and every reason; the
+// batch is named by its expiry, its ID only keys the row.
 export function recommendationRows(
   recommendations: Recommendations,
   timeZone: string,
@@ -124,21 +123,23 @@ export function recommendationRows(
     rank: index + 1,
     dishID: item.dishID,
     name: item.dishName,
-    nearest: `Ближайший срок риска — ${dateTime(item.priorityExpiresAt.epochMs, timeZone)}.`,
+    nearest: `Ближайший срок годности — ${formatStamp(item.priorityExpiresAt.epochMs, timeZone)}.`,
     demand:
       item.demandBasis === 'history'
-        ? 'Спрос по полной истории 7 дней'
-        : 'Спрос без полной истории: ориентир 2 порции/ч',
+        ? 'По продажам за 7 дней'
+        : 'Продаж пока мало — считаем 2 порции в час',
     reasons: item.reasons.map((reason) => ({
-      title: `${reason.productName} · партия ${reason.batchID}`,
+      batchID: reason.batchID,
+      title: reason.productName,
       perPortion: `${formatQuantity(reason.quantityPerPortion, reason.baseUnit)} на порцию`,
-      expires: `Срок до ${dateTime(reason.expiresAt.epochMs, timeZone)}`,
-      risk: `Под риском ${formatQuantity(reason.riskQuantity, reason.baseUnit)}`,
-      target: `Ориентир: ${reason.targetPortions} порц. для этого количества`,
+      expires: `Срок до ${formatStamp(reason.expiresAt.epochMs, timeZone)}`,
+      risk: `Может испортиться: ${formatQuantity(reason.riskQuantity, reason.baseUnit)}`,
+      target: `Хватит примерно на ${reason.targetPortions} ${plural(reason.targetPortions, 'порцию', 'порции', 'порций')}`,
     })),
   }));
 }
 
+// «Обновлено 14 октября, 10:00»: when the shown data was read.
 export function evaluationText(epochMs: number, timeZone: string): string {
-  return `Оценка ${formatStamp(epochMs, timeZone)}`;
+  return `Обновлено ${formatStamp(epochMs, timeZone)}`;
 }

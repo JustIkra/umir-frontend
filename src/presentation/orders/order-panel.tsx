@@ -18,6 +18,7 @@ import { Icon } from '@/presentation/ui/icon';
 import { Stepper } from '@/presentation/ui/stepper';
 import {
   attemptMessage,
+  checkedText,
   compositionText,
   confirmedLines,
   draftSummary,
@@ -26,7 +27,6 @@ import {
   outcomeMessage,
   portionsText,
 } from './order-messages';
-import { evaluationText } from './order-rows';
 
 // Figma Order panel 85:1135: header, body, a grey footer with the action.
 function Panel({
@@ -118,7 +118,7 @@ export function EmptyOrder() {
       footer={
         <>
           <Button disabled w="full">
-            Подготовить заказ
+            Проверить заказ
           </Button>
           <Text textStyle="caption.default" color="text.secondary">
             Добавьте хотя бы одно блюдо, чтобы проверить заказ.
@@ -138,15 +138,14 @@ export function EmptyOrder() {
         </Flex>
         <Text textStyle="body.strong">Заказ пуст</Text>
         <Text textStyle="caption.default" color="text.secondary">
-          Добавьте блюда из меню — каждое добавление создаёт позицию с 1
-          порцией.
+          Добавьте блюда из меню.
         </Text>
       </Stack>
     </Panel>
   );
 }
 
-// The first earlier line with the same dish: «Повтор блюда из поз. N».
+// The first earlier line with the same dish: «Это блюдо уже есть в позиции N».
 function repeatOf(draft: Draft, line: DraftLine): number | undefined {
   return draft.find(
     (other) => other.lineNo < line.lineNo && other.dishID === line.dishID,
@@ -155,9 +154,10 @@ function repeatOf(draft: Draft, line: DraftLine): number | undefined {
 
 type Names = ReadonlyMap<string, string>;
 
-const nameOf = (names: Names, dishID: string) => names.get(dishID) ?? dishID;
+// A dish whose name is not loaded yet is «Блюдо», never its ID.
+const nameOf = (names: Names, dishID: string) => names.get(dishID) ?? 'Блюдо';
 
-// The positions of a proposal, an attempt or a placed order: «1 · Борщ» and
+// The positions of a checked, sent or placed order: «1 · Борщ» and
 // the portions at the right.
 function PositionList({
   positions,
@@ -223,8 +223,8 @@ export function DraftOrder({
           )}
           <Text textStyle="caption.default" color="text.secondary">
             {preparing
-              ? 'Пока идёт проверка, состав не меняется.'
-              : 'Проверка учитывает весь заказ: у блюд бывают общие ингредиенты. Продукты не резервируются.'}
+              ? 'Пока мы проверяем заказ, состав менять нельзя.'
+              : 'Проверим, хватит ли продуктов на весь заказ. Пока ничего не бронируется.'}
           </Text>
           <Button
             w="full"
@@ -232,7 +232,7 @@ export function DraftOrder({
             aria-busy={preparing ? 'true' : undefined}
             onClick={onPrepare}
           >
-            {preparing ? 'Проверяем заказ…' : 'Подготовить заказ'}
+            {preparing ? 'Проверяем…' : 'Проверить заказ'}
           </Button>
         </>
       }
@@ -248,8 +248,8 @@ export function DraftOrder({
                 </Text>
                 {repeatOf(snapshot.draft, line) !== undefined && (
                   <Text textStyle="caption.default" color="text.secondary">
-                    Повтор блюда из поз. {repeatOf(snapshot.draft, line)} —
-                    отдельная позиция
+                    Это блюдо уже есть в позиции{' '}
+                    {repeatOf(snapshot.draft, line)}
                   </Text>
                 )}
               </Stack>
@@ -317,11 +317,11 @@ export function ProposalOrder({
     <Panel
       header={
         <Heading
-          title={confirming ? 'Оформление заказа' : 'Предложение заказа'}
+          title={confirming ? 'Оформление заказа' : 'Проверенный заказ'}
           caption={
             confirming
-              ? 'Отправляем подтверждение…'
-              : evaluationText(proposal.evaluatedAt.epochMs, timeZone)
+              ? 'Оформляем…'
+              : checkedText(proposal.evaluatedAt.epochMs, timeZone)
           }
         />
       }
@@ -329,17 +329,17 @@ export function ProposalOrder({
         <>
           <Text textStyle="caption.strong">
             {confirming
-              ? `Подтверждённый состав · ${compositionText(proposal.acceptedPositions)}`
+              ? `В заказе · ${compositionText(proposal.acceptedPositions)}`
               : finalText(proposal)}
           </Text>
           {!reduced && !confirming && (
             <Text textStyle="caption.default" color="text.secondary">
-              Все позиции доступны. Заказ оформится только после подтверждения.
+              Всё можно приготовить. Проверьте состав и оформите заказ.
             </Text>
           )}
           {confirming && (
             <Text textStyle="caption.default" color="text.secondary">
-              Ждём ответ сервиса. Повторное нажатие не создаст вторую продажу.
+              Повторное нажатие не создаст второй заказ.
             </Text>
           )}
           <Button
@@ -351,10 +351,10 @@ export function ProposalOrder({
             onClick={onConfirm}
           >
             {confirming
-              ? 'Отправляем подтверждение…'
+              ? 'Оформляем…'
               : reduced
-                ? 'Проверить и подтвердить'
-                : 'Подтвердить состав'}
+                ? 'Посмотреть и подтвердить'
+                : 'Оформить заказ'}
           </Button>
           <Button
             variant="secondary"
@@ -362,7 +362,7 @@ export function ProposalOrder({
             disabled={confirming}
             onClick={onEdit}
           >
-            {reduced ? 'Вернуться к изменению заказа' : 'Изменить заказ'}
+            Изменить заказ
           </Button>
         </>
       }
@@ -372,8 +372,8 @@ export function ProposalOrder({
   );
 }
 
-// Figma D2, D3, D4 and F5: an attempt whose outcome is not known. The order
-// is closed until the attempt has a result.
+// Figma D2, D3, D4 and F5: a sent order whose outcome is not known. The
+// order is closed until it has a result.
 export function AttemptOrder({
   phase,
   names,
@@ -420,29 +420,19 @@ export function AttemptOrder({
           {message.text}
         </FormMessage>
         <Text textStyle="caption.strong">
-          Состав этой попытки ·{' '}
-          {compositionText(attempt.proposal.acceptedPositions)}
+          В заказе · {compositionText(attempt.proposal.acceptedPositions)}
         </Text>
         <PositionList
           positions={attempt.proposal.acceptedPositions}
           names={names}
         />
-        <chakra.details textStyle="caption.default" color="text.secondary">
-          <chakra.summary cursor="pointer">Детали попытки</chakra.summary>
-          <Text textStyle="numeric.default" wordBreak="break-all">
-            commandID {attempt.commandID}
-          </Text>
-          <Text textStyle="numeric.default" wordBreak="break-all">
-            proposalID {attempt.proposalID}
-          </Text>
-        </chakra.details>
       </Stack>
     </Panel>
   );
 }
 
 // Figma F1, F2, F4, E12 and the reset of the orders service: the order did
-// not go through, or the proposal is gone.
+// not go through, or its check is out of date.
 export function OutcomeOrder({
   phase,
   names,
@@ -471,7 +461,7 @@ export function OutcomeOrder({
   );
   const again = (
     <Button w="full" onClick={onPrepareAgain}>
-      Подготовить заказ заново
+      Проверить заново
     </Button>
   );
   let actions: ReactNode;
@@ -479,35 +469,35 @@ export function OutcomeOrder({
   let caption: string | undefined;
   if (phase.kind === 'refused') {
     positions = phase.proposal.acceptedPositions;
-    caption = `Состав предложения · ${compositionText(positions)}`;
+    caption = `Состав заказа · ${compositionText(positions)}`;
     actions = (
       <>
         <Button w="full" onClick={onRetry}>
-          Повторить оформление
+          Оформить ещё раз
         </Button>
-        {back('Вернуться к изменению заказа')}
+        {back('Изменить заказ')}
       </>
     );
   } else if (phase.kind === 'superseded' && phase.replacement !== undefined) {
     positions = phase.replacement.acceptedPositions;
-    caption = `Новое предложение · ${compositionText(positions)}`;
+    caption = `Обновлённый заказ · ${compositionText(positions)}`;
     actions = (
       <>
         <Button w="full" onClick={onOpenReplacement}>
-          Открыть новое предложение
+          Открыть обновлённый заказ
         </Button>
-        {back('Вернуться к изменению заказа')}
+        {back('Изменить заказ')}
       </>
     );
   } else if (phase.kind === 'reset') {
     actions = again;
   } else if (phase.kind === 'empty') {
-    actions = back('Вернуться к изменению заказа');
+    actions = back('Изменить заказ');
   } else {
     actions = (
       <>
         {again}
-        {back('Изменить позиции')}
+        {back('Изменить заказ')}
       </>
     );
   }
@@ -577,17 +567,9 @@ export function PlacedOrder({
       }
     >
       <Stack gap="2" py="2">
-        <Stack gap="1">
-          <Flex gap="2" align="baseline">
-            <Text textStyle="caption.default" color="text.secondary">
-              Заказ
-            </Text>
-            <Text textStyle="numeric.default">{order.orderID}</Text>
-          </Flex>
-          <Text textStyle="caption.default" color="text.secondary">
-            {lines.composition}
-          </Text>
-        </Stack>
+        <Text textStyle="caption.default" color="text.secondary">
+          {lines.composition}
+        </Text>
         <PositionList positions={order.acceptedPositions} names={names} />
         {order.allocations.length > 0 && (
           <AllocationFacts
@@ -603,7 +585,7 @@ export function PlacedOrder({
           borderRadius="md"
           textStyle="caption.default"
         >
-          Ингредиенты списаны по партиям (FEFO).
+          Продукты списаны: сначала — с ближайшим сроком годности.
         </Text>
       </Stack>
     </Panel>

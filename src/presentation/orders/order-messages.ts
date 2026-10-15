@@ -8,7 +8,6 @@ import type {
 import { draftTotals, type Draft } from '@/domain/order-draft';
 import { formatQuantity, formatThousandths } from '@/domain/quantity';
 import { listText, plural } from '@/presentation/ui/plural';
-import { formatInstant } from '@/presentation/ui/time';
 import { formatStamp } from '@/presentation/ui/zones';
 
 export const positionsText = (count: number) =>
@@ -34,10 +33,22 @@ export function draftSummary(draft: Draft): string {
   return `${positionsText(totals.positions)} · ${portionsText(totals.portions)}`;
 }
 
-// «доступна 1», «доступно 3», «доступно 0 — позиция исключена».
+// «можно приготовить 3», «не хватает ни на одну — позиция исключена».
 function available(portions: string): string {
-  if (portions === '0') return 'доступно 0 — позиция исключена';
-  return `${plural(portions, 'доступна', 'доступно', 'доступно')} ${portions}`;
+  if (portions === '0') return 'не хватает ни на одну — позиция исключена';
+  return `можно приготовить ${portions}`;
+}
+
+// «Позиция 2 · Борщ»; a dish whose name is not loaded yet is «блюдо».
+const positionTitle = (
+  lineNo: string,
+  names: ReadonlyMap<string, string>,
+  dishID: string,
+) => `Позиция ${lineNo} · ${names.get(dishID) ?? 'блюдо'}`;
+
+// «Проверено 14 октября, 10:00»: when the order was checked.
+export function checkedText(epochMs: number, timeZone: string): string {
+  return `Проверено ${formatStamp(epochMs, timeZone)}`;
 }
 
 export interface ChangeRow {
@@ -62,13 +73,13 @@ export function changeRows(
 ): readonly ChangeRow[] {
   return proposal.changes.map((change) => ({
     lineNo: change.lineNo,
-    title: `Поз. ${change.lineNo} · ${names.get(change.dishID) ?? change.dishID}`,
-    text: `${plural(change.requestedPortions, 'Запрошена', 'Запрошено', 'Запрошено')} ${portionsText(change.requestedPortions)}, ${available(change.acceptedPortions)}`,
+    title: positionTitle(change.lineNo, names, change.dishID),
+    text: `${plural(change.requestedPortions, 'Заказана', 'Заказано', 'Заказано')} ${portionsText(change.requestedPortions)}, ${available(change.acceptedPortions)}`,
     change: `${change.requestedPortions} → ${change.acceptedPortions}`,
     excluded: change.acceptedPortions === '0',
     deficits: change.deficits.map((deficit) => {
       const product = products.get(deficit.productID);
-      return `${product?.name ?? deficit.productID}: на ${forPortions(change.requestedPortions)} нужно ${amount(deficit.requiredQuantity, product)}, доступно для позиции ${amount(deficit.availableQuantity, product)}`;
+      return `${product?.name ?? 'Продукт'}: на ${forPortions(change.requestedPortions)} нужно ${amount(deficit.requiredQuantity, product)}, для этой позиции осталось ${amount(deficit.availableQuantity, product)}`;
     }),
   }));
 }
@@ -95,8 +106,8 @@ export function previousRows(
       const now = accepted.get(position.lineNo) ?? '0';
       return {
         lineNo: position.lineNo,
-        title: `Поз. ${position.lineNo} · ${names.get(position.dishID) ?? position.dishID}`,
-        text: `В прошлом предложении ${portionsText(position.portions)}, ${available(now)}`,
+        title: positionTitle(position.lineNo, names, position.dishID),
+        text: `В прошлом составе ${portionsText(position.portions)}, ${available(now)}`,
         change: `${position.portions} → ${now}`,
         excluded: now === '0',
         deficits: [],
@@ -111,9 +122,9 @@ export function acceptanceText(
   const requested = proposal.requestedPositions;
   const accepted = proposal.acceptedPositions;
   const tail = again
-    ? 'Нужно новое подтверждение.'
-    : 'Сокращение не принимается автоматически.';
-  return `Принято ${String(accepted.length)} из ${ofPositions(requested.length)}, ${String(sum(accepted))} из ${ofPortions(sum(requested))}. ${tail}`;
+    ? 'Подтвердите новый состав.'
+    : 'Подтвердите, если вас устраивает такой заказ.';
+  return `Осталось ${String(accepted.length)} из ${ofPositions(requested.length)}, ${String(sum(accepted))} из ${ofPortions(sum(requested))}. ${tail}`;
 }
 
 export function finalText(proposal: OrderProposal): string {
@@ -133,41 +144,42 @@ export function attemptMessage(
   phase: Extract<OrderPhase, { kind: 'unknown' | 'pending' | 'conflict' }>,
   timeZone: string,
 ): PanelMessage & { readonly stamp: string; readonly footer: string } {
-  const stamp = `Попытка от ${formatStamp(phase.attempt.startedAt, timeZone)}`;
+  const stamp = `Отправлено ${formatStamp(phase.attempt.startedAt, timeZone)}`;
+  const footer = 'Новый заказ можно начать, когда станет ясно, прошёл ли этот.';
   switch (phase.kind) {
     case 'unknown':
       return {
         tone: 'unknown',
-        title: 'Результат оформления неизвестен',
+        title: 'Не знаем, оформлен ли заказ',
         text: phase.checking
-          ? 'Проверяем эту же попытку — вторая продажа не создаётся.'
-          : 'Ответ сервиса заказов не получен. Продажа могла быть записана. Не оформляйте заказ повторно: проверка продолжит ту же попытку.',
+          ? 'Проверяем результат. Второй раз заказ не оформится.'
+          : 'Связь прервалась. Не оформляйте заказ заново — нажмите «Проверить результат», заказ не задвоится.',
         stamp,
-        footer: 'Новый заказ — после результата этой попытки.',
+        footer,
       };
     case 'pending':
       return {
         tone: 'unknown',
-        title: 'Оформление ожидает результата',
-        text: 'Сервис ещё обрабатывает попытку. Проверьте позже — повтор не создаст вторую продажу.',
+        title: 'Заказ ещё обрабатывается',
+        text: 'Проверьте результат через минуту — заказ не задвоится.',
         stamp,
-        footer: 'Новый заказ — после результата этой попытки.',
+        footer,
       };
     case 'conflict':
       return {
         tone: 'error',
-        title: 'Запрос отклонён: номер попытки уже занят',
-        text: 'Этот номер попытки сервис уже связал с другим предложением и отклонил запрос. По нему ничего не записано, прежняя попытка не изменена. Новый номер автоматически не создаётся: сначала выясните, чем закончилась попытка с этим номером.',
-        stamp: `${stamp} · CommandConflict`,
-        footer: 'Новый заказ — после того, как результат попытки установлен.',
+        title: 'Похоже, этот заказ уже отправляли',
+        text: 'Повторная отправка не прошла, по ней ничего не списано. Проверьте результат или загляните в историю склада, прежде чем оформлять снова.',
+        stamp,
+        footer,
       };
   }
 }
 
 const notFound: PanelMessage = {
   tone: 'error',
-  title: 'Предложение больше не найдено',
-  text: 'Сервис заказов не нашёл это предложение: после перезапуска временные предложения не сохраняются. Из этого окна других попыток по нему не было. Подготовьте заказ заново, позиции сохранены, склад пересчитает состав.',
+  title: 'Проверьте заказ заново',
+  text: 'Данные проверки устарели, заказ не оформлен. Блюда в заказе сохранены.',
 };
 
 export function outcomeMessage(
@@ -182,13 +194,11 @@ export function outcomeMessage(
       return phase.afterAttempt
         ? {
             tone: 'info',
-            title: 'Предложение больше не действует',
+            title: 'Данные заказа устарели',
             ...(phase.checkedAt === undefined
               ? {}
-              : {
-                  stamp: `Проверено ${formatStamp(phase.checkedAt, timeZone)}`,
-                }),
-            text: 'Сервис заказов ответил на ту же попытку: предложение больше не действует, а записана ли продажа, он не подтверждает. Прежде чем оформлять заново, проверьте по истории склада, не списаны ли продукты по этой попытке.',
+              : { stamp: checkedText(phase.checkedAt, timeZone) }),
+            text: 'Мы не можем подтвердить, оформлен ли заказ. Прежде чем оформлять снова, загляните в историю склада — не списаны ли уже продукты.',
           }
         : notFound;
     case 'refused':
@@ -197,28 +207,28 @@ export function outcomeMessage(
         title: 'Заказ не оформлен',
         text:
           phase.code === 'InventoryUnavailable'
-            ? 'Сервис склада не подготовил актуальные остатки. Продажа не записана, продукты не списаны.'
-            : 'Сервис заказов не принял оформление. Продажа не записана, продукты не списаны.',
+            ? 'Не получилось проверить остатки. Ничего не списано — попробуйте ещё раз.'
+            : 'Заказ не прошёл. Ничего не списано — попробуйте ещё раз.',
       };
     case 'reset':
       return {
         tone: 'unknown',
-        title: 'Результат оформления неизвестен',
-        text: 'Сервис заказов перезапустился, проверить эту попытку нельзя. Перед новым заказом убедитесь, что продажа не записана.',
+        title: 'Не знаем, оформлен ли заказ',
+        text: 'Была короткая техническая пауза, проверить заказ нельзя. Загляните в историю склада перед новым заказом.',
       };
     case 'superseded':
       return phase.replacement === undefined
         ? notFound
         : {
             tone: 'info',
-            title: 'Это предложение уже заменено',
-            text: `Состав предложения пересчитан, сохранено новое предложение от ${formatInstant(phase.replacement.evaluatedAt.epochMs, timeZone, 'timeSeconds')}. Прежнее предложение оформить нельзя, продажа по нему не записана.`,
+            title: 'Состав заказа обновился',
+            text: 'Мы пересчитали заказ, прежний вариант не оформлен. Подтвердите обновлённый заказ.',
           };
     case 'empty':
       return {
         tone: 'error',
         title: 'Ни одно блюдо из заказа сейчас нельзя приготовить',
-        text: 'Остатки изменились после оценки меню. Измените состав и подготовьте заказ заново.',
+        text: 'Остатков стало меньше после обновления меню. Измените состав и проверьте заказ заново.',
       };
   }
 }
@@ -228,20 +238,20 @@ export function noticeMessage(notice: OrderNotice): PanelMessage {
     case 'portions':
       return {
         tone: 'error',
-        title: 'Введите целое число порций больше 0',
-        text: `Исправьте количество в поз. ${listText(notice.lines)}: допустимо только целое число порций больше 0. Введённое значение сохранено.`,
+        title: 'Проверьте количество порций',
+        text: `В ${notice.lines.length === 1 ? 'позиции' : 'позициях'} ${listText(notice.lines)} укажите целое число порций — 1 или больше.`,
       };
     case 'prepare-failed':
       return {
         tone: 'error',
         title: 'Не удалось проверить заказ',
-        text: 'Сервис заказов не ответил. Состав сохранён, повторите проверку.',
+        text: 'Блюда в заказе сохранены. Попробуйте ещё раз через пару минут.',
       };
     case 'check-failed':
       return {
         tone: 'error',
-        title: 'Проверка не удалась',
-        text: 'Не удалось проверить. Повторите позже.',
+        title: 'Не удалось проверить результат',
+        text: 'Попробуйте ещё раз через минуту.',
       };
   }
 }
@@ -251,7 +261,7 @@ export function confirmedLines(
   timeZone: string,
 ): { readonly stamp: string; readonly composition: string } {
   return {
-    stamp: `Записан сервисом ${formatStamp(order.placedAt.epochMs, timeZone)}`,
-    composition: `Оформленный состав · ${compositionText(order.acceptedPositions)}`,
+    stamp: `Оформлен ${formatStamp(order.placedAt.epochMs, timeZone)}`,
+    composition: `В заказе · ${compositionText(order.acceptedPositions)}`,
   };
 }

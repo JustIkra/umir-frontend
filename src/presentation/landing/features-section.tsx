@@ -234,7 +234,7 @@ function OrderConfirmationVisual() {
         note="Без изменений"
       />
       <Flex wrap="wrap" align="center" columnGap="3" rowGap="2" pt="2">
-        <ButtonLook>Подтвердить состав</ButtonLook>
+        <ButtonLook>Оформить заказ</ButtonLook>
         <Text textStyle="caption.default" color="text.secondary">
           До подтверждения ничего не списывается.
         </Text>
