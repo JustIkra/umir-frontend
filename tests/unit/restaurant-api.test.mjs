@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
+import fin from '../../api/completion-v1-examples.json' with { type: 'json' };
 import {
   createCatalogApi,
   createOrderApi,
@@ -148,36 +149,14 @@ test('serving reads keep the warehouse epoch of the context', async () => {
     background: false,
   });
   assert.equal(list.result.dishes[0].deficits[0].availableQuantity, '20000');
-  const recs = client(
-    envelope(
-      {
-        evaluatedAt: at,
-        stateVersion: '3',
-        items: [
-          {
-            dishID: '207',
-            dishName: 'Ризотто',
-            priorityExpiresAt: at,
-            reasons: [
-              {
-                productID: '125',
-                productName: 'Сыр пармезан',
-                batchID: 'P-0142',
-                quantityPerPortion: '40000',
-                baseUnit: 'g',
-                expiresAt: at,
-              },
-            ],
-          },
-        ],
-      },
-      true,
-    ),
-  );
+  const recs = client(structuredClone(fin.examples[2].value));
   const ranked = await createRestaurantReads(recs).recommendations(R, {
     background: true,
   });
-  assert.equal(ranked.result.items[0].reasons[0].batchID, 'P-0142');
+  assert.equal(
+    ranked.result.items[0].reasons[0].batchID,
+    fin.examples[2].value.result.items[0].reasons[0].batchID,
+  );
   assert.equal(recs.calls[0][1], `/api/v2/r/${R}/serving/recommendations`);
 });
 

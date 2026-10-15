@@ -25,7 +25,13 @@ import {
   oneOf,
   positiveInt64,
   string,
+  closedObject,
+  decimal6,
+  exactNumber,
+  instantNanos,
+  DecodeError,
 } from './common';
+import { decodeCoverage, decodePlanningWindow } from './planning';
 
 const id = nonEmptyString;
 
@@ -80,7 +86,17 @@ export function decodeStopList(value: unknown, path: string): StopList {
 }
 
 function decodeReason(value: unknown, path: string): RecommendationReason {
-  const reason = object(value, path);
+  const reason = closedObject(value, path, [
+    'productID',
+    'productName',
+    'batchID',
+    'quantityPerPortion',
+    'riskQuantity',
+    'targetPortions',
+    'remainingSeconds',
+    'baseUnit',
+    'expiresAt',
+  ]);
   return {
     productID: id(reason.productID, `${path}.productID`),
     productName: string(reason.productName, `${path}.productName`),
@@ -89,16 +105,37 @@ function decodeReason(value: unknown, path: string): RecommendationReason {
       reason.quantityPerPortion,
       `${path}.quantityPerPortion`,
     ),
+    riskQuantity: positiveInt64(reason.riskQuantity, `${path}.riskQuantity`),
+    targetPortions: positiveInt64(
+      reason.targetPortions,
+      `${path}.targetPortions`,
+    ),
+    remainingSeconds: nonNegativeInt64(
+      reason.remainingSeconds,
+      `${path}.remainingSeconds`,
+    ),
     baseUnit: oneOf(reason.baseUnit, `${path}.baseUnit`, baseUnits),
     expiresAt: instant(reason.expiresAt, `${path}.expiresAt`),
   };
 }
 
 function decodeRecommendation(value: unknown, path: string): Recommendation {
-  const item = object(value, path);
+  const item = closedObject(value, path, [
+    'dishID',
+    'dishName',
+    'score',
+    'demandBasis',
+    'priorityExpiresAt',
+    'reasons',
+  ]);
   return {
     dishID: id(item.dishID, `${path}.dishID`),
     dishName: string(item.dishName, `${path}.dishName`),
+    score: decimal6(item.score, `${path}.score`),
+    demandBasis: oneOf(item.demandBasis, `${path}.demandBasis`, [
+      'history',
+      'fallback',
+    ]),
     priorityExpiresAt: instant(
       item.priorityExpiresAt,
       `${path}.priorityExpiresAt`,
@@ -111,15 +148,65 @@ export function decodeRecommendations(
   value: unknown,
   path: string,
 ): Recommendations {
-  const recommendations = object(value, path);
-  return {
+  const recommendations = closedObject(value, path, [
+    'evaluatedAt',
+    'stateVersion',
+    'policyVersion',
+    'horizonHours',
+    'window',
+    'coverage',
+    'items',
+  ]);
+  const result: Recommendations = {
     evaluatedAt: instant(recommendations.evaluatedAt, `${path}.evaluatedAt`),
     stateVersion: nonNegativeInt64(
       recommendations.stateVersion,
       `${path}.stateVersion`,
     ),
     items: array(recommendations.items, `${path}.items`, decodeRecommendation),
+    policyVersion: oneOf(
+      recommendations.policyVersion,
+      `${path}.policyVersion`,
+      ['FIN1'],
+    ),
+    horizonHours: exactNumber(
+      recommendations.horizonHours,
+      `${path}.horizonHours`,
+      72,
+    ),
+    window: decodePlanningWindow(recommendations.window, `${path}.window`),
+    coverage: decodeCoverage(recommendations.coverage, `${path}.coverage`),
   };
+  if (
+    result.items.length > 10 ||
+    new Set(result.items.map((item) => item.dishID)).size !==
+      result.items.length
+  )
+    throw new DecodeError(path, 'duplicate or oversized recommendation result');
+  const at = instantNanos(result.evaluatedAt);
+  for (const item of result.items) {
+    if (
+      item.reasons.length < 1 ||
+      item.reasons.length > 500 ||
+      new Set(item.reasons.map((reason) => reason.productID)).size !==
+        item.reasons.length
+    )
+      throw new DecodeError(path, 'invalid recommendation reasons');
+    let earliest: bigint | undefined;
+    for (const reason of item.reasons) {
+      const expiry = instantNanos(reason.expiresAt);
+      if (
+        expiry <= at ||
+        expiry > at + 72n * 3600n * 1_000_000_000n ||
+        BigInt(reason.remainingSeconds) !== (expiry - at) / 1_000_000_000n
+      )
+        throw new DecodeError(path, 'invalid recommendation expiry');
+      if (earliest === undefined || expiry < earliest) earliest = expiry;
+    }
+    if (instantNanos(item.priorityExpiresAt) !== earliest)
+      throw new DecodeError(path, 'priority expiry differs from reasons');
+  }
+  return result;
 }
 
 function decodePosition(value: unknown, path: string): Position {
@@ -184,7 +271,7 @@ function decodeAllocation(value: unknown, path: string): Allocation {
   };
 }
 
-function decodeOrder(value: unknown, path: string): Order {
+export function decodeOrder(value: unknown, path: string): Order {
   const order = object(value, path);
   return {
     orderID: id(order.orderID, `${path}.orderID`),

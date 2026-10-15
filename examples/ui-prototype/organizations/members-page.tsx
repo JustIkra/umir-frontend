@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useLoaderData } from 'react-router';
-import { type Organization } from '@/presentation/placeholder-organizations';
+import { type Organization } from '../placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { SearchInput } from '@/presentation/ui/form';
 import { organizationPath } from './format';

@@ -7,6 +7,7 @@ import {
 import { decodeCsrfToken } from '@/adapters/api/decode/account';
 import { DecodeError, decodeFailure } from '@/adapters/api/decode/common';
 import { activityHeader } from './read-request';
+import type { LoadOptions } from '@/application/read-model';
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 export type Method = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -15,15 +16,11 @@ export interface SendOptions {
   readonly body?: unknown;
   readonly epoch?: string | undefined;
 }
-
 // Browser access to gateway. Reads resolve to the parsed JSON body; writes
 // carry the CSRF token and, for warehouse and serving, the runtime epoch.
 // Every refusal or loss rejects with ApiError.
 export interface GatewayClient {
-  read(
-    path: string,
-    options: { readonly background: boolean },
-  ): Promise<unknown>;
+  read(path: string, options: LoadOptions): Promise<unknown>;
   send(method: Method, path: string, options?: SendOptions): Promise<unknown>;
   setCsrfToken(token: string): void;
   clearCsrfToken(): void;
@@ -113,8 +110,9 @@ export function createGatewayClient(fetch: FetchLike): GatewayClient {
   }
 
   return {
-    read(path, { background }) {
+    read(path, { background, signal }) {
       return exchange('GET', path, {
+        ...(signal === undefined ? {} : { signal }),
         headers: {
           Accept: 'application/json',
           ...(background ? { [activityHeader]: 'background' } : {}),

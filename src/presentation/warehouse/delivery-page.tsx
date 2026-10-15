@@ -1,11 +1,23 @@
 import { Box, Flex, Grid, Stack, Text, chakra } from '@chakra-ui/react';
-import { useId, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useId, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
 import plusIcon from '@/presentation/assets/icons/plus-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import { findProduct, products } from '@/presentation/placeholder-catalog';
+import { findRestaurant } from '@/application/access';
+import { formatThousandths, unitShort } from '@/domain/quantity';
+import {
+  useAccess,
+  useAttempts,
+  useReadModel,
+  useRestaurantData,
+} from '@/presentation/session/hooks';
+import { useServices } from '@/presentation/services';
+import { useLeaveGuard } from '@/presentation/app-shell/leave-guard';
+import { FormMessage } from '@/presentation/ui/form-message';
+import { formatInstant } from '@/presentation/ui/time';
+import { civilFields, draftFromForm } from './delivery-forms';
 import { media } from '@/presentation/theme/system';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
@@ -26,11 +38,6 @@ import {
 } from '@/presentation/ui/form';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
-
-const productOptions = products.map((product) => ({
-  value: product.code,
-  label: product.name,
-}));
 
 // «1 строка», «2 строки», «5 строк»; the same for «партия».
 const plural = (count: number, forms: readonly [string, string, string]) => {
@@ -81,16 +88,71 @@ interface Row {
   readonly product: string;
 }
 
-// Figma P1 «Приём поставки». A delivery line is a table row from 1367 (P1
-// 1440), a card with two columns from 768 (P1 1024) and a card with one
-// column on 390. Rows are added and removed in place; nothing is checked or
-// sent: «Принять поставку» returns to the stock.
 export function DeliveryPage() {
+  const { restaurantID = '' } = useParams();
+  const products = useReadModel(useRestaurantData().products());
+  return (
+    <DeliveryView
+      key={`${restaurantID}-${products.value?.context.runtimeEpoch ?? ''}`}
+      restaurantID={restaurantID}
+    />
+  );
+}
+function DeliveryView({ restaurantID }: { restaurantID: string }) {
   const path = useRestaurantPath();
   const navigate = useNavigate();
   const base = useId();
-  const [rows, setRows] = useState<readonly Row[]>([{ key: 1, product: '' }]);
-  const [next, setNext] = useState(2);
+  const data = useRestaurantData();
+  const productRead = useReadModel(data.products());
+  const products = productRead.value?.result.items ?? [];
+  const { warehouseCommands, now } = useServices();
+  const commands = warehouseCommands(restaurantID);
+  useAttempts();
+  const pending = commands.pendingDelivery();
+  const restaurant = findRestaurant(useAccess(), restaurantID);
+  const [timeZone] = useState(
+    () =>
+      commands.pendingDeliveryTimeZone() ??
+      restaurant?.timeZone ??
+      'Europe/Moscow',
+  );
+  const [openedAt] = useState(now);
+  const created = civilFields(pending?.createdAt);
+  const [status, setStatus] = useState<
+    'idle' | 'invalid' | 'sending' | 'unknown' | 'refused' | 'reset'
+  >(pending === undefined ? 'idle' : 'unknown');
+  const [message, setMessage] = useState<string | undefined>();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const timezoneChanged =
+    productRead.value !== undefined &&
+    productRead.value.context.settings.timeZone !== timeZone;
+  const closed =
+    status === 'sending' ||
+    status === 'unknown' ||
+    status === 'reset' ||
+    timezoneChanged ||
+    productRead.value === undefined;
+  const [dirty, setDirty] = useState(false);
+  useLeaveGuard(dirty && pending === undefined ? 'Форма поставки' : undefined);
+  const productOptions = products.map((product) => ({
+    value: product.productID,
+    label: product.name,
+  }));
+  const [rows, setRows] = useState<readonly Row[]>(() =>
+    pending === undefined
+      ? [{ key: 1, product: '' }]
+      : pending.lines.map((line, index) => ({
+          key: index + 1,
+          product: line.productID,
+        })),
+  );
+  const [next, setNext] = useState(() => rows.length + 1);
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <Stack gap={{ base: '4', sm: '6' }}>
@@ -103,282 +165,431 @@ export function DeliveryPage() {
         />
         <PageHeader
           title="Приём поставки"
-          description="Каждая строка — отдельная партия. «Годна до» рассчитает склад от изготовления. Время — Москва, UTC+3."
+          description={`Каждая строка — отдельная партия. «Годна до» рассчитает склад от изготовления. Часовой пояс: ${timeZone}.`}
         />
       </Stack>
+      {message !== undefined && (
+        <FormMessage
+          tone={status === 'unknown' ? 'unknown' : 'error'}
+          title={
+            status === 'unknown'
+              ? 'Исход поставки не установлен'
+              : 'Поставка не принята'
+          }
+        >
+          {message}
+        </FormMessage>
+      )}
+      {timezoneChanged && (
+        <FormMessage tone="error" title="Часовой пояс изменился">
+          Проверьте даты в новой форме. Исходная попытка, если она есть,
+          сохраняет свои данные.
+        </FormMessage>
+      )}
       <SplitCardForm
         noValidate
+        onChange={() => {
+          setDirty(true);
+        }}
         onSubmit={(event) => {
           event.preventDefault();
-          void navigate(path('/warehouse'));
+          if (
+            status === 'sending' ||
+            timezoneChanged ||
+            productRead.value === undefined
+          )
+            return;
+          const input =
+            pending ??
+            draftFromForm(
+              new FormData(event.currentTarget),
+              rows,
+              productRead.value.context.settings.settingsVersion,
+            );
+          if (input === undefined) {
+            setStatus('invalid');
+            setMessage(
+              'Заполните номер, даты и время в формате дд.мм.гггг и чч:мм, продукты, срок в днях и положительное количество с точностью до 0,001.',
+            );
+            return;
+          }
+          setStatus('sending');
+          void commands
+            .receiveDelivery(
+              input,
+              timeZone,
+              productRead.value.context.runtimeEpoch,
+            )
+            .then((result) => {
+              if (!mounted.current) return;
+              if (result.kind === 'created') {
+                setDirty(false);
+                void navigate(path('/warehouse'));
+                return;
+              }
+              setStatus(
+                result.kind === 'unknown'
+                  ? 'unknown'
+                  : result.kind === 'reset'
+                    ? 'reset'
+                    : 'refused',
+              );
+              setMessage(
+                result.kind === 'unknown'
+                  ? 'Ответ потерян. Проверка повторяет исходные данные и тот же номер команды; форму пока нельзя менять.'
+                  : result.kind === 'reset'
+                    ? 'Склад перезапущен. Старый исход не подтверждён. Обновите данные перед новой операцией.'
+                    : result.kind === 'refused' &&
+                        result.code === 'SettingsChanged'
+                      ? 'Настройки времени изменились. Обновите данные и проверьте даты перед новой отправкой.'
+                      : 'Склад отказал в приёме. Проверьте доступ, даты и количество; поставка не подтверждена.',
+              );
+            });
         }}
       >
-        <SplitCardBody>
-          <Grid
-            gridTemplateColumns={{ sm: 'repeat(2, minmax(0, 1fr))' }}
-            maxW={{ sm: rem(664) }}
-            columnGap="6"
-            rowGap="4"
-          >
-            <FieldGroup>
-              <FieldLabel htmlFor="delivery-number">Номер поставки</FieldLabel>
-              <TextInput
-                id="delivery-number"
-                name="number"
-                placeholder="Например, 1192"
-                aria-describedby="delivery-number-hint"
-              />
-              <FieldMessage
-                id="delivery-number-hint"
-                hint="Номер из накладной; может повторяться у разных поставок"
-              />
-            </FieldGroup>
-            <FieldGroup>
-              <FieldLabel htmlFor="delivery-date">
-                Дата и время создания поставки (Москва, UTC+3)
-              </FieldLabel>
-              <Flex gap="1.5">
-                <DateInput
-                  id="delivery-date"
-                  name="createdDate"
-                  w="auto"
-                  flex="1"
-                  minW="0"
-                  aria-describedby="delivery-date-hint"
-                />
-                <TimeInput
-                  name="createdTime"
-                  aria-label="Время создания поставки (Москва, UTC+3)"
-                  aria-describedby="delivery-date-hint"
-                />
-              </Flex>
-              <FieldMessage
-                id="delivery-date-hint"
-                hint="Не позже текущего времени"
-              />
-            </FieldGroup>
-          </Grid>
-        </SplitCardBody>
-        <Stack gap="3">
-          <Flex justify="space-between" align="baseline" wrap="wrap" gap="2">
-            <chakra.h2 textStyle="heading.h3">
-              {`Строки поставки · ${String(rows.length)}`}
-            </chakra.h2>
-            <Text textStyle="caption.default" color="text.secondary">
-              {`${plural(rows.length, ['строка', 'строки', 'строк'])} → ${plural(rows.length, ['партия', 'партии', 'партий'])}`}
-            </Text>
-          </Flex>
-          <Stack gap="0">
+        <chakra.fieldset
+          disabled={closed}
+          display="contents"
+          minW="0"
+          border="0"
+          p="0"
+          m="0"
+        >
+          <SplitCardBody>
             <Grid
-              aria-hidden="true"
-              display={{ base: 'none', '2xl': 'grid' }}
-              gridTemplateColumns={wideColumns}
-              columnGap="3"
-              alignItems="start"
-              pb="2"
-              borderBottomWidth="1px"
-              borderColor="border.default"
-              textStyle="caption.strong"
-              color="text.secondary"
+              gridTemplateColumns={{ sm: 'repeat(2, minmax(0, 1fr))' }}
+              maxW={{ sm: rem(664) }}
+              columnGap="6"
+              rowGap="4"
             >
-              <span>№</span>
-              <span>Продукт</span>
-              <span>Количество</span>
-              <span>Изготовлено (Москва, UTC+3)</span>
-              <span>Срок годности</span>
-              <span>Поступило (Москва, UTC+3)</span>
+              <FieldGroup>
+                <FieldLabel htmlFor="delivery-number">
+                  Номер поставки
+                </FieldLabel>
+                <TextInput
+                  id="delivery-number"
+                  name="number"
+                  defaultValue={pending?.number}
+                  placeholder="Например, 1192"
+                  aria-describedby="delivery-number-hint"
+                />
+                <FieldMessage
+                  id="delivery-number-hint"
+                  hint="Номер из накладной; может повторяться у разных поставок"
+                />
+              </FieldGroup>
+              <FieldGroup>
+                <FieldLabel htmlFor="delivery-date">
+                  Дата и время создания поставки
+                </FieldLabel>
+                <Flex gap="1.5">
+                  <DateInput
+                    id="delivery-date"
+                    name="createdDate"
+                    defaultValue={
+                      created.date || formatInstant(openedAt, timeZone, 'date')
+                    }
+                    w="auto"
+                    flex="1"
+                    minW="0"
+                    aria-describedby="delivery-date-hint"
+                  />
+                  <TimeInput
+                    name="createdTime"
+                    defaultValue={
+                      created.time || formatInstant(openedAt, timeZone, 'time')
+                    }
+                    aria-label="Время создания поставки"
+                    aria-describedby="delivery-date-hint"
+                  />
+                </Flex>
+                <FieldMessage
+                  id="delivery-date-hint"
+                  hint="Не позже текущего времени"
+                />
+              </FieldGroup>
             </Grid>
-            <Stack as="ol" gap={{ base: '3', '2xl': '0' }} listStyleType="none">
-              {rows.map((row, index) => {
-                const number = String(index + 1);
-                const id = (field: string) =>
-                  `${base}-${field}-${String(row.key)}`;
-                return (
-                  <Grid
-                    as="li"
-                    key={row.key}
-                    gridTemplateAreas={{
-                      base: "'head' 'product' 'quantity' 'made' 'shelf' 'received'",
-                      sm: "'head head' 'product quantity' 'made shelf' 'received received'",
-                      '2xl':
-                        "'number product quantity made shelf received remove'",
-                    }}
-                    gridTemplateColumns={{
-                      base: '1fr',
-                      sm: 'repeat(2, minmax(0, 1fr))',
-                      '2xl': wideColumns,
-                    }}
-                    alignItems={{ base: 'start', '2xl': 'center' }}
-                    columnGap={{ base: '4', '2xl': '3' }}
-                    rowGap="3"
-                    p={{ base: '4', '2xl': '0' }}
-                    py={{ '2xl': '3' }}
-                    bg="bg.surface"
-                    borderWidth={{ base: '1px', '2xl': '0 0 1px' }}
-                    borderColor="border.default"
-                    borderRadius={{ base: 'md', '2xl': '0' }}
-                  >
-                    <Flex
-                      gridArea="head"
-                      display={{ base: 'flex', '2xl': 'contents' }}
-                      align="center"
-                      gap="3"
+          </SplitCardBody>
+          <Stack gap="3">
+            <Flex justify="space-between" align="baseline" wrap="wrap" gap="2">
+              <chakra.h2 textStyle="heading.h3">
+                {`Строки поставки · ${String(rows.length)}`}
+              </chakra.h2>
+              <Text textStyle="caption.default" color="text.secondary">
+                {`${plural(rows.length, ['строка', 'строки', 'строк'])} → ${plural(rows.length, ['партия', 'партии', 'партий'])}`}
+              </Text>
+            </Flex>
+            <Stack gap="0">
+              <Grid
+                aria-hidden="true"
+                display={{ base: 'none', '2xl': 'grid' }}
+                gridTemplateColumns={wideColumns}
+                columnGap="3"
+                alignItems="start"
+                pb="2"
+                borderBottomWidth="1px"
+                borderColor="border.default"
+                textStyle="caption.strong"
+                color="text.secondary"
+              >
+                <span>№</span>
+                <span>Продукт</span>
+                <span>Количество</span>
+                <span>Изготовлено ({timeZone})</span>
+                <span>Срок годности</span>
+                <span>Поступило ({timeZone})</span>
+              </Grid>
+              <Stack
+                as="ol"
+                gap={{ base: '3', '2xl': '0' }}
+                listStyleType="none"
+              >
+                {rows.map((row, index) => {
+                  const selectedProduct = products.find(
+                    (v) => v.productID === row.product,
+                  );
+                  const unit =
+                    selectedProduct === undefined
+                      ? ''
+                      : unitShort(selectedProduct.baseUnit);
+                  const number = String(index + 1);
+                  const id = (field: string) =>
+                    `${base}-${field}-${String(row.key)}`;
+                  return (
+                    <Grid
+                      as="li"
+                      key={row.key}
+                      gridTemplateAreas={{
+                        base: "'head' 'product' 'quantity' 'made' 'shelf' 'received'",
+                        sm: "'head head' 'product quantity' 'made shelf' 'received received'",
+                        '2xl':
+                          "'number product quantity made shelf received remove'",
+                      }}
+                      gridTemplateColumns={{
+                        base: '1fr',
+                        sm: 'repeat(2, minmax(0, 1fr))',
+                        '2xl': wideColumns,
+                      }}
+                      alignItems={{ base: 'start', '2xl': 'center' }}
+                      columnGap={{ base: '4', '2xl': '3' }}
+                      rowGap="3"
+                      p={{ base: '4', '2xl': '0' }}
+                      py={{ '2xl': '3' }}
+                      bg="bg.surface"
+                      borderWidth={{ base: '1px', '2xl': '0 0 1px' }}
+                      borderColor="border.default"
+                      borderRadius={{ base: 'md', '2xl': '0' }}
                     >
-                      <Text
-                        gridArea="number"
-                        minW="6"
-                        px={{ base: '2', '2xl': '0' }}
-                        bg={{ base: 'bg.subtle', '2xl': 'transparent' }}
-                        borderRadius="sm"
-                        textAlign="center"
-                        textStyle={{
-                          base: 'caption.strong',
-                          '2xl': 'body.default',
-                        }}
-                        color={{ '2xl': 'text.secondary' }}
+                      <Flex
+                        gridArea="head"
+                        display={{ base: 'flex', '2xl': 'contents' }}
+                        align="center"
+                        gap="3"
                       >
-                        {number}
-                      </Text>
-                      <Text
-                        flex="1"
-                        display={{ '2xl': 'none' }}
-                        textStyle="caption.default"
-                        color="text.secondary"
-                      >
-                        Строка — одна партия
-                      </Text>
-                      <chakra.button
-                        type="button"
-                        gridArea="remove"
-                        display="flex"
-                        boxSize="10"
-                        my={{ base: '-2', '2xl': '0' }}
-                        alignItems="center"
-                        justifyContent="center"
-                        borderRadius="md"
-                        cursor="pointer"
-                        _hover={{ bg: 'bg.subtle' }}
-                        _disabled={{
-                          cursor: 'default',
-                          _hover: { bg: 'transparent' },
-                        }}
-                        aria-label={`Удалить строку ${number}`}
-                        disabled={rows.length === 1}
-                        onClick={() => {
-                          setRows((list) =>
-                            list.filter((item) => item.key !== row.key),
-                          );
-                        }}
-                      >
-                        <Icon src={trashIcon} size={20} />
-                      </chakra.button>
-                    </Flex>
-                    <Stack gridArea="product" gap="1">
-                      <RowLabel htmlFor={id('product')}>Продукт</RowLabel>
-                      <SelectField
-                        id={id('product')}
-                        placeholder="Выберите продукт"
-                        options={productOptions}
-                        onChange={(event) => {
-                          const product = event.target.value;
-                          setRows((list) =>
-                            list.map((item) =>
-                              item.key === row.key
-                                ? { ...item, product }
-                                : item,
-                            ),
-                          );
-                        }}
-                      />
-                    </Stack>
-                    <Stack gridArea="quantity" gap="1">
-                      <RowLabel htmlFor={id('quantity')}>Количество</RowLabel>
-                      <QuantityInput
-                        id={id('quantity')}
-                        unit={findProduct(row.product)?.unit ?? 'г'}
-                      />
-                    </Stack>
-                    <Stack gridArea="made" gap="1">
-                      <RowLabel htmlFor={id('made')}>
-                        Дата и время изготовления (Москва, UTC+3)
-                      </RowLabel>
-                      <Flex gap="1.5">
-                        <DateInput id={id('made')} w="auto" flex="1" minW="0" />
-                        <TimeInput
-                          w={{ base: rem(96), '2xl': rem(72) }}
-                          aria-label={`Время изготовления (Москва, UTC+3), строка ${number}`}
-                        />
-                      </Flex>
-                    </Stack>
-                    <Stack gridArea="shelf" gap="1">
-                      <RowLabel htmlFor={id('shelf')}>Срок годности</RowLabel>
-                      <Flex gap="1.5">
-                        <TextInput
-                          id={id('shelf')}
-                          inputMode="numeric"
-                          placeholder="0"
-                          w={rem(64)}
-                          flexShrink="0"
-                        />
-                        <Box flex="1" minW="0">
-                          <SelectField
-                            options={[{ value: 'days', label: 'дней' }]}
-                            aria-label={`Единица срока годности, строка ${number}`}
-                          />
-                        </Box>
-                      </Flex>
-                    </Stack>
-                    <Stack gridArea="received" gap="1">
-                      <RowLabel htmlFor={id('received')}>
-                        Дата и время поступления (Москва, UTC+3)
-                      </RowLabel>
-                      <Flex gap="1.5">
-                        <DateInput
-                          id={id('received')}
-                          w="auto"
+                        <Text
+                          gridArea="number"
+                          minW="6"
+                          px={{ base: '2', '2xl': '0' }}
+                          bg={{ base: 'bg.subtle', '2xl': 'transparent' }}
+                          borderRadius="sm"
+                          textAlign="center"
+                          textStyle={{
+                            base: 'caption.strong',
+                            '2xl': 'body.default',
+                          }}
+                          color={{ '2xl': 'text.secondary' }}
+                        >
+                          {number}
+                        </Text>
+                        <Text
                           flex="1"
-                          minW="0"
-                        />
-                        <TimeInput
-                          w={{ base: rem(96), '2xl': rem(72) }}
-                          aria-label={`Время поступления (Москва, UTC+3), строка ${number}`}
-                        />
+                          display={{ '2xl': 'none' }}
+                          textStyle="caption.default"
+                          color="text.secondary"
+                        >
+                          Строка — одна партия
+                        </Text>
+                        <chakra.button
+                          type="button"
+                          gridArea="remove"
+                          display="flex"
+                          boxSize="10"
+                          my={{ base: '-2', '2xl': '0' }}
+                          alignItems="center"
+                          justifyContent="center"
+                          borderRadius="md"
+                          cursor="pointer"
+                          _hover={{ bg: 'bg.subtle' }}
+                          _disabled={{
+                            cursor: 'default',
+                            _hover: { bg: 'transparent' },
+                          }}
+                          aria-label={`Удалить строку ${number}`}
+                          disabled={rows.length === 1}
+                          onClick={() => {
+                            setRows((list) =>
+                              list.filter((item) => item.key !== row.key),
+                            );
+                          }}
+                        >
+                          <Icon src={trashIcon} size={20} />
+                        </chakra.button>
                       </Flex>
-                    </Stack>
-                  </Grid>
-                );
-              })}
+                      <Stack gridArea="product" gap="1">
+                        <RowLabel htmlFor={id('product')}>Продукт</RowLabel>
+                        <SelectField
+                          id={id('product')}
+                          value={row.product}
+                          placeholder="Выберите продукт"
+                          options={productOptions}
+                          onChange={(event) => {
+                            const product = event.target.value;
+                            setRows((list) =>
+                              list.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, product }
+                                  : item,
+                              ),
+                            );
+                          }}
+                        />
+                      </Stack>
+                      <Stack gridArea="quantity" gap="1">
+                        <RowLabel htmlFor={id('quantity')}>Количество</RowLabel>
+                        <QuantityInput
+                          id={id('quantity')}
+                          name={`quantity-${String(row.key)}`}
+                          defaultValue={
+                            pending?.lines[index]?.quantity === undefined
+                              ? ''
+                              : formatThousandths(pending.lines[index].quantity)
+                          }
+                          unit={unit}
+                        />
+                      </Stack>
+                      <Stack gridArea="made" gap="1">
+                        <RowLabel htmlFor={id('made')}>
+                          Дата и время изготовления
+                        </RowLabel>
+                        <Flex gap="1.5">
+                          <DateInput
+                            id={id('made')}
+                            name={`made-date-${String(row.key)}`}
+                            defaultValue={
+                              civilFields(pending?.lines[index]?.manufacturedAt)
+                                .date
+                            }
+                            w="auto"
+                            flex="1"
+                            minW="0"
+                          />
+                          <TimeInput
+                            w={{ base: rem(96), '2xl': rem(72) }}
+                            name={`made-time-${String(row.key)}`}
+                            defaultValue={
+                              civilFields(pending?.lines[index]?.manufacturedAt)
+                                .time
+                            }
+                            aria-label={`Время изготовления, строка ${number}`}
+                          />
+                        </Flex>
+                      </Stack>
+                      <Stack gridArea="shelf" gap="1">
+                        <RowLabel htmlFor={id('shelf')}>Срок годности</RowLabel>
+                        <Flex gap="1.5">
+                          <TextInput
+                            id={id('shelf')}
+                            name={`shelf-${String(row.key)}`}
+                            defaultValue={
+                              pending?.lines[index]?.shelfLife.value
+                            }
+                            inputMode="numeric"
+                            placeholder="0"
+                            w={rem(64)}
+                            flexShrink="0"
+                          />
+                          <Box flex="1" minW="0">
+                            <SelectField
+                              options={[{ value: 'days', label: 'дней' }]}
+                              aria-label={`Единица срока годности, строка ${number}`}
+                            />
+                          </Box>
+                        </Flex>
+                      </Stack>
+                      <Stack gridArea="received" gap="1">
+                        <RowLabel htmlFor={id('received')}>
+                          Дата и время поступления
+                        </RowLabel>
+                        <Flex gap="1.5">
+                          <DateInput
+                            id={id('received')}
+                            name={`received-date-${String(row.key)}`}
+                            defaultValue={
+                              civilFields(pending?.lines[index]?.receivedAt)
+                                .date ||
+                              formatInstant(openedAt, timeZone, 'date')
+                            }
+                            w="auto"
+                            flex="1"
+                            minW="0"
+                          />
+                          <TimeInput
+                            w={{ base: rem(96), '2xl': rem(72) }}
+                            name={`received-time-${String(row.key)}`}
+                            defaultValue={
+                              civilFields(pending?.lines[index]?.receivedAt)
+                                .time ||
+                              formatInstant(openedAt, timeZone, 'time')
+                            }
+                            aria-label={`Время поступления, строка ${number}`}
+                          />
+                        </Flex>
+                      </Stack>
+                    </Grid>
+                  );
+                })}
+              </Stack>
             </Stack>
+            <Button
+              variant="secondary"
+              alignSelf={{ base: 'stretch', sm: 'flex-start' }}
+              px="calc({spacing.3} - 1px)"
+              py="calc({spacing.2} - 1px)"
+              onClick={() => {
+                setRows((list) => [...list, { key: next, product: '' }]);
+                setNext((value) => value + 1);
+              }}
+            >
+              <MaskIcon src={plusIcon} size={20} />
+              Добавить строку
+            </Button>
           </Stack>
-          <Button
-            variant="secondary"
-            alignSelf={{ base: 'stretch', sm: 'flex-start' }}
-            px="calc({spacing.3} - 1px)"
-            py="calc({spacing.2} - 1px)"
-            onClick={() => {
-              setRows((list) => [...list, { key: next, product: '' }]);
-              setNext((value) => value + 1);
-            }}
-          >
-            <MaskIcon src={plusIcon} size={20} />
-            Добавить строку
-          </Button>
-        </Stack>
-        <CardFooter>
-          <Text textStyle="caption.default" color="text.secondary">
-            Склад проверит всю форму; при ошибке ничего не записывается.
-          </Text>
-          <Flex
-            direction={{ base: 'column-reverse', sm: 'row' }}
-            gap="3"
-            flexShrink="0"
-          >
-            <ButtonLink variant="secondary" to={path('/warehouse')}>
-              Отменить
-            </ButtonLink>
-            <Button type="submit">Принять поставку</Button>
-          </Flex>
-        </CardFooter>
+          <CardFooter>
+            <Text textStyle="caption.default" color="text.secondary">
+              Склад проверит всю форму; при ошибке ничего не записывается.
+            </Text>
+            <Flex
+              direction={{ base: 'column-reverse', sm: 'row' }}
+              gap="3"
+              flexShrink="0"
+            >
+              <ButtonLink variant="secondary" to={path('/warehouse')}>
+                Отменить
+              </ButtonLink>
+              <Button
+                type="submit"
+                disabled={
+                  productRead.value === undefined || products.length === 0
+                }
+              >
+                {status === 'sending' ? 'Принимаем…' : 'Принять поставку'}
+              </Button>
+            </Flex>
+          </CardFooter>
+        </chakra.fieldset>
+        {status === 'unknown' && (
+          <Button type="submit">Проверить результат</Button>
+        )}
       </SplitCardForm>
     </Stack>
   );

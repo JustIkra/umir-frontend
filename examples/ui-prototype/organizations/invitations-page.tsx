@@ -1,7 +1,7 @@
 import { Text } from '@chakra-ui/react';
 import { useRef, useState } from 'react';
 import { useLoaderData } from 'react-router';
-import { type Organization } from '@/presentation/placeholder-organizations';
+import { type Organization } from '../placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { CancelInvitationDialog } from './cancel-invitation-dialog';
 import { organizationPath } from './format';

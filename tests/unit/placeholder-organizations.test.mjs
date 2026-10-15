@@ -4,7 +4,7 @@ import {
   findOrganization,
   organizations,
   zones,
-} from '../../src/presentation/placeholder-organizations.ts';
+} from '../../examples/ui-prototype/placeholder-organizations.ts';
 
 test('the sample has one administered organization with its members and invitations', () => {
   assert.deepEqual(

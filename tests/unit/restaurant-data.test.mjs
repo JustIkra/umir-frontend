@@ -43,7 +43,11 @@ function fakeReads() {
 
 function setup() {
   const epochs = createEpochRegistry();
-  const models = createModelRegistry({ now: () => 0, epochs });
+  const models = createModelRegistry({
+    now: () => 0,
+    epochs,
+    createCancellation: () => new AbortController(),
+  });
   const fake = fakeReads();
   const data = createRestaurantData(models, fake.reads, R);
   return { epochs, models, data, calls: fake.calls };
@@ -66,12 +70,17 @@ test('subscribing reads the restaurant and records the epoch of each service', a
   data.dish('a/b').subscribe(() => undefined);
   data.suggestion('dish').subscribe(() => undefined);
   await settled();
-  assert.deepEqual(calls, [
-    ['products', R, { background: false }],
-    ['menu', R, { background: false }],
-    ['dish', R, 'a/b', { background: false }],
-    ['suggestID', R, 'dish', { background: false }],
-  ]);
+  assert.deepEqual(
+    calls.map((call) =>
+      call.map((arg) => (arg?.signal ? { background: arg.background } : arg)),
+    ),
+    [
+      ['products', R, { background: false }],
+      ['menu', R, { background: false }],
+      ['dish', R, 'a/b', { background: false }],
+      ['suggestID', R, 'dish', { background: false }],
+    ],
+  );
   assert.equal(epochs.get(R, 'warehouse'), WAREHOUSE);
   assert.equal(epochs.get(R, 'serving'), SERVING);
 });
@@ -101,13 +110,14 @@ test('catalog changes re-read the catalog and the menu; stock changes only the m
   ]);
 });
 
-test('only the recommendations re-read on a tick', async () => {
+test('menu, stop list and recommendations re-read on a tick', async () => {
   const { data, models, calls } = setup();
   data.menu().subscribe(() => undefined);
+  data.stopList().subscribe(() => undefined);
   data.recommendations().subscribe(() => undefined);
   await settled();
   calls.length = 0;
   models.markTime(R);
   await settled();
-  assert.deepEqual(names(calls), ['recommendations']);
+  assert.deepEqual(names(calls), ['menu', 'stopList', 'recommendations']);
 });

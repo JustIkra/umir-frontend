@@ -13,7 +13,6 @@ import {
   createSignInLoader,
 } from './app-shell/gates';
 import { NoRestaurantsPage } from './app-shell/no-restaurants-page';
-import { SectionPage } from './app-shell/pages';
 import {
   PasswordResetCodePage,
   PasswordResetNewPage,
@@ -35,20 +34,7 @@ import {
   PrivacyPolicyPage,
 } from './documents/pages';
 import { LandingPage } from './landing/landing-page';
-import {
-  adminOrganizationLoader,
-  memberLoader,
-  organizationLoader,
-} from './organizations/loaders';
 import { OrdersPage } from './orders/orders-page';
-import { InvitationsPage } from './organizations/invitations-page';
-import { InvitePage } from './organizations/invite-page';
-import { MemberPage } from './organizations/member-page';
-import { NewOrganizationPage } from './organizations/new-organization-page';
-import { OrganizationProfilePage } from './organizations/organization-profile-page';
-import { MembersPage } from './organizations/members-page';
-import { OrganizationPage } from './organizations/organization-page';
-import { OrganizationsPage } from './organizations/organizations-page';
 import { OverviewPage } from './overview/overview-page';
 import { DeliveryPage } from './warehouse/delivery-page';
 import { ExpiryPage } from './warehouse/expiry-page';
@@ -108,18 +94,6 @@ const restaurantRoutes: RouteObject[] = [
       { path: 'products/new', element: <NewProductPage /> },
     ],
   },
-  {
-    path: 'menu',
-    element: <SectionGate section="menu" />,
-    children: [
-      { index: true, element: <SectionPage title="Меню и рекомендации" /> },
-    ],
-  },
-  {
-    path: 'analytics',
-    element: <SectionGate section="analytics" />,
-    children: [{ index: true, element: <SectionPage title="Аналитика" /> }],
-  },
 ];
 
 export function createRoutes(services: PresentationServices): RouteObject[] {
@@ -169,38 +143,6 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
               element: <AppShell />,
               children: [
                 { path: 'settings', element: <AccountSettingsPage /> },
-                { path: 'organizations', element: <OrganizationsPage /> },
-                { path: 'organizations/new', element: <NewOrganizationPage /> },
-                {
-                  path: 'organizations/:org',
-                  loader: organizationLoader,
-                  element: <OrganizationPage />,
-                },
-                {
-                  path: 'organizations/:org/members',
-                  loader: adminOrganizationLoader,
-                  element: <MembersPage />,
-                },
-                {
-                  path: 'organizations/:org/members/:member',
-                  loader: memberLoader,
-                  element: <MemberPage />,
-                },
-                {
-                  path: 'organizations/:org/invitations',
-                  loader: adminOrganizationLoader,
-                  element: <InvitationsPage />,
-                },
-                {
-                  path: 'organizations/:org/invitations/new',
-                  loader: adminOrganizationLoader,
-                  element: <InvitePage />,
-                },
-                {
-                  path: 'organizations/:org/profile',
-                  loader: adminOrganizationLoader,
-                  element: <OrganizationProfilePage />,
-                },
               ],
             },
             {

@@ -2,9 +2,9 @@
   "openapi": "3.1.0",
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
-    "title": "Umir backend public candidate",
-    "version": "2.0.0-draft.2",
-    "description": "C1 candidate for C2 review. Unimplemented. Normative semantics: backend-v2.md. Legacy selected contracts remain unchanged."
+    "title": "Umir FIN1 composed public profile",
+    "version": "2.0.0-FIN.1",
+    "description": "Explicit completion profile on UA1. Original C2 and UA1 artifacts/evidence remain separate."
   },
   "servers": [
     {
@@ -1048,7 +1048,7 @@
         "operationId": "createInvitation",
         "x-owner": "Auth",
         "x-required-capability": "invitation.manage",
-        "description": "See backend-v2.md for atomicity, authorization and outcomes.",
+        "description": "UA1 create-mail atomicity is defined in ../ui-api-amendment.md. Predecessor outcome rules remain in backend-v2.md.",
         "responses": {
           "201": {
             "description": "Typed successful result. Acceptance is not delivery or cleanup completion.",
@@ -1095,6 +1095,88 @@
           {
             "session": [],
             "csrf": []
+          }
+        ],
+        "x-ua1-semantic-change": "Fresh create atomically saves one invitation_link job; legacy exact replay keeps its zero-job result."
+      },
+      "get": {
+        "operationId": "organizationInvitations",
+        "x-owner": "Auth",
+        "x-required-capability": "invitation.manage",
+        "description": "UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md.",
+        "parameters": [
+          {
+            "name": "orgID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityID"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "expired",
+                "revoked",
+                "suppressed",
+                "all"
+              ],
+              "default": "all"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Typed result. Capture time and identity apply to all rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationsPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Existing typed failure rules apply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
           }
         ]
       }
@@ -3790,6 +3872,269 @@
             "example": "44444444-4444-4444-8444-444444444444"
           }
         ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v2/r/{restaurantID}/warehouse/products/{productID}/batches": {
+      "get": {
+        "operationId": "productBatches",
+        "x-owner": "warehouse",
+        "x-required-capability": "stock.read",
+        "description": "UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md.",
+        "parameters": [
+          {
+            "name": "restaurantID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityID"
+            }
+          },
+          {
+            "name": "productID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Typed result. Capture time and identity apply to all rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopedProductBatches"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Existing typed failure rules apply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v2/orgs/{orgID}/members": {
+      "get": {
+        "operationId": "organizationMembers",
+        "x-owner": "Auth",
+        "x-required-capability": "membership.manage",
+        "description": "UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md.",
+        "parameters": [
+          {
+            "name": "orgID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityID"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "revoked",
+                "all"
+              ],
+              "default": "active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Typed result. Capture time and identity apply to all rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembersPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Existing typed failure rules apply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v2/orgs/{orgID}/invitations/{invitationID}/resend-link": {
+      "post": {
+        "operationId": "resendInvitationLink",
+        "x-owner": "Auth",
+        "x-required-capability": "invitation.manage",
+        "description": "UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md.",
+        "parameters": [
+          {
+            "name": "orgID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityID"
+            }
+          },
+          {
+            "name": "invitationID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exactly one link job was durably accepted; not proof of SMTP delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DurableResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Existing typed failure rules apply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/r/{restaurantID}/warehouse/supply-suggestions": {
+      "get": {
+        "operationId": "supplySuggestions",
+        "x-owner": "warehouse",
+        "x-required-capability": "stock.read",
+        "description": "FIN1 semantics and cross-field rules are in ../completion-api-amendment.md.",
+        "parameters": [
+          {
+            "name": "restaurantID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One coherent read-only capture.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopedSupplySuggestions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Existing typed read failure. A failure is not an empty success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
         "security": [
           {
             "session": []
@@ -7576,7 +7921,7 @@
           "permissions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Capability"
+              "$ref": "#/components/schemas/FINCapability"
             },
             "minItems": 1,
             "maxItems": 40,
@@ -9182,7 +9527,7 @@
             "$ref": "#/components/schemas/BusinessContext"
           },
           "result": {
-            "$ref": "#/components/schemas/Recommendations"
+            "$ref": "#/components/schemas/FINRecommendations"
           }
         }
       },
@@ -10267,7 +10612,7 @@
             "$ref": "#/components/schemas/ServingContext"
           },
           "result": {
-            "$ref": "#/components/schemas/Recommendations"
+            "$ref": "#/components/schemas/FINRecommendations"
           }
         }
       },
@@ -10551,6 +10896,697 @@
             },
             "description": "Readiness for one explicit restaurant and service, bound to lifecycleVersion and exact peer epoch. Registry envelope restaurantID and runtime route restaurantID must agree with this value."
           }
+        ]
+      },
+      "PositiveBatch": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BatchV2"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "remainingQuantity": {
+                "$ref": "#/components/schemas/PositiveQuantity"
+              }
+            }
+          }
+        ]
+      },
+      "ProductBatchRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "batch",
+          "baseUnit",
+          "status"
+        ],
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/PositiveBatch"
+          },
+          "baseUnit": {
+            "$ref": "#/components/schemas/BaseUnit"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "pending_writeoff"
+            ]
+          }
+        }
+      },
+      "ProductBatchPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "productID",
+          "evaluatedAt",
+          "page",
+          "items"
+        ],
+        "properties": {
+          "productID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "evaluatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageIdentity"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/ProductBatchRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "ScopedProductBatches": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "result"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/BusinessContext"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ProductBatchPage"
+          }
+        }
+      },
+      "AuthPageIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "orgID",
+          "readerEpoch",
+          "aggregateRevision",
+          "evaluatedAt"
+        ],
+        "properties": {
+          "orgID": {
+            "$ref": "#/components/schemas/EntityID"
+          },
+          "readerEpoch": {
+            "$ref": "#/components/schemas/Epoch"
+          },
+          "aggregateRevision": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "evaluatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        }
+      },
+      "MemberContact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "membership",
+          "displayName",
+          "email"
+        ],
+        "properties": {
+          "membership": {
+            "$ref": "#/components/schemas/Membership"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "email": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Email"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MembersPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "items"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/AuthPageIdentity"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/MemberContact"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "InvitationListRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invitation",
+          "linkDelivery",
+          "resendAllowed"
+        ],
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/Invitation"
+          },
+          "linkDelivery": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MailJob"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resendAllowed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InvitationsPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "items"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/AuthPageIdentity"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/InvitationListRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "FINDecimal": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]*)\\.[0-9]{6}$",
+        "maxLength": 64,
+        "description": "Finite nonnegative display decimal, exactly six places. Exact policy arithmetic precedes wire rounding."
+      },
+      "FINWindow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "days"
+        ],
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "days": {
+            "type": "integer",
+            "const": 7
+          }
+        }
+      },
+      "FINPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "historyDays",
+          "coverageThresholdDays",
+          "targetDays"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "FIN1"
+          },
+          "historyDays": {
+            "type": "integer",
+            "const": 7
+          },
+          "coverageThresholdDays": {
+            "type": "integer",
+            "const": 3
+          },
+          "targetDays": {
+            "type": "integer",
+            "const": 7
+          }
+        }
+      },
+      "FINSupplyRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "productID",
+          "productName",
+          "baseUnit",
+          "availableQuantity",
+          "consumedQuantity",
+          "averageDailyBaseUnits",
+          "coverageDays",
+          "onePortionDeficit",
+          "suggestedQuantity",
+          "blockedDishIDs",
+          "reasons"
+        ],
+        "properties": {
+          "productID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "productName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseUnit": {
+            "$ref": "#/components/schemas/BaseUnit"
+          },
+          "availableQuantity": {
+            "$ref": "#/components/schemas/Quantity"
+          },
+          "consumedQuantity": {
+            "$ref": "#/components/schemas/Quantity"
+          },
+          "averageDailyBaseUnits": {
+            "$ref": "#/components/schemas/FINDecimal"
+          },
+          "coverageDays": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FINDecimal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "onePortionDeficit": {
+            "$ref": "#/components/schemas/Quantity"
+          },
+          "suggestedQuantity": {
+            "$ref": "#/components/schemas/PositiveQuantity"
+          },
+          "blockedDishIDs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 0,
+            "maxItems": 500,
+            "uniqueItems": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "low_coverage",
+                "stop_list_deficit"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true
+          }
+        }
+      },
+      "FINSupplySuggestions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evaluatedAt",
+          "stateVersion",
+          "policy",
+          "window",
+          "coverage",
+          "items"
+        ],
+        "properties": {
+          "evaluatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "stateVersion": {
+            "$ref": "#/components/schemas/NonNegativeInt64"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/FINPolicy"
+          },
+          "window": {
+            "$ref": "#/components/schemas/FINWindow"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FINSupplyRow"
+            },
+            "minItems": 0,
+            "maxItems": 500
+          }
+        }
+      },
+      "ScopedSupplySuggestions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "result"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/BusinessContext"
+          },
+          "result": {
+            "$ref": "#/components/schemas/FINSupplySuggestions"
+          }
+        }
+      },
+      "FINRiskBatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "productID",
+          "productName",
+          "batchID",
+          "remainingQuantity",
+          "baseUnit",
+          "expiresAt",
+          "remainingSeconds"
+        ],
+        "properties": {
+          "productID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "productName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batchID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "remainingQuantity": {
+            "$ref": "#/components/schemas/PositiveQuantity"
+          },
+          "baseUnit": {
+            "$ref": "#/components/schemas/BaseUnit"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "remainingSeconds": {
+            "$ref": "#/components/schemas/NonNegativeInt64"
+          }
+        }
+      },
+      "FINDishDemand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dishID",
+          "portions"
+        ],
+        "properties": {
+          "dishID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "portions": {
+            "$ref": "#/components/schemas/PositiveInt64"
+          }
+        }
+      },
+      "FINRecommendationInputs": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evaluatedAt",
+          "stateVersion",
+          "horizonHours",
+          "window",
+          "coverage",
+          "menu",
+          "riskBatches",
+          "demand"
+        ],
+        "properties": {
+          "evaluatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "stateVersion": {
+            "$ref": "#/components/schemas/NonNegativeInt64"
+          },
+          "horizonHours": {
+            "type": "integer",
+            "const": 72
+          },
+          "window": {
+            "$ref": "#/components/schemas/FINWindow"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "menu": {
+            "$ref": "#/components/schemas/WMenuEvaluation"
+          },
+          "riskBatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FINRiskBatch"
+            },
+            "minItems": 0,
+            "maxItems": 10000
+          },
+          "demand": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FINDishDemand"
+            },
+            "minItems": 0,
+            "maxItems": 10000
+          }
+        }
+      },
+      "ScopedRecommendationInputs": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "result"
+        ],
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/BusinessContext"
+          },
+          "result": {
+            "$ref": "#/components/schemas/FINRecommendationInputs"
+          }
+        }
+      },
+      "FINRecommendationReason": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "productID",
+          "productName",
+          "batchID",
+          "quantityPerPortion",
+          "riskQuantity",
+          "targetPortions",
+          "baseUnit",
+          "expiresAt",
+          "remainingSeconds"
+        ],
+        "properties": {
+          "productID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "productName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batchID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "quantityPerPortion": {
+            "$ref": "#/components/schemas/PositiveQuantity"
+          },
+          "riskQuantity": {
+            "$ref": "#/components/schemas/PositiveQuantity"
+          },
+          "targetPortions": {
+            "$ref": "#/components/schemas/PositiveInt64"
+          },
+          "baseUnit": {
+            "$ref": "#/components/schemas/BaseUnit"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "remainingSeconds": {
+            "$ref": "#/components/schemas/NonNegativeInt64"
+          }
+        }
+      },
+      "FINRecommendation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dishID",
+          "dishName",
+          "score",
+          "demandBasis",
+          "priorityExpiresAt",
+          "reasons"
+        ],
+        "properties": {
+          "dishID": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "dishName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "score": {
+            "$ref": "#/components/schemas/FINDecimal"
+          },
+          "demandBasis": {
+            "type": "string",
+            "enum": [
+              "history",
+              "fallback"
+            ]
+          },
+          "priorityExpiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FINRecommendationReason"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        }
+      },
+      "FINRecommendations": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evaluatedAt",
+          "stateVersion",
+          "policyVersion",
+          "horizonHours",
+          "window",
+          "coverage",
+          "items"
+        ],
+        "properties": {
+          "evaluatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "stateVersion": {
+            "$ref": "#/components/schemas/NonNegativeInt64"
+          },
+          "policyVersion": {
+            "type": "string",
+            "const": "FIN1"
+          },
+          "horizonHours": {
+            "type": "integer",
+            "const": 72
+          },
+          "window": {
+            "$ref": "#/components/schemas/FINWindow"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FINRecommendation"
+            },
+            "minItems": 0,
+            "maxItems": 10
+          }
+        }
+      },
+      "FINCapability": {
+        "type": "string",
+        "enum": [
+          "catalog.read",
+          "catalog.write",
+          "stock.read",
+          "delivery.create",
+          "analytics.read",
+          "writeoff.confirm",
+          "menu.read",
+          "recommendations.read",
+          "order.prepare",
+          "order.confirm",
+          "order.read",
+          "feedback.submit",
+          "org.read",
+          "org.settings.write",
+          "restaurant.create",
+          "restaurant.delete",
+          "org.delete",
+          "membership.manage",
+          "invitation.manage",
+          "org.summary.read",
+          "runtime.register",
+          "runtime.close",
+          "expiry.due",
+          "consumer.menu.evaluate",
+          "consumer.order.evaluate",
+          "consumer.order.commit",
+          "consumer.order.resolve",
+          "feedback.anonymous.submit",
+          "feedback.read",
+          "feedback.export",
+          "consumer.recommendations.read"
         ]
       }
     },
@@ -10844,5 +11880,20 @@
       "feedback.read",
       "feedback.export"
     ]
+  },
+  "x-ua1-source": {
+    "backend-v2-public.json": "e710150288d650965cfee80b7cb623f5466583c03da9edf5561f94d127970897",
+    "backend-v2-private.json": "f1a46a199c5c616523ff24ed0c43a0ae92b43edd93e1264a854fd766030aa1c1",
+    "ui-amendment-v1-public.json": "7d18daa682846059b599b04f6bf85c96040ad6c409d33909a8c0ccce2c9c49be",
+    "ui-amendment-v1-private.json": "432dce1c4619bd5038db51f54df266e5607a464b22c27581604b58025fddf55c"
+  },
+  "x-fin-source": {
+    "ui-amendment-v1-composed-public.json": "f1be4d340fcc609ff6429bfe509836afbe0040337e5f7c22702b90bd46063298",
+    "ui-amendment-v1-composed-private.json": "1b7e5d531e15b44f477a980f90abb72ed15b5b77168375569be1849121df7d05",
+    "completion-v1-public.json": "c37c963fe03d91575261eb3646a9b182c9d7a8a3c21aa6a92c1d431c24fb3720",
+    "completion-v1-private.json": "65b5d5500c858f69893efe71f8c661360f73c468decef84e0d591b0569559596"
+  },
+  "x-fin-policy-transition": {
+    "recommendations": "FIN1 replaces the predecessor ranking and strict result shape; preserve historical C2 inputs/results."
   }
 }

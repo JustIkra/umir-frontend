@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import { filterWorkplaces } from '../../src/presentation/app-shell/workplaces.ts';
-import { organizations } from '../../src/presentation/placeholder-organizations.ts';
+import { organizations } from '../../examples/ui-prototype/placeholder-organizations.ts';
 import { readyAccess } from './support/render-route.mjs';
 
 const names = (list) =>

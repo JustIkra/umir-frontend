@@ -1,5 +1,5 @@
 import { Flex, Stack, Text } from '@chakra-ui/react';
-import { type Member } from '@/presentation/placeholder-organizations';
+import { type Member } from '../placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { ListCard } from '@/presentation/ui/card';
 import { rem } from '@/presentation/ui/units';

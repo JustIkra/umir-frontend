@@ -15,9 +15,6 @@ export function NoRestaurants({ onRefresh }: { onRefresh: () => void }) {
       title="Нет доступных ресторанов"
       actions={
         <>
-          <ButtonLink to="/app/organizations/new">
-            Создать предприятие
-          </ButtonLink>
           <Button variant="secondary" onClick={onRefresh}>
             Обновить список
           </Button>
@@ -25,8 +22,7 @@ export function NoRestaurants({ onRefresh }: { onRefresh: () => void }) {
       }
     >
       Учётная запись не связана ни с одним рестораном. Доступ предоставляет
-      администратор организации: приглашение приходит на почту. Также можно
-      создать собственное предприятие.
+      администратор организации: приглашение приходит на почту.
     </StateCard>
   );
 }

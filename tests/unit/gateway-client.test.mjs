@@ -9,6 +9,27 @@ const json = (status, body) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+test('a scoped read passes cancellation to the actual fetch', async () => {
+  const controller = new AbortController();
+  let signal;
+  const client = createGatewayClient(
+    (_url, init) =>
+      new Promise((_resolve, reject) => {
+        signal = init.signal;
+        signal.addEventListener('abort', () => reject(new Error('aborted')), {
+          once: true,
+        });
+      }),
+  );
+  const pending = client.read('/api/v2/r/scoped/warehouse/inventory', {
+    background: true,
+    signal: controller.signal,
+  });
+  controller.abort();
+  assert.equal((await failureOf(pending)).code, 'Transport');
+  assert.equal(signal, controller.signal);
+});
+
 const refusal = (status, code, outcome, extra = {}) =>
   json(status, { code, outcome, message: code, retryable: false, ...extra });
 

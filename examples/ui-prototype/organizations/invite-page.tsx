@@ -4,7 +4,7 @@ import { PageHeader } from '@/presentation/app-shell/pages';
 import {
   inviteValidity,
   type Organization,
-} from '@/presentation/placeholder-organizations';
+} from '../placeholder-organizations';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { CardForm } from '@/presentation/ui/card';
 import {

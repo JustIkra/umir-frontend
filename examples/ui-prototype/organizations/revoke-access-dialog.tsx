@@ -1,10 +1,7 @@
 import { Text, chakra } from '@chakra-ui/react';
 import type { RefObject } from 'react';
 import { useNavigate } from 'react-router';
-import {
-  type Member,
-  type Organization,
-} from '@/presentation/placeholder-organizations';
+import { type Member, type Organization } from '../placeholder-organizations';
 import { Button } from '@/presentation/ui/actions';
 import { ModalPanel } from '@/presentation/ui/dialog';
 import { organizationPath } from './format';

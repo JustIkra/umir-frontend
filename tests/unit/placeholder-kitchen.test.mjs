@@ -3,12 +3,12 @@ import { test } from 'bun:test';
 import {
   findProduct,
   products,
-} from '../../src/presentation/placeholder-catalog.ts';
-import { overview } from '../../src/presentation/placeholder-orders.ts';
+} from '../../examples/ui-prototype/placeholder-catalog.ts';
+import { overview } from '../../examples/ui-prototype/placeholder-orders.ts';
 import {
   history,
   stock,
-} from '../../src/presentation/placeholder-warehouse.ts';
+} from '../../examples/ui-prototype/placeholder-warehouse.ts';
 
 test('the delivery products sample is unique and findable', () => {
   assert.equal(products.length, 32);

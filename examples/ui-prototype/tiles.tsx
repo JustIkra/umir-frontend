@@ -7,7 +7,7 @@ import clockIcon from '@/presentation/assets/icons/clock-24.svg';
 import menuIcon from '@/presentation/assets/icons/menu-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import warehouseIcon from '@/presentation/assets/icons/warehouse-24.svg';
-import { overview } from '@/presentation/placeholder-orders';
+import { overview } from './placeholder-orders';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { MaskIcon } from '@/presentation/ui/icon';

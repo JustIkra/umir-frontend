@@ -1,7 +1,7 @@
 import { Stack } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import { type Organization } from '@/presentation/placeholder-organizations';
+import { type Organization } from '../placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { TabNav } from '@/presentation/ui/tab-nav';
 import { rem } from '@/presentation/ui/units';

@@ -99,6 +99,8 @@ export interface ReasonRow {
   readonly title: string;
   readonly perPortion: string;
   readonly expires: string;
+  readonly risk: string;
+  readonly target: string;
 }
 
 export interface RecommendationRow {
@@ -106,6 +108,7 @@ export interface RecommendationRow {
   readonly dishID: string;
   readonly name: string;
   readonly nearest: string;
+  readonly demand: string;
   readonly reasons: readonly ReasonRow[];
 }
 
@@ -121,11 +124,17 @@ export function recommendationRows(
     rank: index + 1,
     dishID: item.dishID,
     name: item.dishName,
-    nearest: `Ближайший срок партий одной порции — ${dateTime(item.priorityExpiresAt.epochMs, timeZone)}. ${item.reasons.length === 1 ? 'Причина:' : 'Причины:'}`,
+    nearest: `Ближайший срок риска — ${dateTime(item.priorityExpiresAt.epochMs, timeZone)}.`,
+    demand:
+      item.demandBasis === 'history'
+        ? 'Спрос по полной истории 7 дней'
+        : 'Спрос без полной истории: ориентир 2 порции/ч',
     reasons: item.reasons.map((reason) => ({
       title: `${reason.productName} · партия ${reason.batchID}`,
       perPortion: `${formatQuantity(reason.quantityPerPortion, reason.baseUnit)} на порцию`,
       expires: `Срок до ${dateTime(reason.expiresAt.epochMs, timeZone)}`,
+      risk: `Под риском ${formatQuantity(reason.riskQuantity, reason.baseUnit)}`,
+      target: `Ориентир: ${reason.targetPortions} порц. для этого количества`,
     })),
   }));
 }

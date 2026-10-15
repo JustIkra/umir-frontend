@@ -200,6 +200,7 @@ function OrdersView({ flow }: { flow: OrderFlow }) {
       panel = (
         <PlacedOrder
           order={phase.order}
+          warehouseEpoch={phase.context.warehouseEpoch}
           names={names}
           timeZone={timeZone}
           onNew={edit}

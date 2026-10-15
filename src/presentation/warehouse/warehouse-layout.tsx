@@ -2,7 +2,7 @@ import { Flex, Stack } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useRestaurantPath } from '@/presentation/app-shell/paths';
-import { placeholderAccount } from '@/presentation/placeholder-account';
+import { useSectionDate } from '@/presentation/app-shell/section-date';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { EvaluationStamp } from '@/presentation/ui/evaluation-stamp';
 import { TabNav } from '@/presentation/ui/tab-nav';
@@ -19,11 +19,12 @@ export function WarehouseLayout({
   children: ReactNode;
 }) {
   const path = useRestaurantPath();
+  const caption = useSectionDate();
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <PageHeader
         title="Склад"
-        caption={placeholderAccount.today}
+        caption={caption}
         documentTitle={`${section} · Склад`}
         action={
           <ButtonLink to={path('/warehouse/delivery')}>

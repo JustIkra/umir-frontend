@@ -234,6 +234,22 @@ export function fakeServices({
       menu: () => staticModel(data.menu ?? loadingRead),
       stopList: () => staticModel(data.stopList ?? loadingRead),
       recommendations: () => staticModel(data.recommendations ?? loadingRead),
+      inventory: () => staticModel(data.inventory ?? loadingRead),
+      productBatches: () => staticModel(data.productBatches ?? loadingRead),
+      pendingWriteoffs: () => staticModel(data.pendingWriteoffs ?? loadingRead),
+      expiringBatches: () => staticModel(data.expiringBatches ?? loadingRead),
+      history: () => staticModel(data.history ?? loadingRead),
+      supplySuggestions: () =>
+        staticModel(data.supplySuggestions ?? loadingRead),
+    }),
+    warehouseCommands: () => ({
+      receiveDelivery: () =>
+        Promise.reject(new Error('no commands in render tests')),
+      pendingDelivery: () => undefined,
+      pendingDeliveryTimeZone: () => undefined,
+      confirmWriteoff: () =>
+        Promise.reject(new Error('no commands in render tests')),
+      pendingWriteoff: () => false,
     }),
     catalogCommands: () => ({
       registerProduct: () =>

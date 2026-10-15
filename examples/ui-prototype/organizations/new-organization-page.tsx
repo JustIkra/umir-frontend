@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { useNavigate } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import { zones } from '@/presentation/placeholder-organizations';
+import { zones } from '../placeholder-organizations';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { CardForm } from '@/presentation/ui/card';
 import {

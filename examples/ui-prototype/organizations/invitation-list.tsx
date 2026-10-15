@@ -3,7 +3,7 @@ import { useId } from 'react';
 import {
   type Invitation,
   type InvitationStatus,
-} from '@/presentation/placeholder-organizations';
+} from '../placeholder-organizations';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { ListCard } from '@/presentation/ui/card';

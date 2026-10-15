@@ -1,5 +1,5 @@
 import { Flex, Stack, Text } from '@chakra-ui/react';
-import { type Restaurant } from '@/presentation/placeholder-organizations';
+import { type Restaurant } from '../placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { rolesLine } from './format';

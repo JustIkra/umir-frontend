@@ -121,7 +121,7 @@ const pages = [
   [
     `/app/r/${R}/warehouse/delivery`,
     'Приём поставки',
-    ['Номер поставки', 'Дата и время создания поставки (Москва, UTC+3)'],
+    ['Номер поставки', 'Дата и время создания поставки'],
   ],
   [`/app/r/${R}/catalog`, 'Справочники', [], catalogData],
   [`/app/r/${R}/catalog/dishes`, 'Справочники', [], catalogData],
@@ -137,54 +137,10 @@ const pages = [
     ['Название', 'Код продукта', 'граммы, г', 'миллилитры, мл', 'штуки, шт'],
   ],
   [`/app/r/${R}/catalog/dishes/new`, 'Новое блюдо', ['Название', 'Код блюда']],
-  [`/app/r/${R}/menu`, 'Меню и рекомендации', []],
-  [`/app/r/${R}/analytics`, 'Аналитика', []],
   [
     '/app/settings',
     'Учётная запись',
     ['Текущий пароль', 'Новый пароль', 'Повторите новый пароль'],
-  ],
-  ['/app/organizations', 'Организации и рестораны', []],
-  [
-    '/app/organizations/yug',
-    'Сеть ресторанов Южного федерального округа',
-    ['Название ресторана'],
-  ],
-  ['/app/organizations/vostok-food', 'Восток Фуд', []],
-  ['/app/organizations/vostok-food-europe', 'Восток Фуд Европа', []],
-  [
-    '/app/organizations/yug/members',
-    'Сеть ресторанов Южного федерального округа',
-    [],
-  ],
-  [
-    '/app/organizations/yug/members/i-kovaleva',
-    'Ирина Ковалёва',
-    ['Склад', 'Официант'],
-  ],
-  [
-    '/app/organizations/yug/invitations',
-    'Сеть ресторанов Южного федерального округа',
-    [],
-  ],
-  [
-    '/app/organizations/yug/invitations/new',
-    'Пригласить участника',
-    ['Почта', 'Склад', 'Официант'],
-  ],
-  [
-    '/app/organizations/yug/profile',
-    'Сеть ресторанов Южного федерального округа',
-    ['Часовой пояс организации'],
-  ],
-  [
-    '/app/organizations/new',
-    'Создать предприятие',
-    [
-      'Название организации',
-      'Название первого ресторана',
-      'Часовой пояс организации',
-    ],
   ],
   ['/app/no-restaurants', 'Нет доступных ресторанов', []],
 ];
@@ -209,15 +165,6 @@ test('internal links lead to existing pages', async () => {
     '/app',
     `/app/r/${R}`,
     '/app/settings',
-    '/app/organizations',
-    '/app/organizations/yug',
-    '/app/organizations/vostok-food',
-    '/app/organizations/yug/members',
-    '/app/organizations/yug/members/i-kovaleva',
-    '/app/organizations/yug/invitations',
-    '/app/organizations/yug/invitations/new',
-    '/app/organizations/yug/profile',
-    '/app/organizations/new',
     '/app/no-restaurants',
     `/app/r/${R}/orders`,
     `/app/r/${R}/warehouse`,
@@ -304,51 +251,20 @@ test('the landing opens the app through sign-in', async () => {
 
 const notFound = 'Страница не найдена';
 
-test('unknown ids show the 404 page', async () => {
+test('unimplemented prototype routes do not expose sample data', async () => {
   for (const path of [
-    '/app/organizations/nobody',
-    '/app/organizations/nobody/members',
+    '/app/organizations',
+    '/app/organizations/yug',
+    '/app/organizations/yug/members',
+    '/app/organizations/yug/members/i-kovaleva',
+    '/app/organizations/yug/invitations',
+    '/app/organizations/yug/invitations/new',
+    '/app/organizations/yug/profile',
+    '/app/organizations/new',
+    `/app/r/${R}/menu`,
+    `/app/r/${R}/analytics`,
   ])
     assert.equal(h1(await renderRoute(path)), notFound, path);
-});
-
-test('the administrator sees organization tabs, a staff member does not', async () => {
-  const admin = hrefs(await renderRoute('/app/organizations/yug'));
-  for (const tab of ['', '/members', '/invitations', '/profile'])
-    assert.ok(admin.includes(`/app/organizations/yug${tab}`), `tab ${tab}`);
-  const staff = hrefs(await renderRoute('/app/organizations/vostok-food'));
-  assert.ok(!staff.includes('/app/organizations/vostok-food/members'));
-});
-
-test('organization pages leave the sidebar without a current item', async () => {
-  const current = (html) => html.match(/aria-current="page"/g)?.length ?? 0;
-  assert.equal(current(await renderRoute('/app/organizations')), 0);
-  assert.equal(current(await renderRoute('/app/organizations/yug')), 1);
-});
-
-test('staff and admin ids outside the sample show 404', async () => {
-  for (const path of [
-    '/app/organizations/vostok-food/members',
-    '/app/organizations/yug/members/m-belova',
-    '/app/organizations/yug/members/nobody',
-    '/app/organizations/vostok-food/profile',
-  ])
-    assert.equal(h1(await renderRoute(path)), notFound, path);
-});
-
-test('the member page checks the sample roles', async () => {
-  const html = await renderRoute('/app/organizations/yug/members/i-kovaleva');
-  assert.equal(
-    html.match(/<input[^>]*type="checkbox"[^>]*checked/g)?.length,
-    3,
-  );
-});
-
-test('invitation actions follow the status', async () => {
-  const html = await renderRoute('/app/organizations/yug/invitations');
-  // Three pending rows and the submit button of the closed CX01 dialog.
-  assert.equal(html.match(/>Отменить приглашение</g)?.length, 3 + 1);
-  assert.equal(html.match(/>Пригласить повторно</g)?.length, 3);
 });
 
 const OTHER = '55555555-5555-4555-8555-555555555555';
@@ -389,10 +305,10 @@ const sectionLinks = (html) =>
       '',
   );
 
-test('the account menu lists workplaces and leads to organizations', async () => {
+test('the account menu lists real workplaces without prototype management links', async () => {
   const html = await renderRoute(`/app/r/${R}`, { access: twoOrganizations });
   const menu = accountMenu(html);
-  assert.ok(hrefs(menu).includes('/app/organizations'));
+  assert.ok(!hrefs(menu).some((path) => path.startsWith('/app/organizations')));
   assert.ok(menu.includes('Найти ресторан'));
   assert.equal(menu.match(/aria-current="true"/g)?.length, 1);
   assert.match(text(menu), /Марина Белова/);
@@ -409,7 +325,7 @@ test('without restaurants the shell has no sections and no workplaces', async ()
   });
   assert.ok(!hrefs(html).includes(`/app/r/${R}/orders`));
   assert.ok(!html.includes('Рабочее место'));
-  assert.ok(hrefs(html).includes('/app/organizations/new'));
+  assert.ok(!hrefs(html).includes('/app/organizations/new'));
 });
 
 test('an organization without restaurants adds no workplaces (W13)', async () => {
@@ -430,7 +346,7 @@ test('an organization without restaurants adds no workplaces (W13)', async () =>
 });
 
 test('outside a restaurant the menu marks no restaurant current', async () => {
-  for (const path of ['/app/settings', '/app/organizations']) {
+  for (const path of ['/app/settings']) {
     const menu = accountMenu(await renderRoute(path));
     assert.ok(menu.includes('Найти ресторан'), path);
     assert.equal(menu.match(/aria-current="true"/g)?.length ?? 0, 0, path);
@@ -464,18 +380,13 @@ test('section pages keep their sidebar item current', async () => {
   );
 });
 
-test('the warehouse shows the sample stock, expiry and history', async () => {
-  const stockHtml = await renderRoute(`/app/r/${R}/warehouse`);
-  assert.ok(stockHtml.includes('P-0158'));
-  assert.ok(hrefs(stockHtml).includes(`/app/r/${R}/warehouse/delivery`));
-  assert.ok(
-    (await renderRoute(`/app/r/${R}/warehouse/expiry`)).includes(
-      'через 20 ч 38 мин',
-    ),
-  );
-  assert.ok(
-    (await renderRoute(`/app/r/${R}/warehouse/history`)).includes('#1057'),
-  );
+test('warehouse pages wait for their real reads without sample figures', async () => {
+  for (const suffix of ['', '/expiry', '/history']) {
+    const html = await renderRoute(`/app/r/${R}/warehouse${suffix}`);
+    assert.equal(h1(html), 'Склад');
+    assert.doesNotMatch(text(html), /P-0158|#1057|через 20 ч 38 мин/);
+    assert.match(text(html), /Получаем данные/);
+  }
 });
 
 test('the order flow goes from the menu to the placed order', async () => {
@@ -527,6 +438,7 @@ test('the order flow goes from the menu to the placed order', async () => {
     order: orderSnapshot({
       phase: {
         kind: 'confirmed',
+        context: { warehouseEpoch: '44444444-4444-4444-8444-444444444444' },
         afterCheck: false,
         order: {
           orderID: 'ord-20261010-0042',
@@ -542,20 +454,18 @@ test('the order flow goes from the menu to the placed order', async () => {
   assert.ok(hrefs(placed).includes(`/app/r/${R}/warehouse/history`));
 });
 
-test('overview tiles lead into the sections', async () => {
-  const links = hrefs(await renderRoute('/app'));
+test('overview links lead to implemented sections without sample totals', async () => {
+  const html = await renderRoute('/app');
+  const links = hrefs(html);
   for (const path of [
     `/app/r/${R}/orders`,
     `/app/r/${R}/warehouse`,
-    `/app/r/${R}/warehouse/delivery`,
-    `/app/r/${R}/warehouse/history`,
-    `/app/r/${R}/warehouse/expiry`,
-    `/app/r/${R}/catalog/products/new`,
-    `/app/r/${R}/catalog/dishes/new`,
-    `/app/r/${R}/menu`,
-    `/app/r/${R}/analytics`,
+    `/app/r/${R}/catalog`,
   ])
     assert.ok(links.includes(path), path);
+  assert.ok(!links.includes(`/app/r/${R}/menu`));
+  assert.ok(!links.includes(`/app/r/${R}/analytics`));
+  assert.doesNotMatch(text(html), /Тальятелле|Масло трюфельное/);
 });
 
 test('a guest is sent to sign-in with the return address', async () => {
@@ -723,11 +633,7 @@ test('the shell follows another user and the roles of the restaurant', async () 
   assert.match(text(accountMenu(html)), /i\.kovaleva/);
   assert.match(text(html), /На Тургеневской · Официант/);
   assert.ok(html.includes('aria-label="Учётная запись: Ирина Ковалёва"'));
-  assert.deepEqual(sectionLinks(html), [
-    `/app/r/${R}`,
-    `/app/r/${R}/orders`,
-    `/app/r/${R}/menu`,
-  ]);
+  assert.deepEqual(sectionLinks(html), [`/app/r/${R}`, `/app/r/${R}/orders`]);
 });
 
 test('pages outside a restaurant without restaurants mark no section current', async () => {
@@ -808,10 +714,7 @@ test('W12: the overview names the missing section between the header and the til
     'Раздел «Склад» недоступен в ресторане «На Пушкинской»',
   );
   // «Собрать заказ» is the header action; the warehouse tile follows.
-  assert.ok(
-    notice > page.indexOf('Собрать заказ'),
-    'the notice follows the header',
-  );
+  assert.ok(notice > page.indexOf('Обзор'), 'the notice follows the header');
   assert.ok(
     html.indexOf('недоступен в ресторане') <
       html.indexOf(`href="/app/r/${R}/warehouse"`),

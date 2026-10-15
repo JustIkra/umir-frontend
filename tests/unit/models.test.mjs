@@ -7,6 +7,34 @@ const R = '33333333-3333-4333-8333-333333333333';
 const Q = '55555555-5555-4555-8555-555555555555';
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+test('clearing models aborts pending reads and refuses late epoch observations', async () => {
+  const epochs = createEpochRegistry();
+  const models = registry(epochs);
+  let finish;
+  let signal;
+  const read = models.scoped(
+    {
+      restaurantID: R,
+      resource: 'stock',
+      service: 'warehouse',
+      topics: ['stock'],
+    },
+    (options) => {
+      signal = options.signal;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  );
+  read.subscribe(() => undefined);
+  models.clear();
+  finish({ context: { runtimeEpoch: Q }, result: {} });
+  await settled();
+  assert.equal(epochs.get(R, 'warehouse'), undefined);
+  assert.equal(read.getSnapshot().value, undefined);
+  assert.equal(signal.aborted, true);
+});
+
 function counter(value = 'v') {
   const loader = {
     calls: 0,
@@ -19,7 +47,11 @@ function counter(value = 'v') {
 }
 
 const registry = (epochs = createEpochRegistry()) =>
-  createModelRegistry({ now: () => 0, epochs });
+  createModelRegistry({
+    now: () => 0,
+    epochs,
+    createCancellation: () => new AbortController(),
+  });
 
 const watch = (models, key, loader) =>
   models.model(key, loader.load).subscribe(() => undefined);

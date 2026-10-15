@@ -4,6 +4,7 @@ import {
   createReadModel,
   type LoadOptions,
   type ReadModel,
+  type ReadCancellation,
 } from './read-model';
 
 export interface ModelKey {
@@ -52,9 +53,11 @@ interface Entry {
 export function createModelRegistry({
   now,
   epochs,
+  createCancellation,
 }: {
   readonly now: () => number;
   readonly epochs: EpochRegistry;
+  readonly createCancellation: () => ReadCancellation;
 }): ModelRegistry {
   const entries = new Map<string, Entry>();
   const listeners = new Set<() => void>();
@@ -93,6 +96,7 @@ export function createModelRegistry({
     const created = createReadModel(load, {
       refreshOnTick: key.refreshOnTick ?? false,
       now,
+      createCancellation,
     });
     entries.set(idOf(key), { key, model: created });
     return created;
@@ -104,6 +108,7 @@ export function createModelRegistry({
       const id = idOf(key);
       return model(key, async (options) => {
         const envelope = await load(options);
+        if (options.signal?.aborted === true) throw new Error('Read cancelled');
         const change = epochs.record(
           key.restaurantID,
           key.service,
@@ -149,6 +154,7 @@ export function createModelRegistry({
       if (notice) setNotice(undefined);
     },
     clear() {
+      for (const entry of entries.values()) entry.model.dispose();
       entries.clear();
       setNotice(undefined);
     },

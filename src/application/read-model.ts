@@ -4,6 +4,12 @@ export interface LoadOptions {
   // True when a live signal or tick caused the read; the request then sends
   // X-Umir-Activity: background and does not extend the session.
   readonly background: boolean;
+  readonly signal?: AbortSignal | undefined;
+}
+
+export interface ReadCancellation {
+  readonly signal: AbortSignal;
+  abort(): void;
 }
 
 export interface ReadModelSnapshot<T> {
@@ -25,12 +31,14 @@ export interface ReadModel<T> extends StaleTarget {
   // A read the operator caused. It starts at once and supersedes the request
   // in flight.
   refresh(): void;
+  dispose(): void;
 }
 
 export interface ReadModelOptions {
   // Re-read on every tick, for models that depend on the current time.
   readonly refreshOnTick: boolean;
   readonly now: () => number;
+  readonly createCancellation: () => ReadCancellation;
 }
 
 // Data of one view. Only the response to the latest request is applied: the
@@ -39,7 +47,7 @@ export interface ReadModelOptions {
 // subscription.
 export function createReadModel<T>(
   load: (options: LoadOptions) => Promise<T>,
-  { refreshOnTick, now }: ReadModelOptions,
+  { refreshOnTick, now, createCancellation }: ReadModelOptions,
 ): ReadModel<T> {
   const listeners = new Set<() => void>();
   let snapshot: ReadModelSnapshot<T> = {
@@ -51,6 +59,8 @@ export function createReadModel<T>(
   };
   let latest = 0;
   let stale = true;
+  let disposed = false;
+  let active: ReadCancellation | undefined;
 
   function update(next: ReadModelSnapshot<T>): void {
     snapshot = next;
@@ -58,11 +68,15 @@ export function createReadModel<T>(
   }
 
   function start(background: boolean): void {
+    if (disposed) return;
+    active?.abort();
+    active = createCancellation();
+    const signal = active.signal;
     latest += 1;
     const request = latest;
     stale = false;
     update({ ...snapshot, loading: true });
-    load({ background }).then(
+    load({ background, signal }).then(
       (value) => {
         settle(request, {
           value,
@@ -84,7 +98,8 @@ export function createReadModel<T>(
   }
 
   function settle(request: number, next: ReadModelSnapshot<T>): void {
-    if (request !== latest) return;
+    if (disposed || request !== latest) return;
+    active = undefined;
     update(next);
     if (stale && listeners.size > 0) start(true);
   }
@@ -95,6 +110,14 @@ export function createReadModel<T>(
       if (listeners.size === 1 && stale && !snapshot.loading) start(false);
       return () => {
         listeners.delete(listener);
+        void Promise.resolve().then(() => {
+          if (disposed || listeners.size > 0 || active === undefined) return;
+          latest += 1;
+          active.abort();
+          active = undefined;
+          stale = true;
+          update({ ...snapshot, loading: false });
+        });
       };
     },
     getSnapshot: () => snapshot,
@@ -102,9 +125,23 @@ export function createReadModel<T>(
       start(false);
     },
     markStale(scope: StaleScope) {
+      if (disposed) return;
       if (scope === 'time' && !refreshOnTick) return;
       stale = true;
       if (listeners.size > 0 && !snapshot.loading) start(true);
+    },
+    dispose() {
+      disposed = true;
+      latest += 1;
+      active?.abort();
+      active = undefined;
+      update({
+        value: undefined,
+        loadedAt: undefined,
+        loading: false,
+        failed: false,
+        failure: undefined,
+      });
     },
   };
 }

@@ -2,7 +2,7 @@ import {
   type Organization,
   type Restaurant,
   type Zone,
-} from '@/presentation/placeholder-organizations';
+} from '../placeholder-organizations';
 
 // Captions write the zone with a comma, the zone field with a middle dot.
 export const zoneLine = (zone: Zone) =>

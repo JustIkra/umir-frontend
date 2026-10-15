@@ -25,6 +25,50 @@ export function object(value: unknown, path: string): Fields {
   return value as Fields;
 }
 
+export function closedObject(
+  value: unknown,
+  path: string,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): Fields {
+  const fields = object(value, path);
+  for (const key of required) {
+    if (!Object.hasOwn(fields, key))
+      throw new DecodeError(`${path}.${key}`, 'missing');
+  }
+  for (const key of Object.keys(fields)) {
+    if (!required.includes(key) && !optional.includes(key))
+      throw new DecodeError(`${path}.${key}`, 'unknown field');
+  }
+  return fields;
+}
+
+export function decimal6(value: unknown, path: string): string {
+  const text = string(value, path);
+  if (text.length > 64 || !/^(?:0|[1-9][0-9]*)\.[0-9]{6}$/.test(text))
+    throw new DecodeError(path, 'not a finite six-place decimal');
+  return text;
+}
+
+export function exactNumber<const N extends number>(
+  value: unknown,
+  path: string,
+  expected: N,
+): N {
+  if (value !== expected)
+    throw new DecodeError(path, 'unexpected policy value');
+  return expected;
+}
+
+export function instantNanos(value: Instant): bigint {
+  const fraction =
+    /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value.iso)?.[1] ?? '';
+  return (
+    BigInt(value.epochMs) * 1_000_000n +
+    BigInt(fraction.padEnd(9, '0').slice(3))
+  );
+}
+
 export function string(value: unknown, path: string): string {
   if (typeof value !== 'string') throw new DecodeError(path, 'not a string');
   return value;
@@ -59,7 +103,7 @@ export function array<T>(
   );
 }
 
-export function oneOf<T extends string>(
+export function oneOf<const T extends string>(
   value: unknown,
   path: string,
   allowed: readonly T[],

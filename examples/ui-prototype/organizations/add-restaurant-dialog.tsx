@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { type Zone } from '@/presentation/placeholder-organizations';
+import { type Zone } from '../placeholder-organizations';
 import { Button } from '@/presentation/ui/actions';
 import { ModalPanel } from '@/presentation/ui/dialog';
 import {

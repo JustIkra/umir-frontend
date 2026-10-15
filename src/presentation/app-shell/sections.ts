@@ -1,8 +1,6 @@
-import analyticsIcon from '@/presentation/assets/icons/analytics-24.svg';
 import catalogIcon from '@/presentation/assets/icons/catalog-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import overviewIcon from '@/presentation/assets/icons/overview-24-active.svg';
-import recommendationsIcon from '@/presentation/assets/icons/menu-24.svg';
 import warehouseIcon from '@/presentation/assets/icons/warehouse-24.svg';
 import type { SectionKey } from '@/domain/access';
 
@@ -27,18 +25,6 @@ export const appSections: readonly {
     suffix: '/catalog',
     title: 'Справочники',
     icon: catalogIcon,
-  },
-  {
-    key: 'menu',
-    suffix: '/menu',
-    title: 'Меню и рекомендации',
-    icon: recommendationsIcon,
-  },
-  {
-    key: 'analytics',
-    suffix: '/analytics',
-    title: 'Аналитика',
-    icon: analyticsIcon,
   },
 ];
 

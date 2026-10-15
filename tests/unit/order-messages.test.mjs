@@ -399,6 +399,7 @@ test('the panel follows the phase of the order', async () => {
     orderSnapshot({
       phase: {
         kind: 'confirmed',
+        context: { warehouseEpoch: '44444444-4444-4444-8444-444444444444' },
         order: {
           orderID: 'ord-1',
           proposalID: 'prp-1',

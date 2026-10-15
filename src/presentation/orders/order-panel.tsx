@@ -2,6 +2,7 @@ import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import type { ReactNode, RefObject } from 'react';
 import type { OrderPhase, OrderSnapshot } from '@/application/order-flow';
 import type { Order, OrderProposal, Position } from '@/application/restaurant';
+import { AllocationFacts } from '@/presentation/warehouse/recorded-allocations';
 import {
   portionsValid,
   type Draft,
@@ -531,11 +532,13 @@ export function OutcomeOrder({
 // Figma B4, 08 and D5 «Заказ оформлен».
 export function PlacedOrder({
   order,
+  warehouseEpoch,
   names,
   timeZone,
   onNew,
 }: {
   order: Order;
+  warehouseEpoch: string | undefined;
   names: Names;
   timeZone: string;
   onNew: () => void;
@@ -586,6 +589,13 @@ export function PlacedOrder({
           </Text>
         </Stack>
         <PositionList positions={order.acceptedPositions} names={names} />
+        {order.allocations.length > 0 && (
+          <AllocationFacts
+            order={order}
+            warehouseEpoch={warehouseEpoch}
+            timeZone={timeZone}
+          />
+        )}
         <Text
           px="3"
           py="2"

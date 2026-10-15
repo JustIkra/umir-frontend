@@ -23,6 +23,7 @@ import {
   decodeRecommendations,
   decodeStopList,
 } from './decode/serving';
+import { decodePlanningEnvelope } from './decode/planning';
 
 const base = (restaurantID: string) =>
   `/api/v2/r/${encodeURIComponent(restaurantID)}`;
@@ -43,7 +44,10 @@ const dishDetails = envelope(decodeDishDetails, 'unavailable');
 const suggestion = envelope(decodeSuggestion, 'unavailable');
 const menu = envelope(decodeMenu, 'unavailable');
 const stopList = envelope(decodeStopList, 'unavailable');
-const recommendations = envelope(decodeRecommendations, 'unavailable');
+const recommendations = decoded(
+  (body) => decodePlanningEnvelope(body, decodeRecommendations, 'serving'),
+  'unavailable',
+);
 const proposal = envelope(decodeOrderProposal, 'unavailable');
 const createdProduct = envelope(decodeProduct, 'unknown');
 const createdDish = envelope(decodeDish, 'unknown');

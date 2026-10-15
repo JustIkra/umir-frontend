@@ -21,8 +21,18 @@ function pins() {
       /^\| `([^`]+\.json)`\s*\|.+\|\s*`([0-9a-f]{64})`\s*\|$/gm,
     ),
   ];
-  if (rows.length !== 2) {
-    throw new Error('api/README.md must pin both contract files');
+  const expected = [
+    'backend-v2-public.json',
+    'backend-v2-examples.json',
+    'completion-v1-examples.json',
+  ];
+  if (
+    rows.length !== expected.length ||
+    !expected.every((file) => rows.some(([, name]) => name === file))
+  ) {
+    throw new Error(
+      'api/README.md must pin the public profile, predecessor examples and FIN1 examples',
+    );
   }
   return rows.map(([, file, hash]) => ({ file, hash }));
 }

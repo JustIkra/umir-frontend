@@ -1,10 +1,7 @@
 import { Stack, Text, chakra } from '@chakra-ui/react';
 import { Link as RouterLink } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import {
-  organizations,
-  type Organization,
-} from '@/presentation/placeholder-organizations';
+import { organizations, type Organization } from '../placeholder-organizations';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { organizationPath, zoneLine } from './format';
 import { OrganizationLayout } from './organization-layout';

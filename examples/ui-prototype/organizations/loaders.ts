@@ -4,7 +4,7 @@ import {
   findOrganization,
   type Member,
   type Organization,
-} from '@/presentation/placeholder-organizations';
+} from '../placeholder-organizations';
 
 // Route params pick sample records; anything else is a 404.
 export function organizationLoader({ params }: LoaderFunctionArgs) {

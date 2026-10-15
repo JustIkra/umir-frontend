@@ -3,7 +3,7 @@ import {
   type Member,
   type Restaurant,
   type Role,
-} from '@/presentation/placeholder-organizations';
+} from '../placeholder-organizations';
 import { media } from '@/presentation/theme/system';
 import { CheckboxField } from '@/presentation/ui/form';
 import { rem } from '@/presentation/ui/units';

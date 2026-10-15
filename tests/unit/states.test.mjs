@@ -19,12 +19,12 @@ import { hrefs, renderElement, text } from './support/render-route.mjs';
 const noop = () => {};
 const R = '33333333-3333-4333-8333-333333333333';
 
-test('W13 offers to create an enterprise or refresh the list', () => {
+test('W13 offers to refresh access without linking prototype management', () => {
   const html = renderElement(h(NoRestaurants, { onRefresh: noop }));
   assert.match(text(html), /Нет доступных ресторанов/);
   assert.match(text(html), /Учётная запись не связана ни с одним рестораном\./);
   assert.match(text(html), /Обновить список/);
-  assert.ok(hrefs(html).includes('/app/organizations/new'));
+  assert.ok(!hrefs(html).includes('/app/organizations/new'));
 });
 
 test('W14 names the section and the restaurant and leads to the overview', () => {

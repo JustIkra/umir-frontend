@@ -307,8 +307,8 @@ function RecommendationsPanel({
   if (rows.length === 0) {
     return (
       <Empty title="Рекомендаций нет">
-        Рекомендации строятся только по доступным блюдам, а сейчас нет блюд даже
-        на одну порцию.
+        Сейчас нет доступных блюд с ингредиентами, срок которых истекает в
+        ближайшие 72 часа.
       </Empty>
     );
   }
@@ -331,6 +331,9 @@ function RecommendationsPanel({
               <Text textStyle="caption.default" color="text.secondary">
                 {item.nearest}
               </Text>
+              <Text textStyle="caption.default" color="text.secondary">
+                {item.demand}
+              </Text>
             </Stack>
             {item.reasons.map((reason) => (
               <Stack
@@ -348,6 +351,9 @@ function RecommendationsPanel({
                   </Text>
                   <Badge tone="expiry">{reason.expires}</Badge>
                 </Flex>
+                <Text textStyle="caption.default">
+                  {reason.risk}. {reason.target}.
+                </Text>
               </Stack>
             ))}
           </Stack>
@@ -375,7 +381,7 @@ function RecommendationsPanel({
           textStyle="caption.default"
           color="text.secondary"
         >
-          {`Показаны ${String(shown.length)} из ${String(rows.length)}. Ранжируются все доступные блюда — по ближайшему сроку используемых партий.`}
+          {`Показаны ${String(shown.length)} из ${String(rows.length)}. Приоритет учитывает срок, долю рискованного остатка и спрос. Ориентир по порциям не гарантирует запас остальных ингредиентов.${recommendations.coverage.complete ? '' : ' История расхода неполная.'}`}
         </Text>
         {!all && rows.length > shown.length && (
           <Button

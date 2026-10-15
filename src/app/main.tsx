@@ -9,6 +9,10 @@ import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { createAccessApi } from '@/adapters/api/access-api';
 import {
+  createWarehouseReads,
+  createWarehouseApi,
+} from '@/adapters/api/warehouse-api';
+import {
   createCatalogApi,
   createOrderApi,
   createRestaurantReads,
@@ -43,6 +47,10 @@ import {
   type RestaurantData,
 } from '@/application/restaurant-data';
 import { createSessionStore } from '@/application/session';
+import {
+  createWarehouseCommands,
+  type WarehouseCommands,
+} from '@/application/warehouse-commands';
 import { createRoutes } from '@/presentation/routes';
 import {
   ServicesProvider,
@@ -76,7 +84,11 @@ const scheduler = createTimerScheduler(window);
 const visibility = createPageVisibility(document);
 const now = () => Date.now();
 const epochs = createEpochRegistry();
-const models = createModelRegistry({ now, epochs });
+const models = createModelRegistry({
+  now,
+  epochs,
+  createCancellation: () => new AbortController(),
+});
 const commands = createCommandRunner({
   newId: () => crypto.randomUUID(),
   now,
@@ -108,8 +120,13 @@ const live = createLiveSync({
   // (spec 3, section 6).
   resolvePending: () => Promise.resolve(),
 });
-const restaurantReads = createRestaurantReads(client);
+const restaurantReads = {
+  ...createRestaurantReads(client),
+  ...createWarehouseReads(client),
+};
 const catalogApi = createCatalogApi(client);
+const warehouseApi = createWarehouseApi(client);
+const warehouseCommands = new Map<string, WarehouseCommands>();
 const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
 const restaurantData = new Map<string, RestaurantData>();
@@ -155,10 +172,12 @@ const session = createSessionStore({
     access.clear();
     orderFlows.forget();
     catalogCommands.clear();
+    warehouseCommands.clear();
     client.clearCsrfToken();
   },
   onExpired: () => {
     live.stop();
+    models.clear();
     access.clear();
     client.clearCsrfToken();
   },
@@ -171,6 +190,7 @@ const session = createSessionStore({
     access.clear();
     orderFlows.forget();
     catalogCommands.clear();
+    warehouseCommands.clear();
     void access.refresh();
   },
   // L13: the server ended the session while a password change is pending,
@@ -236,6 +256,25 @@ const services: PresentationServices = {
       catalogCommands.set(restaurantID, catalog);
     }
     return catalog;
+  },
+  warehouseCommands: (restaurantID) => {
+    let value = warehouseCommands.get(restaurantID);
+    if (value === undefined) {
+      value = createWarehouseCommands({
+        api: warehouseApi,
+        commands,
+        restaurantID,
+        newID: () => crypto.randomUUID(),
+        markStale: (topics) => {
+          models.markStale(restaurantID, topics);
+        },
+        onUnauthenticated: () => {
+          void session.check();
+        },
+      });
+      warehouseCommands.set(restaurantID, value);
+    }
+    return value;
   },
   orderFlow: (restaurantID) => {
     const state = session.getSnapshot();

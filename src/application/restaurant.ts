@@ -2,6 +2,7 @@ import type { BaseUnit } from '@/domain/quantity';
 import type { DraftLine } from '@/domain/order-draft';
 import type { Envelope, Instant } from './api';
 import type { LoadOptions } from './read-model';
+import type { PlanningCapture } from './planning';
 
 export interface Product {
   readonly productID: string;
@@ -67,18 +68,23 @@ export interface RecommendationReason {
   readonly productName: string;
   readonly batchID: string;
   readonly quantityPerPortion: string;
+  readonly riskQuantity: string;
+  readonly targetPortions: string;
+  readonly remainingSeconds: string;
   readonly baseUnit: BaseUnit;
   readonly expiresAt: Instant;
 }
 export interface Recommendation {
   readonly dishID: string;
   readonly dishName: string;
+  readonly score: string;
+  readonly demandBasis: 'history' | 'fallback';
   readonly priorityExpiresAt: Instant;
   readonly reasons: readonly RecommendationReason[];
 }
-export interface Recommendations {
-  readonly evaluatedAt: Instant;
-  readonly stateVersion: string;
+export interface Recommendations extends PlanningCapture {
+  readonly policyVersion: 'FIN1';
+  readonly horizonHours: 72;
   readonly items: readonly Recommendation[];
 }
 export interface Position {

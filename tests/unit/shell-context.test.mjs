@@ -23,7 +23,7 @@ test('a ready restaurant shows its name, roles and permitted sections', () => {
   );
   assert.equal(context.title, 'На Пушкинской');
   assert.equal(context.caption, 'На Пушкинской · Официант');
-  assert.deepEqual(context.sections, ['overview', 'orders', 'menu']);
+  assert.deepEqual(context.sections, ['overview', 'orders']);
 });
 
 test('roles read as in Figma; an administrator is named once', () => {
@@ -58,7 +58,7 @@ test('W13, W15, W16 and W17 leave the sidebar empty with their captions', () => 
 test('without verified access a restaurant address keeps every section', () => {
   const context = shellContext(unverified, 'restaurant', R);
   assert.equal(context.caption, 'Доступ не проверен');
-  assert.equal(context.sections.length, 6);
+  assert.equal(context.sections.length, 4);
 });
 
 test('organization pages without any restaurant show «Нет доступных ресторанов»', () => {

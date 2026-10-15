@@ -11,6 +11,7 @@ import {
   localFailure,
   type ApiFailure,
   type Envelope,
+  type BusinessContext,
 } from './api';
 import type { CommandResult, CommandRunner, CommandSpec } from './commands';
 import type { EpochRegistry } from './epochs';
@@ -41,6 +42,7 @@ export type OrderPhase =
       readonly kind: 'confirmed';
       readonly order: Order;
       readonly afterCheck: boolean;
+      readonly context: BusinessContext;
     }
   | { readonly kind: 'empty'; readonly proposal: OrderProposal | undefined }
   | {
@@ -243,14 +245,23 @@ export function createOrderFlow({
     });
   }
 
-  function applyResult(result: ConfirmResult, checking: boolean): void {
+  function applyResult(
+    reply: Envelope<ConfirmResult>,
+    checking: boolean,
+  ): void {
+    const result = reply.result;
     switch (result.kind) {
       case 'OrderConfirmed':
         attempt = undefined;
         draft = [];
         save();
         onOrdered();
-        show({ kind: 'confirmed', order: result.order, afterCheck: checking });
+        show({
+          kind: 'confirmed',
+          order: result.order,
+          afterCheck: checking,
+          context: reply.context,
+        });
         return;
       case 'RequiresConfirmation': {
         const previous = attempt?.proposal ?? latest;
@@ -344,7 +355,7 @@ export function createOrderFlow({
     }
     switch (result.kind) {
       case 'committed':
-        applyResult(result.value.result, checking);
+        applyResult(result.value, checking);
         return;
       case 'unknown':
         if (attempt !== undefined) {
@@ -361,57 +372,57 @@ export function createOrderFlow({
     }
   }
 
-  async function resolveAttempt(): Promise<void> {
+  async function resolveAttempt(): Promise<boolean> {
     const current = phase;
     const saved = attempt;
     if (
       saved === undefined ||
       (current.kind !== 'pending' && current.kind !== 'conflict')
     ) {
-      return;
+      return false;
     }
     cancelTimer?.();
     cancelTimer = undefined;
     show({ ...current, checking: true });
-    let result: ConfirmResult;
+    let reply: Envelope<ConfirmResult>;
     try {
-      result = (
-        await api.resolve(restaurantID, {
-          commandID: saved.commandID,
-          proposalID: saved.proposalID,
-          runtimeEpoch: saved.runtimeEpoch,
-        })
-      ).result;
+      reply = await api.resolve(restaurantID, {
+        commandID: saved.commandID,
+        proposalID: saved.proposalID,
+        runtimeEpoch: saved.runtimeEpoch,
+      });
     } catch (error) {
-      if (disposed) return;
+      if (disposed) return false;
       const failure =
         failureOf(error) ?? localFailure('Malformed', 'unavailable');
       if (ended(failure)) {
         onUnauthenticated();
         show({ ...current, checking: false });
-        return;
+        return false;
       }
       if (wasReset(failure)) {
         clearAttempt();
         onReset();
         show({ kind: 'reset' });
-        return;
+        return false;
       }
       if (failure.code === 'ProposalNotFound') {
         clearAttempt();
         show({ kind: 'not-found', afterAttempt: true, checkedAt: now() });
-        return;
+        return false;
       }
       show({ ...current, checking: false }, { kind: 'check-failed' });
-      return;
+      return false;
     }
-    if (disposed) return;
+    if (disposed) return false;
+    const result = reply.result;
     if (result.kind === 'ConfirmationPending') {
       const waiting = keepAttempt({ ...saved, state: 'pending' });
       show({ kind: 'pending', attempt: waiting, checking: false });
-      return;
+      return true;
     }
-    applyResult(result, true);
+    applyResult(reply, true);
+    return false;
   }
 
   function edit(next: Draft): void {
@@ -491,10 +502,16 @@ export function createOrderFlow({
       settle(result, true, saved.proposal, undefined);
       return;
     }
-    if (
-      (current.kind === 'pending' || current.kind === 'conflict') &&
-      !current.checking
-    ) {
+    if (current.kind === 'pending' && !current.checking) {
+      const waiting = await resolveAttempt();
+      if (disposed || !waiting || attempt === undefined) return;
+      const saved = attempt;
+      if (!commands.getSnapshot().some((item) => item.key === key))
+        restorePending(saved);
+      show({ kind: 'pending', attempt: saved, checking: true });
+      const result = await commands.run(confirmSpec(saved.proposal));
+      settle(result, true, saved.proposal, undefined);
+    } else if (current.kind === 'conflict' && !current.checking) {
       await resolveAttempt();
     }
   }

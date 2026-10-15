@@ -14,8 +14,27 @@ function controlledLoader() {
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+test('unmount cancels the read and a late reply cannot install its value', async () => {
+  const loader = controlledLoader();
+  const read = model(loader);
+  const stop = read.subscribe(() => undefined);
+  assert.ok(loader.calls[0].options.signal instanceof AbortSignal);
+  stop();
+  await settled();
+  assert.equal(loader.calls[0].options.signal.aborted, true);
+  loader.calls[0].resolve('old restaurant');
+  await settled();
+  assert.equal(read.getSnapshot().value, undefined);
+  read.subscribe(() => undefined);
+  assert.equal(loader.calls.length, 2);
+});
+
 function model(loader, { refreshOnTick = false, now = () => 1000 } = {}) {
-  return createReadModel(loader.load, { refreshOnTick, now });
+  return createReadModel(loader.load, {
+    refreshOnTick,
+    now,
+    createCancellation: () => new AbortController(),
+  });
 }
 
 test('the first subscriber reads once in the foreground', async () => {
@@ -24,7 +43,7 @@ test('the first subscriber reads once in the foreground', async () => {
   readModel.subscribe(() => undefined);
   readModel.subscribe(() => undefined);
   assert.deepEqual(
-    loader.calls.map((call) => call.options),
+    loader.calls.map((call) => ({ background: call.options.background })),
     [{ background: false }],
   );
   assert.equal(readModel.getSnapshot().loading, true);
@@ -60,7 +79,7 @@ test('a stale model without subscribers reads on the next subscription', async (
   assert.equal(loader.calls.length, 1);
   readModel.subscribe(() => undefined);
   assert.deepEqual(
-    loader.calls.map((call) => call.options),
+    loader.calls.map((call) => ({ background: call.options.background })),
     [{ background: false }, { background: false }],
   );
 });
@@ -76,7 +95,7 @@ test('marks during a request cause exactly one background request after it', asy
   loader.calls[0].resolve('v1');
   await settled();
   assert.deepEqual(
-    loader.calls.map((call) => call.options),
+    loader.calls.map((call) => ({ background: call.options.background })),
     [{ background: false }, { background: true }],
   );
   loader.calls[1].resolve('v2');
@@ -147,7 +166,7 @@ test('ticks re-read only models that depend on time', async () => {
   plainModel.markStale('time');
   timedModel.markStale('time');
   assert.equal(plain.calls.length, 1);
-  assert.deepEqual(timed.calls[1].options, { background: true });
+  assert.equal(timed.calls[1].options.background, true);
 });
 
 test('subscribers hear every snapshot change', async () => {

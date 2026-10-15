@@ -3,7 +3,7 @@ import { useId, useRef, useState } from 'react';
 import checkIcon from '@/presentation/assets/icons/check-secondary-24.svg';
 import chevronIcon from '@/presentation/assets/icons/chevron-down-24.svg';
 import closeIcon from '@/presentation/assets/icons/close-24.svg';
-import { type Zone, zones } from '@/presentation/placeholder-organizations';
+import { type Zone, zones } from '../placeholder-organizations';
 import { atLeast, scrim } from '@/presentation/theme/system';
 import { FieldLabel, FieldMessage, SearchInput } from '@/presentation/ui/form';
 import { Icon } from '@/presentation/ui/icon';

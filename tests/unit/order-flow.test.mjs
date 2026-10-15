@@ -36,7 +36,11 @@ const order = {
   allocations: [],
   placedAt: at,
 };
-const envelope = (result) => ({ context: { runtimeEpoch: EPOCH }, result });
+const context = {
+  runtimeEpoch: EPOCH,
+  warehouseEpoch: '66666666-6666-4666-8666-666666666666',
+};
+const envelope = (result) => ({ context, result });
 
 function manualScheduler() {
   const tasks = [];
@@ -216,6 +220,7 @@ test('a confirmed order clears the draft and the attempt', async () => {
   assert.deepEqual(calls.at(-1), ['confirm', R, 'prp-1', 'cmd-1', EPOCH]);
   assert.deepEqual(phase(flow), {
     kind: 'confirmed',
+    context,
     order,
     afterCheck: false,
   });
@@ -305,7 +310,29 @@ test('ConfirmationPending waits, checks once after 3 s and then on demand', asyn
   assert.deepEqual(scheduler.delays(), []);
   answers.resolve.push(envelope({ kind: 'OrderConfirmed', order }));
   await flow.check();
-  assert.deepEqual(phase(flow), { kind: 'confirmed', order, afterCheck: true });
+  assert.deepEqual(phase(flow), {
+    kind: 'confirmed',
+    context,
+    order,
+    afterCheck: true,
+  });
+});
+
+test('an explicit check resumes a saved pending command after passive lookup remains pending', async () => {
+  const { flow, answers, calls } = await atProposal();
+  answers.confirm.push(envelope({ kind: 'ConfirmationPending' }));
+  await flow.confirm();
+  answers.resolve.push(envelope({ kind: 'ConfirmationPending' }));
+  answers.confirm.push(envelope({ kind: 'OrderConfirmed', order }));
+  await flow.check();
+  assert.equal(phase(flow).kind, 'confirmed');
+  assert.deepEqual(
+    calls.filter((call) => call[0] === 'confirm').map((call) => call.slice(1)),
+    [
+      [R, 'prp-1', 'cmd-1', EPOCH],
+      [R, 'prp-1', 'cmd-1', EPOCH],
+    ],
+  );
 });
 
 test('a failed resolve says so and keeps waiting; 401 asks the session', async () => {

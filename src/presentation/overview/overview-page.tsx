@@ -1,37 +1,40 @@
-import { Stack } from '@chakra-ui/react';
+import { Grid, Stack, Text } from '@chakra-ui/react';
 import { useLocation, useParams } from 'react-router';
 import { findRestaurant } from '@/application/access';
+import { canOpenSection } from '@/domain/access';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import {
   missingSectionOf,
   useRestaurantPath,
 } from '@/presentation/app-shell/paths';
-import { sectionTitle } from '@/presentation/app-shell/sections';
-import { placeholderAccount } from '@/presentation/placeholder-account';
+import { appSections, sectionTitle } from '@/presentation/app-shell/sections';
+import { useSectionDate } from '@/presentation/app-shell/section-date';
 import { useAccess } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { InfoNotice } from '@/presentation/ui/states';
-import { OverviewTiles } from './tiles';
+import { Card } from '@/presentation/ui/card';
 
-// Figma W03 «Обзор» for «Склад» and «Официант»; «Собрать заказ» is centred
-// on the heading block there. After a switch to a restaurant without the
-// section that was open, the overview says so above the tiles (W12).
 export function OverviewPage() {
-  const path = useRestaurantPath();
-  const missing = missingSectionOf(useLocation().state as unknown);
   const { restaurantID = '' } = useParams();
   const restaurant = findRestaurant(useAccess(), restaurantID);
+  const path = useRestaurantPath();
+  const missing = missingSectionOf(useLocation().state as unknown);
+  const caption = useSectionDate();
+  const sections = appSections.filter(
+    (section) =>
+      section.key !== 'overview' &&
+      canOpenSection(section.key, restaurant?.permissions),
+  );
   return (
-    <Stack gap={{ base: '4', sm: '6' }}>
+    <Stack gap="6">
       <PageHeader
         title="Обзор"
-        eyebrow={`${placeholderAccount.organization} · ${placeholderAccount.restaurant}`}
-        caption={placeholderAccount.today}
-        action={
-          <ButtonLink to={path('/orders')} alignSelf={{ sm: 'center' }}>
-            Собрать заказ
-          </ButtonLink>
+        eyebrow={
+          restaurant === undefined
+            ? undefined
+            : `${restaurant.orgName} · ${restaurant.name}`
         }
+        caption={caption}
       />
       {missing !== undefined && (
         <InfoNotice
@@ -41,7 +44,25 @@ export function OverviewPage() {
           ресторане.
         </InfoNotice>
       )}
-      <OverviewTiles />
+      <Grid
+        templateColumns={{ base: '1fr', md: 'repeat(2, minmax(0, 1fr))' }}
+        gap="4"
+      >
+        {sections.map((section) => (
+          <Card key={section.key} p="6">
+            <Stack gap="3">
+              <Text textStyle="heading.h3">{section.title}</Text>
+              <ButtonLink
+                variant="secondary"
+                to={path(section.suffix)}
+                alignSelf="flex-start"
+              >
+                Открыть раздел
+              </ButtonLink>
+            </Stack>
+          </Card>
+        ))}
+      </Grid>
     </Stack>
   );
 }

@@ -1,6 +1,6 @@
 import { chakra } from '@chakra-ui/react';
 import { useLoaderData } from 'react-router';
-import { type Organization } from '@/presentation/placeholder-organizations';
+import { type Organization } from '../placeholder-organizations';
 import { Card } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
 import {

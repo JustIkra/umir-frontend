@@ -53,11 +53,14 @@ const stopList = {
   ],
 };
 const recommendations = {
+  coverage: { complete: false },
   evaluatedAt: at,
   stateVersion: '1',
   items: [
     {
       dishID: '207',
+      score: '0.500000',
+      demandBasis: 'fallback',
       dishName: 'Ризотто с пармезаном и рукколой',
       priorityExpiresAt: instantOf('2026-10-14T20:30:00+03:00'),
       reasons: [
@@ -65,6 +68,9 @@ const recommendations = {
           productID: '125',
           productName: 'Сыр пармезан',
           batchID: 'P-0142',
+          riskQuantity: '400000',
+          targetPortions: '10',
+          remainingSeconds: '37800',
           quantityPerPortion: '40000',
           baseUnit: 'g',
           expiresAt: instantOf('2026-10-14T20:30:00+03:00'),
@@ -73,6 +79,9 @@ const recommendations = {
           productID: '117',
           productName: 'Руккола',
           batchID: 'P-0150',
+          riskQuantity: '90000',
+          targetPortions: '3',
+          remainingSeconds: '37800',
           quantityPerPortion: '30000',
           baseUnit: 'g',
           expiresAt: instantOf('2026-10-14T20:30:00+03:00'),
@@ -131,16 +140,20 @@ test('recommendations: nearest expiry and every reason in the zone', () => {
       rank: 1,
       dishID: '207',
       name: 'Ризотто с пармезаном и рукколой',
-      nearest:
-        'Ближайший срок партий одной порции — 14.10.2026, 20:30. Причины:',
+      nearest: 'Ближайший срок риска — 14.10.2026, 20:30.',
+      demand: 'Спрос без полной истории: ориентир 2 порции/ч',
       reasons: [
         {
           title: 'Сыр пармезан · партия P-0142',
+          risk: 'Под риском 400 г',
+          target: 'Ориентир: 10 порц. для этого количества',
           perPortion: '40 г на порцию',
           expires: 'Срок до 14.10.2026, 20:30',
         },
         {
           title: 'Руккола · партия P-0150',
+          risk: 'Под риском 90 г',
+          target: 'Ориентир: 3 порц. для этого количества',
           perPortion: '30 г на порцию',
           expires: 'Срок до 14.10.2026, 20:30',
         },

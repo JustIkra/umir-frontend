@@ -11,6 +11,7 @@ import type { OrderFlow } from '@/application/order-flow';
 import type { PasswordResetFlow } from '@/application/password-reset';
 import type { RestaurantData } from '@/application/restaurant-data';
 import type { SessionStore } from '@/application/session';
+import type { WarehouseCommands } from '@/application/warehouse-commands';
 
 // Application ports the screens use; the app layer assembles the adapters.
 export interface PresentationServices {
@@ -29,6 +30,7 @@ export interface PresentationServices {
   accountSettings: AccountSettings;
   restaurantData: (restaurantID: string) => RestaurantData;
   catalogCommands: (restaurantID: string) => CatalogCommands;
+  warehouseCommands: (restaurantID: string) => WarehouseCommands;
   // undefined without a signed-in user.
   orderFlow: (restaurantID: string) => OrderFlow | undefined;
 }

@@ -269,9 +269,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    get: operations['organizationInvitations'];
     put?: never;
-    /** @description See backend-v2.md for atomicity, authorization and outcomes. */
+    /** @description UA1 create-mail atomicity is defined in ../ui-api-amendment.md. Predecessor outcome rules remain in backend-v2.md. */
     post: operations['createInvitation'];
     delete?: never;
     options?: never;
@@ -1045,6 +1046,74 @@ export interface paths {
     };
     /** @description Human-authorized passive observation of a final-writeoff attempt. No append, expiry preparation or command retry. commandID and batchID reconstruct the original fingerprint. Compare the original saved Warehouse epoch before lookup; mismatch returns 409 RuntimeReset, outcome=indeterminate. Different batch for a retained command returns 409 CommandConflict and never reveals the original result. See backend-v2.md. */
     get: operations['resolveWriteoffCommand'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/r/{restaurantID}/warehouse/products/{productID}/batches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    get: operations['productBatches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/orgs/{orgID}/members': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    get: operations['organizationMembers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/orgs/{orgID}/invitations/{invitationID}/resend-link': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description UA1 draft; semantics and cross-field bindings are in ../ui-api-amendment.md. */
+    post: operations['resendInvitationLink'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/r/{restaurantID}/warehouse/supply-suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description FIN1 semantics and cross-field rules are in ../completion-api-amendment.md. */
+    get: operations['supplySuggestions'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2107,7 +2176,7 @@ export interface components {
       accessVersion: components['schemas']['Version'];
       orgID: components['schemas']['EntityID'];
       tenantID: components['schemas']['EntityID'];
-      permissions: components['schemas']['Capability'][];
+      permissions: components['schemas']['FINCapability'][];
       settings: components['schemas']['Settings'];
       lifecycleVersion: components['schemas']['Version'];
       token: string;
@@ -2519,7 +2588,7 @@ export interface components {
     };
     ScopedRecommendations: {
       context: components['schemas']['BusinessContext'];
-      result: components['schemas']['Recommendations'];
+      result: components['schemas']['FINRecommendations'];
     };
     ScopedOrderProposal: {
       context: components['schemas']['BusinessContext'];
@@ -2804,7 +2873,7 @@ export interface components {
     };
     ServingScopedRecommendations: {
       context: components['schemas']['ServingContext'];
-      result: components['schemas']['Recommendations'];
+      result: components['schemas']['FINRecommendations'];
     };
     ServingScopedOrderProposal: {
       context: components['schemas']['ServingContext'];
@@ -2885,6 +2954,187 @@ export interface components {
           lifecycleVersion: components['schemas']['Version'];
           restaurantID: components['schemas']['EntityID'];
         };
+    PositiveBatch: components['schemas']['BatchV2'] & {
+      remainingQuantity?: components['schemas']['PositiveQuantity'];
+    };
+    ProductBatchRow: {
+      batch: components['schemas']['PositiveBatch'];
+      baseUnit: components['schemas']['BaseUnit'];
+      /** @enum {string} */
+      status: 'available' | 'pending_writeoff';
+    };
+    ProductBatchPage: {
+      productID: components['schemas']['ID'];
+      evaluatedAt: components['schemas']['Instant'];
+      page: components['schemas']['PageIdentity'];
+      items: components['schemas']['ProductBatchRow'][];
+      nextCursor?: string;
+    };
+    ScopedProductBatches: {
+      context: components['schemas']['BusinessContext'];
+      result: components['schemas']['ProductBatchPage'];
+    };
+    AuthPageIdentity: {
+      orgID: components['schemas']['EntityID'];
+      readerEpoch: components['schemas']['Epoch'];
+      aggregateRevision: components['schemas']['Version'];
+      evaluatedAt: components['schemas']['Instant'];
+    };
+    MemberContact: {
+      membership: components['schemas']['Membership'];
+      displayName: string;
+      email: components['schemas']['Email'] | null;
+    };
+    MembersPage: {
+      context: components['schemas']['AuthPageIdentity'];
+      items: components['schemas']['MemberContact'][];
+      nextCursor?: string;
+    };
+    InvitationListRow: {
+      invitation: components['schemas']['Invitation'];
+      linkDelivery: components['schemas']['MailJob'] | null;
+      resendAllowed: boolean;
+    };
+    InvitationsPage: {
+      context: components['schemas']['AuthPageIdentity'];
+      items: components['schemas']['InvitationListRow'][];
+      nextCursor?: string;
+    };
+    /** @description Finite nonnegative display decimal, exactly six places. Exact policy arithmetic precedes wire rounding. */
+    FINDecimal: string;
+    FINWindow: {
+      from: components['schemas']['Instant'];
+      to: components['schemas']['Instant'];
+      /** @constant */
+      days: 7;
+    };
+    FINPolicy: {
+      /** @constant */
+      version: 'FIN1';
+      /** @constant */
+      historyDays: 7;
+      /** @constant */
+      coverageThresholdDays: 3;
+      /** @constant */
+      targetDays: 7;
+    };
+    FINSupplyRow: {
+      productID: components['schemas']['ID'];
+      productName: string;
+      baseUnit: components['schemas']['BaseUnit'];
+      availableQuantity: components['schemas']['Quantity'];
+      consumedQuantity: components['schemas']['Quantity'];
+      averageDailyBaseUnits: components['schemas']['FINDecimal'];
+      coverageDays: components['schemas']['FINDecimal'] | null;
+      onePortionDeficit: components['schemas']['Quantity'];
+      suggestedQuantity: components['schemas']['PositiveQuantity'];
+      blockedDishIDs: components['schemas']['ID'][];
+      reasons: ('low_coverage' | 'stop_list_deficit')[];
+    };
+    FINSupplySuggestions: {
+      evaluatedAt: components['schemas']['Instant'];
+      stateVersion: components['schemas']['NonNegativeInt64'];
+      policy: components['schemas']['FINPolicy'];
+      window: components['schemas']['FINWindow'];
+      coverage: components['schemas']['Coverage'];
+      items: components['schemas']['FINSupplyRow'][];
+    };
+    ScopedSupplySuggestions: {
+      context: components['schemas']['BusinessContext'];
+      result: components['schemas']['FINSupplySuggestions'];
+    };
+    FINRiskBatch: {
+      productID: components['schemas']['ID'];
+      productName: string;
+      batchID: components['schemas']['ID'];
+      remainingQuantity: components['schemas']['PositiveQuantity'];
+      baseUnit: components['schemas']['BaseUnit'];
+      expiresAt: components['schemas']['Instant'];
+      remainingSeconds: components['schemas']['NonNegativeInt64'];
+    };
+    FINDishDemand: {
+      dishID: components['schemas']['ID'];
+      portions: components['schemas']['PositiveInt64'];
+    };
+    FINRecommendationInputs: {
+      evaluatedAt: components['schemas']['Instant'];
+      stateVersion: components['schemas']['NonNegativeInt64'];
+      /** @constant */
+      horizonHours: 72;
+      window: components['schemas']['FINWindow'];
+      coverage: components['schemas']['Coverage'];
+      menu: components['schemas']['WMenuEvaluation'];
+      riskBatches: components['schemas']['FINRiskBatch'][];
+      demand: components['schemas']['FINDishDemand'][];
+    };
+    ScopedRecommendationInputs: {
+      context: components['schemas']['BusinessContext'];
+      result: components['schemas']['FINRecommendationInputs'];
+    };
+    FINRecommendationReason: {
+      productID: components['schemas']['ID'];
+      productName: string;
+      batchID: components['schemas']['ID'];
+      quantityPerPortion: components['schemas']['PositiveQuantity'];
+      riskQuantity: components['schemas']['PositiveQuantity'];
+      targetPortions: components['schemas']['PositiveInt64'];
+      baseUnit: components['schemas']['BaseUnit'];
+      expiresAt: components['schemas']['Instant'];
+      remainingSeconds: components['schemas']['NonNegativeInt64'];
+    };
+    FINRecommendation: {
+      dishID: components['schemas']['ID'];
+      dishName: string;
+      score: components['schemas']['FINDecimal'];
+      /** @enum {string} */
+      demandBasis: 'history' | 'fallback';
+      priorityExpiresAt: components['schemas']['Instant'];
+      reasons: components['schemas']['FINRecommendationReason'][];
+    };
+    FINRecommendations: {
+      evaluatedAt: components['schemas']['Instant'];
+      stateVersion: components['schemas']['NonNegativeInt64'];
+      /** @constant */
+      policyVersion: 'FIN1';
+      /** @constant */
+      horizonHours: 72;
+      window: components['schemas']['FINWindow'];
+      coverage: components['schemas']['Coverage'];
+      items: components['schemas']['FINRecommendation'][];
+    };
+    /** @enum {string} */
+    FINCapability:
+      | 'catalog.read'
+      | 'catalog.write'
+      | 'stock.read'
+      | 'delivery.create'
+      | 'analytics.read'
+      | 'writeoff.confirm'
+      | 'menu.read'
+      | 'recommendations.read'
+      | 'order.prepare'
+      | 'order.confirm'
+      | 'order.read'
+      | 'feedback.submit'
+      | 'org.read'
+      | 'org.settings.write'
+      | 'restaurant.create'
+      | 'restaurant.delete'
+      | 'org.delete'
+      | 'membership.manage'
+      | 'invitation.manage'
+      | 'org.summary.read'
+      | 'runtime.register'
+      | 'runtime.close'
+      | 'expiry.due'
+      | 'consumer.menu.evaluate'
+      | 'consumer.order.evaluate'
+      | 'consumer.order.commit'
+      | 'consumer.order.resolve'
+      | 'feedback.anonymous.submit'
+      | 'feedback.read'
+      | 'feedback.export'
+      | 'consumer.recommendations.read';
   };
   responses: {
     /** @description The frontend proxy could not obtain the gateway response. No query result is available. */
@@ -3878,6 +4128,42 @@ export interface operations {
         };
       };
       /** @description Typed failure; a transport failure never proves not_committed. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  organizationInvitations: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+        state?:
+          'pending' | 'accepted' | 'expired' | 'revoked' | 'suppressed' | 'all';
+      };
+      header?: never;
+      path: {
+        orgID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Typed result. Capture time and identity apply to all rows. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InvitationsPage'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
       default: {
         headers: {
           [name: string]: unknown;
@@ -5575,6 +5861,143 @@ export interface operations {
         };
       };
       /** @description Typed authorized failure; a GET transport failure is unavailable, never not_committed for the original attempt. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  productBatches: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path: {
+        restaurantID: components['schemas']['EntityID'];
+        productID: components['schemas']['ID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Typed result. Capture time and identity apply to all rows. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopedProductBatches'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  organizationMembers: {
+    parameters: {
+      query?: {
+        limit?: number;
+        cursor?: string;
+        state?: 'active' | 'revoked' | 'all';
+      };
+      header?: never;
+      path: {
+        orgID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Typed result. Capture time and identity apply to all rows. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MembersPage'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  resendInvitationLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        orgID: components['schemas']['EntityID'];
+        invitationID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Command'];
+      };
+    };
+    responses: {
+      /** @description Exactly one link job was durably accepted; not proof of SMTP delivery. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DurableResult'];
+        };
+      };
+      /** @description Existing typed failure rules apply. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  supplySuggestions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        restaurantID: components['schemas']['EntityID'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description One coherent read-only capture. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopedSupplySuggestions'];
+        };
+      };
+      /** @description Existing typed read failure. A failure is not an empty success. */
       default: {
         headers: {
           [name: string]: unknown;

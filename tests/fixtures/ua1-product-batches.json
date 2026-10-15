@@ -1,0 +1,54 @@
+{
+  "context": {
+    "orgID": "00000000-0000-4000-8000-000000000001",
+    "tenantID": "00000000-0000-4000-8000-000000000002",
+    "runtimeEpoch": "00000000-0000-4000-8000-000000000003",
+    "settings": {
+      "timeZone": "Europe/Moscow",
+      "settingsVersion": "1"
+    },
+    "evaluatedAt": "2026-10-14T15:00:00+03:00",
+    "stateVersion": "4"
+  },
+  "result": {
+    "productID": "rice",
+    "evaluatedAt": "2026-10-14T15:00:00+03:00",
+    "page": {
+      "tenantID": "00000000-0000-4000-8000-000000000002",
+      "epoch": "00000000-0000-4000-8000-000000000003",
+      "stateVersion": "4",
+      "prefixSequence": "4",
+      "filterFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "settings": {
+        "timeZone": "Europe/Moscow",
+        "settingsVersion": "1"
+      }
+    },
+    "items": [
+      {
+        "batch": {
+          "batchID": "batch-1",
+          "deliveryID": "delivery-1",
+          "lineNo": "1",
+          "productID": "rice",
+          "manufacturedAt": "2026-10-13T15:00:00+03:00",
+          "shelfLife": {
+            "value": "1",
+            "unit": "day"
+          },
+          "receivedAt": "2026-10-14T14:00:00+03:00",
+          "expiresAt": "2026-10-14T15:00:00+03:00",
+          "receivedQuantity": "2000",
+          "remainingQuantity": "1500",
+          "appliedSettings": {
+            "timeZone": "Europe/Moscow",
+            "settingsVersion": "1"
+          },
+          "tzdataVersion": "2026b"
+        },
+        "baseUnit": "g",
+        "status": "pending_writeoff"
+      }
+    ]
+  }
+}
