@@ -10,6 +10,7 @@ import {
   Td,
 } from '@/presentation/ui/table';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { plural } from '@/presentation/ui/plural';
 import { WarehouseRead } from './warehouse-read';
 
 export function displayDecimal(value: string): string {
@@ -19,30 +20,36 @@ export function displayDecimal(value: string): string {
   return tail === '' ? grouped : `${grouped},${tail}`;
 }
 
+// «1 день», «3 дня», «2,5 дня»: a fraction takes «дня».
+const days = (value: string): string => {
+  const [whole = '0', fraction = ''] = value.split('.');
+  const form = /[1-9]/.test(fraction)
+    ? 'дня'
+    : plural(whole, 'день', 'дня', 'дней');
+  return `${displayDecimal(value)}\u00a0${form}`;
+};
+
 function SupplyRows({ value }: { value: SupplySuggestions }) {
   return (
     <Stack gap="3">
       {!value.coverage.complete && (
-        <FormMessage tone="info" title="История расхода неполная">
-          Учтён зарегистрированный расход за последние 7 дней. До начала текущей
-          истории расход не предполагается; при отсутствии расхода предложение
-          покрывает только дефицит одной порции.
+        <FormMessage tone="info" title="Данных пока мало">
+          Мы знаем расход меньше чем за 7 дней, поэтому подсказка
+          приблизительная.
         </FormMessage>
       )}
       {value.items.length === 0 ? (
-        <Text color="text.secondary">
-          Пополнение по текущим данным не требуется.
-        </Text>
+        <Text color="text.secondary">Сейчас ничего докупать не нужно.</Text>
       ) : (
         <TableCard>
           <DataTable mobile="cards">
             <chakra.thead>
               <tr>
                 <Th>Продукт</Th>
-                <Th>Пригодный остаток</Th>
+                <Th>Можно использовать</Th>
                 <Th>Средний расход</Th>
-                <Th>Запас</Th>
-                <Th>Предложение</Th>
+                <Th>Хватит на</Th>
+                <Th>Докупить</Th>
               </tr>
             </chakra.thead>
             <tbody>
@@ -56,7 +63,7 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                     <Text textStyle="body.strong">{row.productName}</Text>
                     <Text textStyle="caption.default" color="text.secondary">
                       {row.reasons.includes('low_coverage')
-                        ? 'Запас менее 3 дней. '
+                        ? 'Хватит меньше чем на 3 дня. '
                         : ''}
                       {row.reasons.includes('stop_list_deficit')
                         ? `Не хватает на одну порцию: ${formatQuantity(row.onePortionDeficit, row.baseUnit)}.`
@@ -65,7 +72,7 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                   </Td>
                   <Td gridArea="stock" textStyle="numeric.body">
                     <MobileCellLabel aria-hidden="true">
-                      Пригодно
+                      Можно использовать
                     </MobileCellLabel>
                     {formatQuantity(row.availableQuantity, row.baseUnit)}
                   </Td>
@@ -73,16 +80,15 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                     <MobileCellLabel aria-hidden="true">
                       Средний расход
                     </MobileCellLabel>
-                    {displayDecimal(row.averageDailyBaseUnits)}{' '}
-                    {unitShort(row.baseUnit)}/день
+                    {`${displayDecimal(row.averageDailyBaseUnits)}\u00a0${unitShort(row.baseUnit)} в день`}
                   </Td>
                   <Td gridArea="coverage">
                     <MobileCellLabel aria-hidden="true">
-                      Покрытие
+                      Хватит на
                     </MobileCellLabel>
                     {row.coverageDays === null
-                      ? 'Нет расхода'
-                      : `${displayDecimal(row.coverageDays)} дн.`}
+                      ? 'Расхода нет'
+                      : days(row.coverageDays)}
                   </Td>
                   <Td
                     gridArea="suggestion"
@@ -90,7 +96,7 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                     color="text.action"
                   >
                     <MobileCellLabel aria-hidden="true">
-                      Пополнить
+                      Докупить
                     </MobileCellLabel>
                     +{formatQuantity(row.suggestedQuantity, row.baseUnit)}
                   </Td>
@@ -108,14 +114,13 @@ export function SupplyPanel() {
   const data = useRestaurantData();
   return (
     <Stack gap="3">
-      <chakra.h2 textStyle="heading.h3">Предложения поставок</chakra.h2>
+      <chakra.h2 textStyle="heading.h3">Что докупить</chakra.h2>
       <Text textStyle="caption.default" color="text.secondary">
-        Ориентир — 7 дней наблюдаемого расхода или дефицит одной порции.
-        Поставка создаётся человеком.
+        Считаем по расходу за 7 дней. Заказ поставщику вы оформляете сами.
       </Text>
       <WarehouseRead
         model={data.supplySuggestions()}
-        title="Не удалось рассчитать пополнение"
+        title="Не удалось рассчитать, что докупить"
       >
         {(value) => <SupplyRows value={value.result} />}
       </WarehouseRead>

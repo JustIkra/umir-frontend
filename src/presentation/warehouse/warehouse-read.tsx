@@ -8,10 +8,13 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import { Button } from '@/presentation/ui/actions';
 import { formatStamp } from '@/presentation/ui/zones';
 
+const contextStamp = (context: BusinessContext) =>
+  formatStamp(context.evaluatedAt.epochMs, context.settings.timeZone);
+
 export const warehouseStamp = (context: BusinessContext | undefined) =>
   context === undefined
     ? 'Получаем данные…'
-    : `Оценка ${formatStamp(context.evaluatedAt.epochMs, context.settings.timeZone)}`;
+    : `Обновлено ${contextStamp(context)}`;
 
 export function WarehouseRead<T>({
   model,
@@ -34,7 +37,7 @@ export function WarehouseRead<T>({
             model.refresh();
           }}
         >
-          Данные сейчас недоступны. Это не означает, что список пуст.
+          Попробуйте ещё раз.
         </ReadFailure>
       );
     return (
@@ -48,7 +51,7 @@ export function WarehouseRead<T>({
       {failure !== undefined && (
         <FormMessage
           tone="error"
-          title="Данные не обновлены"
+          title="Не удалось обновить данные"
           action={
             <Button
               variant="secondary"
@@ -56,11 +59,11 @@ export function WarehouseRead<T>({
                 model.refresh();
               }}
             >
-              Повторить чтение
+              Попробовать ещё раз
             </Button>
           }
         >
-          Показана предыдущая оценка. {warehouseStamp(snapshot.value.context)}.
+          Показаны данные на {contextStamp(snapshot.value.context)}.
         </FormMessage>
       )}
       {children(snapshot.value)}

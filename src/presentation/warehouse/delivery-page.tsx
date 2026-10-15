@@ -17,6 +17,7 @@ import { useServices } from '@/presentation/services';
 import { useLeaveGuard } from '@/presentation/app-shell/leave-guard';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { formatInstant } from '@/presentation/ui/time';
+import { formatSectionDate } from '@/presentation/ui/zones';
 import { civilFields, draftFromForm } from './delivery-forms';
 import { media } from '@/presentation/theme/system';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
@@ -38,21 +39,6 @@ import {
 } from '@/presentation/ui/form';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
-
-// «1 строка», «2 строки», «5 строк»; the same for «партия».
-const plural = (count: number, forms: readonly [string, string, string]) => {
-  const tens = count % 100;
-  const ones = count % 10;
-  const form =
-    tens > 10 && tens < 20
-      ? forms[2]
-      : ones === 1
-        ? forms[0]
-        : ones > 1 && ones < 5
-          ? forms[1]
-          : forms[2];
-  return `${String(count)} ${form}`;
-};
 
 // From 1367 the column heads name the fields, so the labels are hidden
 // visually but stay for screen readers.
@@ -165,25 +151,28 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
         />
         <PageHeader
           title="Приём поставки"
-          description={`Каждая строка — отдельная партия. «Годна до» рассчитает склад от изготовления. Часовой пояс: ${timeZone}.`}
+          caption={formatSectionDate(openedAt, timeZone)}
+          description="Одна строка — одна партия. Срок годности посчитаем сами по дате изготовления."
         />
       </Stack>
       {message !== undefined && (
         <FormMessage
           tone={status === 'unknown' ? 'unknown' : 'error'}
           title={
-            status === 'unknown'
-              ? 'Исход поставки не установлен'
-              : 'Поставка не принята'
+            status === 'unknown' || status === 'reset'
+              ? 'Не знаем, принята ли поставка'
+              : status === 'invalid'
+                ? 'Проверьте форму'
+                : 'Поставка не принята'
           }
         >
           {message}
         </FormMessage>
       )}
       {timezoneChanged && (
-        <FormMessage tone="error" title="Часовой пояс изменился">
-          Проверьте даты в новой форме. Исходная попытка, если она есть,
-          сохраняет свои данные.
+        <FormMessage tone="error" title="Изменился часовой пояс ресторана">
+          Обновите страницу и проверьте даты и время. Если поставка уже
+          отправлена, её данные не изменятся.
         </FormMessage>
       )}
       <SplitCardForm
@@ -209,7 +198,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
           if (input === undefined) {
             setStatus('invalid');
             setMessage(
-              'Заполните номер, даты и время в формате дд.мм.гггг и чч:мм, продукты, срок в днях и положительное количество с точностью до 0,001.',
+              'Заполните все поля. Дата — дд.мм.гггг, время — чч:мм, срок — целое число дней, количество — больше нуля, с точностью до 0,001.',
             );
             return;
           }
@@ -236,13 +225,13 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               );
               setMessage(
                 result.kind === 'unknown'
-                  ? 'Ответ потерян. Проверка повторяет исходные данные и тот же номер команды; форму пока нельзя менять.'
+                  ? 'Связь прервалась. Нажмите «Проверить результат» — поставка не задвоится. Пока форму менять нельзя.'
                   : result.kind === 'reset'
-                    ? 'Склад перезапущен. Старый исход не подтверждён. Обновите данные перед новой операцией.'
+                    ? 'Была короткая техническая пауза. Прежде чем отправлять снова, проверьте поставку в истории склада.'
                     : result.kind === 'refused' &&
                         result.code === 'SettingsChanged'
-                      ? 'Настройки времени изменились. Обновите данные и проверьте даты перед новой отправкой.'
-                      : 'Склад отказал в приёме. Проверьте доступ, даты и количество; поставка не подтверждена.',
+                      ? 'Изменились настройки времени ресторана. Обновите страницу и проверьте даты.'
+                      : 'Проверьте даты и количество и попробуйте ещё раз.',
               );
             });
         }}
@@ -275,7 +264,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                 />
                 <FieldMessage
                   id="delivery-number-hint"
-                  hint="Номер из накладной; может повторяться у разных поставок"
+                  hint="Номер из накладной. Может совпадать у разных поставок."
                 />
               </FieldGroup>
               <FieldGroup>
@@ -315,9 +304,6 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               <chakra.h2 textStyle="heading.h3">
                 {`Строки поставки · ${String(rows.length)}`}
               </chakra.h2>
-              <Text textStyle="caption.default" color="text.secondary">
-                {`${plural(rows.length, ['строка', 'строки', 'строк'])} → ${plural(rows.length, ['партия', 'партии', 'партий'])}`}
-              </Text>
             </Flex>
             <Stack gap="0">
               <Grid
@@ -335,9 +321,9 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                 <span>№</span>
                 <span>Продукт</span>
                 <span>Количество</span>
-                <span>Изготовлено ({timeZone})</span>
+                <span>Изготовлено</span>
                 <span>Срок годности</span>
-                <span>Поступило ({timeZone})</span>
+                <span>Поступило</span>
               </Grid>
               <Stack
                 as="ol"
@@ -566,7 +552,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
           </Stack>
           <CardFooter>
             <Text textStyle="caption.default" color="text.secondary">
-              Склад проверит всю форму; при ошибке ничего не записывается.
+              Если в форме ошибка, ничего не сохранится.
             </Text>
             <Flex
               direction={{ base: 'column-reverse', sm: 'row' }}

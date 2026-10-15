@@ -35,22 +35,23 @@ function ProductBatches({
     <Stack p="4" ps={{ sm: '12' }} gap="3">
       <WarehouseRead
         model={data.productBatches(productID)}
-        title="Не удалось получить партии"
+        title="Не удалось загрузить партии"
       >
         {(value) =>
           value.context.runtimeEpoch !== epoch ||
           value.result.items.some((row) => row.baseUnit !== unit) ? (
             <Text color="text.secondary">
-              Данные склада изменились. Обновляем остатки перед показом партий.
+              Остатки изменились. Обновляем их, потом покажем партии.
             </Text>
           ) : (
             <>
               <Text textStyle="caption.default" color="text.secondary">
-                {warehouseStamp(value.context)} · Порядок FEFO
+                {warehouseStamp(value.context)} · Сначала — партии с ближайшим
+                сроком
               </Text>
               {value.result.items.length === 0 ? (
                 <Text color="text.secondary">
-                  Партий с положительным остатком нет.
+                  Сейчас партий с остатком нет.
                 </Text>
               ) : (
                 value.result.items.map(({ batch, status }, i) => (
@@ -66,13 +67,7 @@ function ProductBatches({
                     borderColor="border.default"
                     alignItems="start"
                   >
-                    <Text
-                      textStyle="numeric.default"
-                      color="text.secondary"
-                      overflowWrap="anywhere"
-                    >
-                      Партия {batch.batchID}
-                    </Text>
+                    <Text color="text.secondary">Партия</Text>
                     <Text textStyle="numeric.body" overflowWrap="anywhere">
                       {formatQuantity(batch.remainingQuantity, unit)}
                     </Text>
@@ -99,8 +94,7 @@ function ProductBatches({
                         {formatStamp(
                           batch.receivedAt.epochMs,
                           value.context.settings.timeZone,
-                        )}{' '}
-                        · поставка {batch.deliveryID}, строка {batch.lineNo}
+                        )}
                       </Text>
                     </Stack>
                   </Grid>
@@ -143,7 +137,7 @@ export function StockPage() {
           setQuery(event.target.value);
         }}
       />
-      <WarehouseRead model={model} title="Не удалось получить остатки">
+      <WarehouseRead model={model} title="Не удалось загрузить остатки">
         {(value) => {
           const search = query.trim().toLocaleLowerCase('ru-RU');
           const rows = value.result.items.filter((row) =>
@@ -155,7 +149,7 @@ export function StockPage() {
             <Text color="text.secondary">
               {value.result.items.length === 0
                 ? 'Продуктов пока нет. Добавьте продукты в справочнике и примите поставку.'
-                : 'По запросу продуктов нет.'}
+                : 'Ничего не нашли. Проверьте название или код.'}
             </Text>
           ) : (
             <TableCard>
@@ -163,7 +157,7 @@ export function StockPage() {
                 <chakra.thead>
                   <tr>
                     <Th>Продукт</Th>
-                    <Th textAlign="end">Пригодный остаток</Th>
+                    <Th textAlign="end">Можно использовать</Th>
                     <Th>Ожидает списания</Th>
                     <Th>Код</Th>
                   </tr>
@@ -211,7 +205,7 @@ export function StockPage() {
                             overflowWrap="anywhere"
                           >
                             <MobileCellLabel aria-hidden="true">
-                              Пригодно
+                              Можно использовать
                             </MobileCellLabel>
                             {formatQuantity(
                               row.availableQuantity,

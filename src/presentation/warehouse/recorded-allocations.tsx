@@ -20,7 +20,7 @@ export function AllocationFacts({
   const rows = recordedAllocations(order, warehouseEpoch, history.value);
   return (
     <Stack gap="2">
-      <Text textStyle="caption.strong">Фактический расход по партиям</Text>
+      <Text textStyle="caption.strong">Из каких партий списано</Text>
       {rows.map((row, index) => {
         const catalog = products.value;
         const product =
@@ -38,19 +38,18 @@ export function AllocationFacts({
             borderColor="border.default"
           >
             <Text textStyle="caption.default" overflowWrap="anywhere">
-              {product?.name ?? `Продукт ${row.productID}`} · партия{' '}
-              {row.batchID}
+              {product?.name ?? `Продукт с кодом ${row.productID}`}
             </Text>
             <Text textStyle="numeric.default" overflowWrap="anywhere">
               {product === undefined
-                ? `${formatThousandths(row.quantity)} (единица из справочника недоступна)`
+                ? `${formatThousandths(row.quantity)} (единица неизвестна)`
                 : formatQuantity(row.quantity, product.baseUnit)}
             </Text>
             <Text textStyle="caption.default" color="text.secondary">
               {row.expiresAt === undefined
                 ? history.loading
-                  ? 'Получаем срок из истории поступления…'
-                  : 'Срок партии не подтверждён доступной историей.'
+                  ? 'Узнаём срок годности…'
+                  : 'Срок годности неизвестен.'
                 : `Годна до ${formatStamp(row.expiresAt.epochMs, timeZone)}`}
             </Text>
           </Stack>

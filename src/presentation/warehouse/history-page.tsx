@@ -6,26 +6,49 @@ import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
 import { Button } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { ListCard } from '@/presentation/ui/card';
+import { plural } from '@/presentation/ui/plural';
 import { SegmentChoice } from '@/presentation/ui/segment-choice';
 import { formatStamp } from '@/presentation/ui/zones';
 import { WarehouseLayout } from './warehouse-layout';
 import { WarehouseRead, warehouseStamp } from './warehouse-read';
 import { AllocationFacts } from './recorded-allocations';
 
-const label = (fact: HistoryRecord['fact']): string => {
+const label = (
+  fact: HistoryRecord['fact'],
+  product: (productID: string) => string,
+): string => {
   switch (fact.kind) {
     case 'product':
       return `Добавлен продукт «${fact.name}»`;
     case 'dish':
       return `Добавлено блюдо «${fact.name}»`;
-    case 'receipt':
-      return `Поставка № ${fact.number} · ${String(fact.batches.length)} партий`;
-    case 'sale':
-      return `Заказ ${fact.order.orderID}`;
+    case 'receipt': {
+      const count = fact.batches.length;
+      return `Поставка № ${fact.number} · ${String(count)} ${plural(count, 'партия', 'партии', 'партий')}`;
+    }
+    case 'sale': {
+      const count = fact.order.acceptedPositions.length;
+      return `Заказ из ${String(count)} ${plural(count, 'позиции', 'позиций', 'позиций')}`;
+    }
     case 'pending':
-      return `Партия ${fact.batchID} ожидает списания`;
+      return `${product(fact.productID)}: партия ожидает списания`;
     case 'writeoff':
-      return `Подтверждено списание партии ${fact.batchID}: ${fact.baseUnit === undefined ? formatThousandths(fact.quantity) : formatQuantity(fact.quantity, fact.baseUnit)}`;
+      return `${product(fact.productID)}: списано ${fact.baseUnit === undefined ? formatThousandths(fact.quantity) : formatQuantity(fact.quantity, fact.baseUnit)}`;
+  }
+};
+const kind = (fact: HistoryRecord['fact']): string => {
+  switch (fact.kind) {
+    case 'product':
+    case 'dish':
+      return 'Справочник';
+    case 'receipt':
+      return 'Поступление';
+    case 'sale':
+      return 'Продажа';
+    case 'pending':
+      return 'Срок истёк';
+    case 'writeoff':
+      return 'Списание';
   }
 };
 type Filter = 'all' | 'receipt' | 'sale' | 'writeoff';
@@ -33,6 +56,7 @@ export function HistoryPage() {
   const data = useRestaurantData();
   const model = data.history();
   const snapshot = useReadModel(model);
+  const products = useReadModel(data.products()).value;
   const [filter, setFilter] = useState<Filter>('all');
   const [count, setCount] = useState(20);
   const [open, setOpen] = useState<readonly string[]>([]);
@@ -65,8 +89,13 @@ export function HistoryPage() {
           Обновить
         </Button>
       </Flex>
-      <WarehouseRead model={model} title="Не удалось получить историю">
+      <WarehouseRead model={model} title="Не удалось загрузить историю">
         {(value) => {
+          const product = (productID: string) =>
+            (products?.context.runtimeEpoch === value.context.runtimeEpoch
+              ? products.result.items.find((v) => v.productID === productID)
+                  ?.name
+              : undefined) ?? `Продукт с кодом ${productID}`;
           const events = value.result.events
             .filter(
               (v) =>
@@ -78,9 +107,7 @@ export function HistoryPage() {
           return (
             <Stack gap="3">
               {events.length === 0 ? (
-                <Text color="text.secondary">
-                  В текущей истории таких событий нет.
-                </Text>
+                <Text color="text.secondary">Таких событий пока нет.</Text>
               ) : (
                 <ListCard p="0">
                   {events.slice(0, count).map((event, index) => (
@@ -100,7 +127,7 @@ export function HistoryPage() {
                               : 'neutral'
                           }
                         >
-                          #{event.sequence}
+                          {kind(event.fact)}
                         </Badge>
                         <Text
                           textStyle="caption.default"
@@ -113,7 +140,7 @@ export function HistoryPage() {
                         </Text>
                       </Flex>
                       <Text textStyle="body.strong" overflowWrap="anywhere">
-                        {label(event.fact)}
+                        {label(event.fact, product)}
                       </Text>
                       {event.fact.kind === 'sale' && (
                         <>
@@ -129,7 +156,7 @@ export function HistoryPage() {
                               );
                             }}
                           >
-                            Фактические партии заказа
+                            Партии заказа
                           </Button>
                           {open.includes(event.eventID) && (
                             <AllocationFacts

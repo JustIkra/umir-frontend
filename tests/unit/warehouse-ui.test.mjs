@@ -44,9 +44,9 @@ test('stock and M6 display actual quantities and partial-history facts', async (
   });
   const page = text(html);
   assert.match(page, /Продукт со стенда/);
-  assert.match(page, /Пригодно12,345 г/);
-  assert.match(page, /Предложения поставок/);
-  assert.match(page, /История расхода неполная/);
+  assert.match(page, /Можно использовать12,345 г/);
+  assert.match(page, /Что докупить/);
+  assert.match(page, /Данных пока мало/);
   assert.doesNotMatch(page, /P-0158/);
 });
 test('a human writeoff waits for the batch quantity unit instead of asking for blind confirmation', async () => {
@@ -57,11 +57,12 @@ test('a human writeoff waits for the batch quantity unit instead of asking for b
     /<button[^>]*disabled[^>]*>Подтвердить списание<\/button>/.test(html),
   );
 });
-test('delivery labels follow the actual organization time zone', async () => {
+test('the delivery header names the city of the organization time zone', async () => {
   const access = readyAccess([
     sampleRestaurant({ timeZone: 'Asia/Yekaterinburg' }),
   ]);
   const html = await renderRoute(`/app/r/${R}/warehouse/delivery`, { access });
-  assert.match(text(html), /Изготовлено \(Asia\/Yekaterinburg\)/);
-  assert.doesNotMatch(text(html), /Изготовлено \(Москва/);
+  assert.match(text(html), / · Екатеринбург/);
+  assert.match(text(html), /Изготовлено/);
+  assert.doesNotMatch(text(html), /Asia\/Yekaterinburg|Москва|UTC/);
 });

@@ -41,7 +41,9 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
       Record<string, 'sending' | 'unknown' | 'done' | 'refused' | 'reset'>
     >
   >({});
-  const [message, setMessage] = useState<string | undefined>();
+  const [message, setMessage] = useState<
+    { readonly title: string; readonly text: string } | undefined
+  >();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -52,17 +54,18 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
   const name = (id: string, epoch: string) =>
     products.value?.context.runtimeEpoch === epoch
       ? (products.value.result.items.find((v) => v.productID === id)?.name ??
-        id)
-      : id;
+        `Продукт с кодом ${id}`)
+      : `Продукт с кодом ${id}`;
   const confirm = async (batchID: string, epoch: string) => {
     setStates((v) => ({ ...v, [batchID]: 'sending' }));
     const result = await commands.confirmWriteoff(batchID, epoch);
     if (!mounted.current) return;
     if (result.kind === 'created') {
       setStates((v) => ({ ...v, [batchID]: 'done' }));
-      setMessage(
-        `Подтверждено списание ${formatQuantity(result.value.writtenOffQuantity, result.value.baseUnit)} из партии ${batchID}.`,
-      );
+      setMessage({
+        title: 'Готово',
+        text: `Списание подтверждено: ${name(result.value.productID, epoch)}, ${formatQuantity(result.value.writtenOffQuantity, result.value.baseUnit)}.`,
+      });
     } else {
       setStates((v) => ({
         ...v,
@@ -75,10 +78,19 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
       }));
       setMessage(
         result.kind === 'unknown'
-          ? 'Ответ не получен. Проверка повторит сохранённую попытку без нового списания.'
+          ? {
+              title: 'Не знаем, прошло ли списание',
+              text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не спишется.',
+            }
           : result.kind === 'reset'
-            ? 'Данные склада обновились. Старый исход не подтверждён; обновите список.'
-            : 'Списание не подтверждено. Обновите данные и повторите проверку доступа.',
+            ? {
+                title: 'Не знаем, прошло ли списание',
+                text: 'Данные обновились. Обновите список и проверьте, списана ли партия.',
+              }
+            : {
+                title: 'Не удалось списать',
+                text: 'Обновите страницу и попробуйте ещё раз.',
+              },
       );
     }
   };
@@ -94,19 +106,19 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
       stamp={warehouseStamp(expiry.value?.context)}
     >
       <Flex wrap="wrap" gap="3" justify="space-between" align="center">
-        <Text>Пригодные партии со сроком в ближайшие 48 часов</Text>
+        <Text>Что испортится в ближайшие 2 дня</Text>
         <Button variant="secondary" onClick={refresh}>
           Обновить
         </Button>
       </Flex>
       <WarehouseRead
         model={expiryModel}
-        title="Не удалось получить сроки годности"
+        title="Не удалось загрузить сроки годности"
       >
         {(value) =>
           value.result.items.length === 0 ? (
             <Text color="text.secondary">
-              Пригодных партий с истекающим сроком в ближайшие 48 часов нет.
+              В ближайшие 2 дня ничего не испортится.
             </Text>
           ) : (
             <ListCard p="0">
@@ -127,11 +139,11 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                       {name(row.productID, value.context.runtimeEpoch)}
                     </Text>
                     <Text textStyle="numeric.default" overflowWrap="anywhere">
-                      Партия {row.batchID} ·{' '}
+                      Остаток{' '}
                       {formatQuantity(row.remainingQuantity, row.baseUnit)}
                     </Text>
                     <Text textStyle="caption.default" color="text.secondary">
-                      До{' '}
+                      Годна до{' '}
                       {formatStamp(
                         row.expiresAt.epochMs,
                         value.context.settings.timeZone,
@@ -152,21 +164,21 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
       </WarehouseRead>
       <chakra.h2 textStyle="heading.h3">Ожидает списания</chakra.h2>
       <Text textStyle="caption.default" color="text.secondary">
-        Просроченные партии уже недоступны для заказов. Окончательное списание
-        подтверждает сотрудник склада.
+        Просроченное уже не попадает в заказы. Подтвердите списание, когда
+        уберёте продукты.
       </Text>
       {message !== undefined && (
-        <FormMessage tone="info" title="Результат операции">
-          {message}
+        <FormMessage tone="info" title={message.title}>
+          {message.text}
         </FormMessage>
       )}
       <WarehouseRead
         model={data.pendingWriteoffs()}
-        title="Не удалось получить партии к списанию"
+        title="Не удалось загрузить партии к списанию"
       >
         {(value) =>
           value.result.items.length === 0 ? (
-            <Text color="text.secondary">Партий, ожидающих списания, нет.</Text>
+            <Text color="text.secondary">Списывать пока нечего.</Text>
           ) : (
             <ListCard p="0">
               {value.result.items.map(({ batch }, index) => {
@@ -200,10 +212,9 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                         {name(batch.productID, value.context.runtimeEpoch)}
                       </Text>
                       <Text textStyle="numeric.default" overflowWrap="anywhere">
-                        Партия {batch.batchID}
                         {unit === undefined
-                          ? ' · получаем единицу измерения…'
-                          : ` · ${formatQuantity(batch.remainingQuantity, unit)}`}
+                          ? 'Узнаём единицу измерения…'
+                          : `Остаток ${formatQuantity(batch.remainingQuantity, unit)}`}
                       </Text>
                       <Text textStyle="caption.default" color="text.secondary">
                         Срок истёк{' '}
@@ -231,7 +242,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                         }}
                       >
                         {status === 'sending'
-                          ? 'Подтверждаем…'
+                          ? 'Списываем…'
                           : status === 'unknown'
                             ? 'Проверить результат'
                             : 'Подтвердить списание'}
