@@ -74,7 +74,7 @@ export function CookieBanner() {
           alignSelf={{ sm: 'end' }}
           textStyle="body.strong"
         >
-          Мы используем только необходимые cookie
+          Мы используем необходимые cookie
         </Text>
         <Text
           gridArea="text"
@@ -83,7 +83,9 @@ export function CookieBanner() {
           color="text.secondary"
         >
           Они обеспечивают вход в систему и сохранение незавершённой операции.
-          Аналитические и рекламные cookie не применяются.
+          Карта в разделе «Контакты» загружается с Яндекс Карт — Яндекс может
+          установить свои cookie. Аналитические и рекламные cookie мы не
+          применяем.
         </Text>
         <Flex
           gridArea="actions"
