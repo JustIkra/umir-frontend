@@ -17,9 +17,7 @@ const breakpoints = {
   md: '881px',
   lg: '1025px',
   xl: '1201px',
-  // The delivery lines become a table here: its columns need 1030px of content
-  // (see wideColumns), a 1400 screen less the sidebar and the card paddings.
-  '2xl': '1400px',
+  '2xl': '1367px',
   '3xl': '2400px',
 } as const;
 
@@ -31,8 +29,6 @@ export const atLeast = { sm: `(min-width: ${breakpoints.sm})` } as const;
 export const media = {
   sm: `@media ${atLeast.sm}`,
   belowSm: '@media (max-width: 767.98px)',
-  // P1: the delivery lines become a table from 2xl.
-  wide: `@media (min-width: ${breakpoints['2xl']})`,
 } as const;
 
 // Figma Overlay scrim under modal dialogs and sheets.

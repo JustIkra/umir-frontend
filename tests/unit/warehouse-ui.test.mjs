@@ -75,7 +75,7 @@ test('the delivery form has typed fields and no system select', async () => {
     /<input type="hidden" name="createdDate" value="14.10.2026"/,
   );
   assert.match(html, /<input type="hidden" name="createdTime" value="10:00"/);
-  assert.match(html, /placeholder="Выберите продукт"/);
+  assert.match(html, /placeholder="Найти продукт"/);
   assert.match(html, /name="shelf-1"/);
   assert.match(html, /aria-label="Больше дней: строка 1"/);
   assert.doesNotMatch(html, />дней<\/option>/);

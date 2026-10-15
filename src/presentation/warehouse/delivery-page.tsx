@@ -19,7 +19,6 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import { formatInstant } from '@/presentation/ui/time';
 import { formatSectionDate } from '@/presentation/ui/zones';
 import { civilFields, draftFromForm } from './delivery-forms';
-import { media } from '@/presentation/theme/system';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
 import {
@@ -42,10 +41,15 @@ import { Stepper, daysUnit } from '@/presentation/ui/stepper';
 import { TimeField } from '@/presentation/ui/time-field';
 import { rem } from '@/presentation/ui/units';
 
-// From 1367 the column heads name the fields, so the labels are hidden
+// The delivery lines are a table from 1420, not from the theme's 2xl (1367):
+// at 1367 the content is 997 and the columns need 1039, so the product field
+// would clip its «Найти продукт». Below it the lines stay cards.
+const wide = '@media (min-width: 1420px)';
+
+// In the table the column heads name the fields, so the labels are hidden
 // visually but stay for screen readers.
 const hiddenWide = {
-  [media.wide]: {
+  [wide]: {
     position: 'absolute',
     width: '1px',
     height: '1px',
@@ -55,11 +59,35 @@ const hiddenWide = {
   },
 } as const;
 
-// The date field is at least 148 wide, so a date with a time (100) needs 254;
-// the fixed columns and the 6 gaps of 8 sum to 1014, which fits the content of
-// a 1400 screen (1030) and leaves the product at least 112.
-const wideColumns = `${rem(24)} minmax(${rem(112)}, 1fr) ${rem(104)} ${rem(254)} ${rem(170)} ${rem(254)} ${rem(40)}`;
-const rowTimeWidth = { base: rem(112), '2xl': rem(100) } as const;
+// Columns of the table layout, in px. The fixed ones are 24 + 104 + 254 + 170
+// + 254 + 32 = 838 and the 6 gaps of 6 add 36, so with the product field at
+// least 165 (its placeholder is 111 and the field adds 52) the content needs
+// 1039. The content is the viewport less 370: 1050 at 1420 (the product has
+// 176) and 1070 at 1440 (196). A date with a time is 254: the date field is
+// at least 148, the gap 6, the time 100.
+const wideColumns = `${rem(24)} minmax(${rem(165)}, 1fr) ${rem(104)} ${rem(254)} ${rem(170)} ${rem(254)} ${rem(32)}`;
+const wideGap = '1.5';
+const rowTimeWide = { [wide]: { width: rem(100) } } as const;
+const rowWide = {
+  [wide]: {
+    gridTemplateAreas: "'number product quantity made shelf received remove'",
+    gridTemplateColumns: wideColumns,
+    alignItems: 'center',
+    columnGap: wideGap,
+    p: '0',
+    py: '3',
+    borderWidth: '0 0 1px',
+    borderRadius: '0',
+  },
+} as const;
+const numberWide = {
+  [wide]: {
+    px: '0',
+    bg: 'transparent',
+    textStyle: 'body.default',
+    color: 'text.secondary',
+  },
+} as const;
 
 function RowLabel({
   htmlFor,
@@ -336,9 +364,10 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
             <Stack gap="0">
               <Grid
                 aria-hidden="true"
-                display={{ base: 'none', '2xl': 'grid' }}
+                display="none"
+                css={{ [wide]: { display: 'grid' } }}
                 gridTemplateColumns={wideColumns}
-                columnGap="2"
+                columnGap={wideGap}
                 alignItems="start"
                 pb="2"
                 borderBottomWidth="1px"
@@ -355,7 +384,8 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               </Grid>
               <Stack
                 as="ol"
-                gap={{ base: '3', '2xl': '0' }}
+                gap="3"
+                css={{ [wide]: { gap: '0' } }}
                 listStyleType="none"
               >
                 {rows.map((row, index) => {
@@ -376,48 +406,43 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                       gridTemplateAreas={{
                         base: "'head' 'product' 'quantity' 'made' 'shelf' 'received'",
                         sm: "'head head' 'product quantity' 'made shelf' 'received received'",
-                        '2xl':
-                          "'number product quantity made shelf received remove'",
                       }}
                       gridTemplateColumns={{
                         base: '1fr',
                         sm: 'repeat(2, minmax(0, 1fr))',
-                        '2xl': wideColumns,
                       }}
-                      alignItems={{ base: 'start', '2xl': 'center' }}
-                      columnGap={{ base: '4', '2xl': '2' }}
+                      alignItems="start"
+                      columnGap="4"
                       rowGap="3"
-                      p={{ base: '4', '2xl': '0' }}
-                      py={{ '2xl': '3' }}
+                      p="4"
                       bg="bg.surface"
-                      borderWidth={{ base: '1px', '2xl': '0 0 1px' }}
+                      borderWidth="1px"
                       borderColor="border.default"
-                      borderRadius={{ base: 'md', '2xl': '0' }}
+                      borderRadius="md"
+                      css={rowWide}
                     >
                       <Flex
                         gridArea="head"
-                        display={{ base: 'flex', '2xl': 'contents' }}
+                        display="flex"
                         align="center"
                         gap="3"
+                        css={{ [wide]: { display: 'contents' } }}
                       >
                         <Text
                           gridArea="number"
                           minW="6"
-                          px={{ base: '2', '2xl': '0' }}
-                          bg={{ base: 'bg.subtle', '2xl': 'transparent' }}
+                          px="2"
+                          bg="bg.subtle"
                           borderRadius="sm"
                           textAlign="center"
-                          textStyle={{
-                            base: 'caption.strong',
-                            '2xl': 'body.default',
-                          }}
-                          color={{ '2xl': 'text.secondary' }}
+                          textStyle="caption.strong"
+                          css={numberWide}
                         >
                           {number}
                         </Text>
                         <Text
                           flex="1"
-                          display={{ '2xl': 'none' }}
+                          css={{ [wide]: { display: 'none' } }}
                           textStyle="caption.default"
                           color="text.secondary"
                         >
@@ -428,7 +453,8 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                           gridArea="remove"
                           display="flex"
                           boxSize="10"
-                          my={{ base: '-2', '2xl': '0' }}
+                          my="-2"
+                          css={{ [wide]: { boxSize: '8', my: '0' } }}
                           alignItems="center"
                           justifyContent="center"
                           borderRadius="md"
@@ -455,7 +481,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                           id={id('product')}
                           options={productOptions}
                           value={row.product}
-                          placeholder="Выберите продукт"
+                          placeholder="Найти продукт"
                           disabled={closed}
                           onValueChange={(product) => {
                             markDirty();
@@ -500,7 +526,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                             disabled={closed}
                             onValueChange={markDirty}
                           />
-                          <Box w={rowTimeWidth} flexShrink="0">
+                          <Box w={rem(112)} css={rowTimeWide} flexShrink="0">
                             <TimeField
                               id={id('made-time')}
                               name={`made-time-${String(row.key)}`}
@@ -561,7 +587,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                             disabled={closed}
                             onValueChange={markDirty}
                           />
-                          <Box w={rowTimeWidth} flexShrink="0">
+                          <Box w={rem(112)} css={rowTimeWide} flexShrink="0">
                             <TimeField
                               id={id('received-time')}
                               name={`received-time-${String(row.key)}`}
