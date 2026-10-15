@@ -7,6 +7,7 @@ import {
   defineTextStyles,
   defineTokens,
 } from '@chakra-ui/react';
+import { comboboxRecipe } from './recipes';
 
 // Mobile-first form of the project scale from the design brief:
 // Mobile Portrait ≤767 is the base, Mobile Landscape ≤880, Tablet Portrait ≤1024,
@@ -333,6 +334,7 @@ const config = defineConfig({
         decor: { value: '0' },
         content: { value: '1' },
         banner: { value: '20' },
+        popover: { value: '25' },
         skipLink: { value: '30' },
       },
       durations: {
@@ -343,6 +345,7 @@ const config = defineConfig({
     semanticTokens: { colors },
     textStyles,
     keyframes,
+    slotRecipes: { combobox: comboboxRecipe },
   },
 });
 
