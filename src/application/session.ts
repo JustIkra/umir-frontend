@@ -1,3 +1,4 @@
+import { isEntityId } from '@/domain/ids';
 import { failureOf, localFailure, type ApiFailure } from './api';
 import type {
   AccountApi,
@@ -88,12 +89,14 @@ export const idleRecheckMs = 30_000;
 // A background check without an answer is repeated after this long.
 export const lostCheckRetryMs = 60_000;
 
-// The sign-in page returns only to addresses inside the app.
+const invitationPath = /^\/invite\/([^/?#]+)$/;
+
+// The sign-in page returns only to addresses inside the app and to the page
+// of one invitation (/invite/:id).
 export function returnPath(raw: string | null): string {
-  if (raw === null || raw.includes('\\') || !/^\/app(?:[/?#]|$)/.test(raw)) {
-    return '/app';
-  }
-  return raw;
+  if (raw === null || raw.includes('\\')) return '/app';
+  if (/^\/app(?:[/?#]|$)/.test(raw)) return raw;
+  return isEntityId(invitationPath.exec(raw)?.[1]) ? raw : '/app';
 }
 
 export function createSessionStore({

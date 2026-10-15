@@ -268,6 +268,18 @@ const checks = {
       );
     },
 
+  'serves the invitation page without a referrer': async () => {
+    const id = '77777777-7777-4777-8777-777777777777';
+    const response = await send('GET', `/invite/${id}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers['referrer-policy'], 'no-referrer');
+    assert.match(response.headers['content-type'] ?? '', /^text\/html/);
+    // Only the invitation address carries the policy.
+    const other = await send('GET', '/login');
+    assert.equal(other.status, 200);
+    assert.equal(other.headers['referrer-policy'], undefined);
+  },
+
   // Nginx 1.30 already streams small chunks and speaks HTTP/1.1 upstream by
   // default, so the contract's settings are checked in the file as well.
   'configures the restaurant stream for a long-lived connection': () => {

@@ -34,6 +34,7 @@ import {
   PersonalDataConsentPage,
   PrivacyPolicyPage,
 } from './documents/pages';
+import { InviteAcceptancePage, createInviteLoader } from './invite/invite-page';
 import { LandingPage } from './landing/landing-page';
 import {
   createAdminLoader,
@@ -147,6 +148,12 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
           path: '/password-reset/new',
           loader: createResetStepLoader(services, 'password'),
           element: <PasswordResetNewPage />,
+        },
+        {
+          path: '/invite/:invitationID',
+          loader: createInviteLoader(services),
+          element: <InviteAcceptancePage />,
+          errorElement: <NotFoundBoundary />,
         },
         {
           path: '/app',

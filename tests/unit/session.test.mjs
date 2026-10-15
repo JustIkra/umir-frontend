@@ -481,6 +481,24 @@ test('returnPath keeps only addresses inside the app', () => {
   }
 });
 
+test('returnPath also keeps the address of one invitation', () => {
+  const id = 'abcdef12-7777-4777-8777-777777777777';
+  assert.equal(returnPath(`/invite/${id}`), `/invite/${id}`);
+  for (const raw of [
+    '/invite/x',
+    '/invite/',
+    `/invite/${id.toUpperCase()}`,
+    `/invite/${id}/../x`,
+    `/invite/${id}/x`,
+    `/invite/${id}?a=b`,
+    `//invite/${id}`,
+    `/invite/${id}\\evil`,
+    `/invite\\${id}`,
+  ]) {
+    assert.equal(returnPath(raw), '/app', raw);
+  }
+});
+
 test('adopt() activates the new session like a sign-in', async () => {
   const { api } = account();
   const { session, events } = setup(api);
