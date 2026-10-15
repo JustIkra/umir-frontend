@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import { createElement as h } from 'react';
 import { SearchSelect } from '../../src/presentation/ui/search-select.tsx';
+import { TimeField } from '../../src/presentation/ui/time-field.tsx';
 import { renderElement } from './support/render-route.mjs';
 
 const products = [
@@ -62,4 +63,21 @@ test('a disabled search select disables its input and trigger', () => {
     html,
     /<button[^>]*aria-label="Показать список"[^>]*disabled=""/,
   );
+});
+
+test('the time field is a combobox with a masked numeric input', () => {
+  const html = renderElement(
+    h(TimeField, {
+      id: 't1',
+      name: 'made-time-1',
+      defaultValue: '14:27',
+      'aria-label': 'Время изготовления, строка 1',
+    }),
+  );
+  assert.match(html, /role="combobox"/);
+  assert.match(html, /inputMode="numeric"|inputmode="numeric"/);
+  assert.match(html, /placeholder="чч:мм"/);
+  assert.match(html, /value="14:27"/);
+  assert.match(html, /<input type="hidden" name="made-time-1" value="14:27"/);
+  assert.doesNotMatch(html, /type="time"/);
 });
