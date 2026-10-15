@@ -66,3 +66,45 @@ test('the delivery header names the city of the organization time zone', async (
   assert.match(text(html), /Изготовлено/);
   assert.doesNotMatch(text(html), /Asia\/Yekaterinburg|Москва|UTC/);
 });
+test('the delivery form has typed fields and no system select', async () => {
+  const html = await renderRoute(`/app/r/${R}/warehouse/delivery`);
+  assert.doesNotMatch(html, /<select/);
+  assert.match(html, /aria-label="Открыть календарь"/);
+  assert.match(
+    html,
+    /<input type="hidden" name="createdDate" value="14.10.2026"/,
+  );
+  assert.match(html, /<input type="hidden" name="createdTime" value="10:00"/);
+  assert.match(html, /placeholder="Выберите продукт"/);
+  assert.match(html, /name="shelf-1"/);
+  assert.match(html, /aria-label="Больше дней: строка 1"/);
+  assert.doesNotMatch(html, />дней<\/option>/);
+});
+test('an unfinished delivery comes back into the typed fields', async () => {
+  const civil = (localDateTime) => ({ civil: { localDateTime } });
+  const html = await renderRoute(`/app/r/${R}/warehouse/delivery`, {
+    pendingDelivery: {
+      number: '1192',
+      createdAt: civil('2026-10-14T09:00:00'),
+      expectedSettingsVersion: '1',
+      lines: [
+        {
+          productID: 'parmesan',
+          quantity: '1500',
+          manufacturedAt: civil('2026-10-10T09:40:00'),
+          receivedAt: civil('2026-10-14T08:30:00'),
+          shelfLife: { value: '7', unit: 'day' },
+        },
+      ],
+    },
+  });
+  assert.match(html, /name="createdDate" value="14.10.2026"/);
+  assert.match(html, /name="createdTime" value="09:00"/);
+  assert.match(html, /name="made-date-1" value="10.10.2026"/);
+  assert.match(html, /name="made-time-1" value="09:40"/);
+  assert.match(html, /name="received-time-1" value="08:30"/);
+  assert.match(
+    html,
+    /name="shelf-1"[^>]*value="7"|value="7"[^>]*name="shelf-1"/,
+  );
+});
