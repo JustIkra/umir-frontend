@@ -5,8 +5,8 @@ import mobileGlowBottom from '@/presentation/assets/decor/contacts/mobile-glow-b
 import mobileGlowTop from '@/presentation/assets/decor/contacts/mobile-glow-top.svg';
 import tabletGlowLeft from '@/presentation/assets/decor/contacts/tablet-glow-left.svg';
 import tabletGlowRight from '@/presentation/assets/decor/contacts/tablet-glow-right.svg';
+import { FeedbackForm } from '@/presentation/feedback/feedback-form';
 import { DecorLayer, type DecorPiece } from '@/presentation/ui/decor';
-import { FeedbackForm } from './feedback-form';
 import { OfficeMap } from './office-map';
 import { LandingSection, SectionContent, SectionHead } from './section';
 

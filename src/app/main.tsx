@@ -29,6 +29,7 @@ import { createOrderStore } from '@/adapters/browser-storage/order-store';
 import { createInvitationStore } from '@/adapters/browser-storage/invitation-store';
 import { createPasswordResetStore } from '@/adapters/browser-storage/password-reset-store';
 import { createLastRestaurantStore } from '@/adapters/browser-storage/last-restaurant-store';
+import { createAppFeedbackApiSender } from '@/adapters/feedback/app-feedback-sender';
 import { createFeedbackApiSender } from '@/adapters/feedback/feedback-api-sender';
 import { createGatewayClient } from '@/adapters/http/gateway-client';
 import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
@@ -42,7 +43,10 @@ import { createCommandRunner } from '@/application/commands';
 import { createDeliveryFlow } from '@/application/delivery-flow';
 import { createDeliveryFlowRegistry } from '@/application/delivery-flows';
 import { createEpochRegistry } from '@/application/epochs';
-import { createFeedbackSubmitter } from '@/application/feedback';
+import {
+  createFeedbackSubmitter,
+  type FeedbackSubmitter,
+} from '@/application/feedback';
 import { createLifecycleTracker } from '@/application/lifecycles';
 import { createLiveSync } from '@/application/live-sync';
 import { createModelRegistry } from '@/application/models';
@@ -146,6 +150,7 @@ const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
 const restaurantData = new Map<string, RestaurantData>();
 const catalogCommands = new Map<string, CatalogCommands>();
+const restaurantFeedback = new Map<string, FeedbackSubmitter>();
 const orderFlows = createOrderFlowRegistry(
   (userID, restaurantID) =>
     createOrderFlow({
@@ -226,6 +231,7 @@ const session = createSessionStore({
     catalogCommands.clear();
     deliveryFlows.forget();
     writeoffCommands.clear();
+    restaurantFeedback.clear();
     organizationReads.clear();
     organizationCommands.clear();
     lifecycles.clear();
@@ -247,6 +253,7 @@ const session = createSessionStore({
     catalogCommands.clear();
     deliveryFlows.forget();
     writeoffCommands.clear();
+    restaurantFeedback.clear();
     organizationReads.clear();
     organizationCommands.clear();
     lifecycles.clear();
@@ -311,6 +318,17 @@ const services: PresentationServices = {
   feedback: createFeedbackSubmitter(createFeedbackApiSender(client), () =>
     crypto.randomUUID(),
   ),
+  restaurantFeedback: (restaurantID) => {
+    let feedback = restaurantFeedback.get(restaurantID);
+    if (feedback === undefined) {
+      feedback = createFeedbackSubmitter(
+        createAppFeedbackApiSender(client, restaurantID),
+        () => crypto.randomUUID(),
+      );
+      restaurantFeedback.set(restaurantID, feedback);
+    }
+    return feedback;
+  },
   session,
   access,
   lastRestaurant: createLastRestaurantStore(browserLocalStorage()),

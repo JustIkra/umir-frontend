@@ -1,6 +1,9 @@
 import { Box, Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { FeedbackOutcome } from '@/application/feedback';
+import type {
+  FeedbackOutcome,
+  FeedbackSubmitter,
+} from '@/application/feedback';
 import {
   codePointLength,
   emptyFeedbackDraft,
@@ -80,11 +83,22 @@ const retryAfterText = (seconds: number) =>
   `${String(Math.max(1, Math.ceil(seconds / 60)))}\u00A0мин.`;
 
 // Figma Feedback form 205:3747 with the states Default, Filled, Field errors,
-// Submitting, Sent, Rate limited, Unavailable and Unknown.
-export function FeedbackForm() {
+// Submitting, Sent, Rate limited, Unavailable and Unknown. The landing sends
+// anonymously (the default submitter); the app passes the submitter of its
+// restaurant and the name and email of the signed-in user, which the form
+// returns to after a sent message.
+export function FeedbackForm({
+  submitter,
+  initial,
+}: {
+  submitter?: FeedbackSubmitter;
+  initial?: Partial<Pick<FeedbackDraft, 'name' | 'email'>>;
+}) {
   const { feedback } = useServices();
+  const sender = submitter ?? feedback;
+  const start: FeedbackDraft = { ...emptyFeedbackDraft, ...initial };
   const id = useId();
-  const [draft, setDraft] = useState<FeedbackDraft>(emptyFeedbackDraft);
+  const [draft, setDraft] = useState<FeedbackDraft>(start);
   const [fieldErrors, setFieldErrors] = useState<FeedbackFieldErrors>({});
   const [checked, setChecked] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: 'editing' });
@@ -123,7 +137,7 @@ export function FeedbackForm() {
   const submit = async () => {
     if (submitting || rateLimit !== undefined) return;
     setStatus({ kind: 'submitting' });
-    const outcome = await feedback.submit(draft);
+    const outcome = await sender.submit(draft);
     if (outcome.kind === 'invalid') {
       setChecked(true);
       setFieldErrors(outcome.fieldErrors);
@@ -142,7 +156,7 @@ export function FeedbackForm() {
       return;
     }
     if (outcome.kind === 'sent') {
-      setDraft(emptyFeedbackDraft);
+      setDraft(start);
       setChecked(false);
       setFieldErrors({});
     }

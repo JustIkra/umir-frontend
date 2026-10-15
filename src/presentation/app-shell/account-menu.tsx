@@ -8,6 +8,7 @@ import type {
 import type { User } from '@/application/account';
 import type { SectionKey } from '@/domain/access';
 import closeIcon from '@/presentation/assets/icons/close-24.svg';
+import infoIcon from '@/presentation/assets/icons/info-24.svg';
 import organizationIcon from '@/presentation/assets/icons/organization-24.svg';
 import settingsIcon from '@/presentation/assets/icons/settings-24.svg';
 import signOutIcon from '@/presentation/assets/icons/sign-out-24.svg';
@@ -209,6 +210,7 @@ export function AccountMenu({
   user,
   organizations,
   currentID,
+  feedbackPath,
   onSwitch,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
@@ -216,6 +218,8 @@ export function AccountMenu({
   user: User | undefined;
   organizations: readonly OrganizationAccess[] | undefined;
   currentID: string | undefined;
+  // The feedback page of the open restaurant; undefined outside one.
+  feedbackPath: string | undefined;
   onSwitch: (restaurant: RestaurantAccess) => void;
 }) {
   const close = () => dialogRef.current?.close();
@@ -303,6 +307,12 @@ export function AccountMenu({
           <Icon src={organizationIcon} size={20} />
           Организации и рестораны
         </MenuItem>
+        {feedbackPath !== undefined && (
+          <MenuItem to={feedbackPath} onClick={onLeave}>
+            <Icon src={infoIcon} size={20} />
+            Обратная связь
+          </MenuItem>
+        )}
         <MenuItem to="/logout" onClick={onLeave}>
           <Icon src={signOutIcon} size={20} />
           Выйти

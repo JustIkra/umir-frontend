@@ -368,6 +368,9 @@ export function fakeServices({
     },
     cookieNotice: { isClosed: () => true, close: () => {} },
     feedback: {},
+    restaurantFeedback: () => ({
+      submit: () => Promise.reject(new Error('no feedback in render tests')),
+    }),
     session: {
       ...store(session),
       ensure: () => Promise.resolve(session),

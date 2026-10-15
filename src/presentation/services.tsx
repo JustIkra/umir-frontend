@@ -22,6 +22,9 @@ import type { WriteoffCommands } from '@/application/writeoff-commands';
 export interface PresentationServices {
   cookieNotice: CookieNoticeStore;
   feedback: FeedbackSubmitter;
+  // The feedback form inside a restaurant; one submitter per restaurant, so
+  // an unconfirmed send is repeated with the same submissionID.
+  restaurantFeedback: (restaurantID: string) => FeedbackSubmitter;
   session: SessionStore;
   access: AccessStore;
   lastRestaurant: LastRestaurantStore;
