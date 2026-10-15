@@ -12,10 +12,12 @@ import { TabNav } from '@/presentation/ui/tab-nav';
 export function WarehouseLayout({
   section,
   stamp,
+  onRefresh,
   children,
 }: {
   section: string;
   stamp: string;
+  onRefresh: () => void;
   children: ReactNode;
 }) {
   const path = useRestaurantPath();
@@ -47,7 +49,7 @@ export function WarehouseLayout({
             { to: path('/warehouse/history'), title: 'История' },
           ]}
         />
-        <EvaluationStamp text={stamp} />
+        <EvaluationStamp text={stamp} onRefresh={onRefresh} />
       </Flex>
       <Stack gap="4">{children}</Stack>
     </Stack>

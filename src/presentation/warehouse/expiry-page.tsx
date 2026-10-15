@@ -82,20 +82,20 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
       );
     }
   };
+  const refresh = () => {
+    expiryModel.refresh();
+    data.pendingWriteoffs().refresh();
+    data.products().refresh();
+  };
   return (
     <WarehouseLayout
+      onRefresh={refresh}
       section="Сроки годности"
       stamp={warehouseStamp(expiry.value?.context)}
     >
       <Flex wrap="wrap" gap="3" justify="space-between" align="center">
         <Text>Пригодные партии со сроком в ближайшие 48 часов</Text>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            expiryModel.refresh();
-            data.pendingWriteoffs().refresh();
-          }}
-        >
+        <Button variant="secondary" onClick={refresh}>
           Обновить
         </Button>
       </Flex>

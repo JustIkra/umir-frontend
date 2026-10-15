@@ -13,7 +13,7 @@ export function EvaluationStamp({
 }: {
   text: string;
   icon?: boolean | 'narrow';
-  onRefresh?: () => void;
+  onRefresh: () => void;
 }) {
   return (
     <Flex

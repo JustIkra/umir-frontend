@@ -128,6 +128,11 @@ export function StockPage() {
   };
   return (
     <WarehouseLayout
+      onRefresh={() => {
+        model.refresh();
+        data.supplySuggestions().refresh();
+        for (const productID of open) data.productBatches(productID).refresh();
+      }}
       section="Остатки"
       stamp={warehouseStamp(snapshot.value?.context)}
     >

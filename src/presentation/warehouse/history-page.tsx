@@ -38,6 +38,9 @@ export function HistoryPage() {
   const [open, setOpen] = useState<readonly string[]>([]);
   return (
     <WarehouseLayout
+      onRefresh={() => {
+        model.refresh();
+      }}
       section="История"
       stamp={warehouseStamp(snapshot.value?.context)}
     >
