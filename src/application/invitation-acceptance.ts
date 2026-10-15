@@ -1,13 +1,8 @@
 import type { Challenge, UserView, VerifiedChallenge } from './account';
 import type { AccessStore } from './access';
-import type { ApiFailure } from './api';
-import type { CommandResult, CommandRunner } from './commands';
-import {
-  defaultWaitSeconds,
-  nameProblem,
-  normalizedCode,
-  passwordProblem,
-} from './credentials';
+import { createChallengeFlow } from './challenge-flow';
+import type { CommandRunner } from './commands';
+import { nameProblem, normalizedCode, passwordProblem } from './credentials';
 import type { Membership } from './organizations';
 import type { SessionStore } from './session';
 
@@ -156,8 +151,6 @@ const labels: Record<AcceptAction, string> = {
   accept: 'принятия приглашения',
 };
 
-type Refusal = Exclude<CommandResult<unknown>, { readonly kind: 'committed' }>;
-
 // The code turns into «expired» at expiresAt without a request.
 export function isAcceptCodeExpired(
   snapshot: AcceptSnapshot,
@@ -178,26 +171,15 @@ export function createInvitationAcceptance({
   storage,
   now,
 }: AcceptOptions): InvitationAcceptance {
-  const listeners = new Set<() => void>();
   let invitationID: string | undefined;
   let mode: AcceptMode = 'register';
-  let record: AcceptRecord | undefined;
   let displayName = '';
-  let finished = false;
   let membership: Membership | undefined;
-  let busy = false;
-  let notice: AcceptNotice | undefined;
-  // restart() and open() start a new generation; answers of an older one are
-  // dropped.
-  let generation = 0;
-  // The inputs of the last attempts live in memory only: «Проверить
-  // результат» repeats them, and a reload loses them.
-  let password = '';
-  let lastCode = '';
 
   function view(): AcceptSnapshot {
+    const { record } = core;
     let step: AcceptStep = 'start';
-    if (finished) step = 'done';
+    if (core.finished) step = 'done';
     else if (record !== undefined) {
       step = record.proof === undefined ? 'code' : 'details';
     }
@@ -208,136 +190,65 @@ export function createInvitationAcceptance({
       displayName,
       expiresAtMs: record?.challenge.expiresAt.epochMs,
       resendAtMs: record?.challenge.resendAvailableAt.epochMs,
-      busy,
-      notice,
+      busy: core.busy,
+      notice: core.notice,
       membership,
     };
-  }
-  let snapshot = view();
-
-  function show(next: AcceptNotice | undefined): void {
-    notice = next;
-    snapshot = view();
-    for (const listener of listeners) listener();
-  }
-
-  function discardAttempts(): void {
-    for (const key of Object.values(acceptKeys)) commands.discard(key);
-  }
-
-  // Another challenge makes the attempts of the previous one meaningless.
-  function keep(next: AcceptRecord | undefined): void {
-    if (next?.challenge.challengeID !== record?.challenge.challengeID) {
-      commands.discard(acceptKeys.verify);
-      commands.discard(acceptKeys.resend);
-      commands.discard(acceptKeys.complete);
-      commands.discard(acceptKeys.accept);
-    }
-    record = next;
-    if (next === undefined) storage.clear();
-    else storage.save(next);
-  }
-
-  function forgetInputs(): void {
-    password = '';
-    lastCode = '';
   }
 
   // Back to the start, without a notification. The saved record is removed
   // unless open() has just read it.
   function clear(keepName: boolean, wipeStorage = true): void {
-    generation += 1;
-    discardAttempts();
-    if (wipeStorage) keep(undefined);
-    else record = undefined;
+    core.reset(wipeStorage);
     if (!keepName) displayName = '';
-    forgetInputs();
-    finished = false;
     membership = undefined;
-    busy = false;
   }
 
-  function dropped(own: number): boolean {
-    if (own === generation) return false;
-    show(notice);
-    return true;
-  }
-
-  // own is the generation of the action: a stale answer leaves busy to the
-  // newer action.
-  async function send<T>(
-    own: number,
-    action: AcceptAction,
-    execute: (commandID: string) => Promise<T>,
-  ): Promise<CommandResult<T>> {
-    busy = true;
-    show(undefined);
-    const result = await commands.run({
-      key: acceptKeys[action],
-      label: labels[action],
-      execute,
-    });
-    if (own === generation) busy = false;
-    return result;
-  }
-
-  // Refusals every step shares. specific answers for the codes of the
-  // action; 401 means the session the code was bound to is gone.
-  function refused(
-    result: Refusal,
-    action: AcceptAction,
-    specific: (failure: ApiFailure) => AcceptNotice | 'silent' | undefined,
-  ): void {
-    if (result.kind === 'unknown') {
-      show({ kind: 'unknown', action });
-      return;
-    }
-    const { failure } = result;
-    if (failure.status === 401) {
+  const core = createChallengeFlow<
+    AcceptAction,
+    AcceptNotice,
+    AcceptRecord,
+    AcceptSnapshot
+  >({
+    commands,
+    now,
+    storage,
+    initial: undefined,
+    keys: acceptKeys,
+    labels,
+    notices: {
+      unknown: (action) => ({ kind: 'unknown', action }),
+      limited: (untilMs) => ({ kind: 'limited', untilMs }),
+      unavailable: { kind: 'unavailable' },
+    },
+    view,
+    abandon: () => {
       clear(true);
-      show(undefined);
-      return;
-    }
-    const own = specific(failure);
-    if (own !== undefined) {
-      show(own === 'silent' ? undefined : own);
-      return;
-    }
-    if (failure.status === 429) {
-      const seconds = failure.retryAfterSeconds ?? defaultWaitSeconds;
-      show({ kind: 'limited', untilMs: now() + seconds * 1000 });
-      return;
-    }
-    show({ kind: 'unavailable' });
-  }
-
-  // The attempt is dead: back to the start with the reason.
-  function startOver(reason: AcceptNotice): AcceptNotice {
-    clear(true);
-    return reason;
-  }
+    },
+  });
+  const { memory } = core;
 
   async function begin(): Promise<void> {
     const id = invitationID;
     if (id === undefined) return;
-    const own = generation;
+    const own = core.generation;
     const kind = mode;
-    const result = await send(own, 'begin', (commandID) =>
+    const result = await core.send(own, 'begin', (commandID) =>
       api.begin(id, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
-      keep({
+      core.keep({
         invitationID: id,
         mode: kind,
         displayName: kind === 'register' ? displayName : '',
         challenge: result.value,
         proof: undefined,
       });
-      show(undefined);
+      core.show(undefined);
       return;
     }
-    refused(result, 'begin', ({ code }) => {
+    core.refused(result, 'begin', ({ code }) => {
       if (code === 'NotFound' || code === 'InvalidArgument') {
         return { kind: 'invitation-closed' };
       }
@@ -362,27 +273,27 @@ export function createInvitationAcceptance({
   function register(input: DetailsInput): Promise<void> {
     const problem = detailsNotice(input);
     if (problem !== undefined) {
-      show(problem);
+      core.show(problem);
       return Promise.resolve();
     }
     displayName = input.displayName.trim();
-    password = input.password;
+    memory.password = input.password;
     return begin();
   }
 
   async function verify(input: string): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (current === undefined) return;
     if (now() >= current.challenge.expiresAt.epochMs) {
-      show({ kind: 'expired' });
+      core.show({ kind: 'expired' });
       return;
     }
     const code = normalizedCode(input);
     if (code === undefined) {
-      show({ kind: 'code-format' });
+      core.show({ kind: 'code-format' });
       return;
     }
-    lastCode = code;
+    memory.lastCode = code;
     await sendCode(current, code);
   }
 
@@ -390,33 +301,33 @@ export function createInvitationAcceptance({
   // answers for an expired code itself, and a proof issued before expiry
   // must not be lost.
   async function sendCode(current: AcceptRecord, code: string): Promise<void> {
-    const own = generation;
+    const own = core.generation;
     const { challengeID } = current.challenge;
-    const result = await send(own, 'verify', (commandID) =>
+    const result = await core.send(own, 'verify', (commandID) =>
       api.verify(challengeID, code, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       const next = {
         ...current,
         challenge: result.value.challenge,
         proof: result.value.proof,
       };
-      keep(next);
-      lastCode = '';
+      core.keep(next);
+      memory.lastCode = '';
       // The proof is spent at once if the scenario holds what it needs.
       if (next.mode === 'accept') {
-        busy = true;
+        core.hold();
         await acceptNow(next);
-      } else if (password !== '') {
-        busy = true;
+      } else if (memory.password !== '') {
+        core.hold();
         await completeNow(next);
       } else {
-        show(undefined);
+        core.show(undefined);
       }
       return;
     }
-    refused(result, 'verify', ({ code: refusal }) => {
+    core.refused(result, 'verify', ({ code: refusal }) => {
       // A wrong code is committed: the attempt counts against the five.
       if (refusal === 'InvalidArgument') return { kind: 'wrong-code' };
       if (refusal === 'ChallengeLocked') return { kind: 'locked' };
@@ -425,22 +336,22 @@ export function createInvitationAcceptance({
   }
 
   async function resend(): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (current === undefined) return;
-    const own = generation;
-    const result = await send(own, 'resend', (commandID) =>
+    const own = core.generation;
+    const result = await core.send(own, 'resend', (commandID) =>
       api.resend(current.challenge.challengeID, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       // The previous code no longer works.
       commands.discard(acceptKeys.verify);
-      keep({ ...current, challenge: result.value });
-      show({ kind: 'resent' });
+      core.keep({ ...current, challenge: result.value });
+      core.show({ kind: 'resent' });
       return;
     }
-    refused(result, 'resend', ({ code }) =>
-      code === 'NotFound' ? startOver({ kind: 'expired' }) : undefined,
+    core.refused(result, 'resend', ({ code }) =>
+      code === 'NotFound' ? core.startOver({ kind: 'expired' }) : undefined,
     );
   }
 
@@ -451,33 +362,33 @@ export function createInvitationAcceptance({
   }
 
   function finish(next: Membership | undefined): void {
-    generation += 1;
-    keep(undefined);
-    forgetInputs();
+    core.finish();
     membership = next;
-    finished = true;
-    busy = false;
   }
 
   async function completeNow(current: AcceptRecord): Promise<void> {
     const proof = proofOf(current);
-    if (proof === undefined || password === '') return;
-    const own = generation;
-    const invited = { ...proof, password, displayName };
-    const result = await send(own, 'complete', (commandID) =>
+    if (proof === undefined || memory.password === '') return;
+    const own = core.generation;
+    const invited = { ...proof, password: memory.password, displayName };
+    const result = await core.send(own, 'complete', (commandID) =>
       api.complete(invited, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       finish(undefined);
       session.adopt(result.value);
       void access.refresh();
-      show(undefined);
+      core.show(undefined);
       return;
     }
-    refused(result, 'complete', ({ code }) => {
-      if (code === 'NotFound') return startOver({ kind: 'proof-expired' });
-      if (code === 'CommandConflict') return startOver({ kind: 'email-taken' });
+    core.refused(result, 'complete', ({ code }) => {
+      if (code === 'NotFound') {
+        return core.startOver({ kind: 'proof-expired' });
+      }
+      if (code === 'CommandConflict') {
+        return core.startOver({ kind: 'email-taken' });
+      }
       if (code === 'Forbidden') {
         // Signed in meanwhile: the page opens again in accept mode.
         clear(true);
@@ -499,52 +410,58 @@ export function createInvitationAcceptance({
     const proof = proofOf(current);
     const id = invitationID;
     if (proof === undefined || id === undefined) return;
-    const own = generation;
-    const result = await send(own, 'accept', (commandID) =>
+    const own = core.generation;
+    const result = await core.send(own, 'accept', (commandID) =>
       api.accept(id, proof, commandID),
     );
-    if (dropped(own)) return;
+    if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       finish(result.value);
       void access.refresh();
-      show(undefined);
+      core.show(undefined);
       return;
     }
-    refused(result, 'accept', ({ code }) => {
-      if (code === 'NotFound') return startOver({ kind: 'proof-expired' });
-      if (code === 'Forbidden') return startOver({ kind: 'other-email' });
-      if (code === 'CommandConflict')
-        return startOver({ kind: 'not-accepted' });
+    core.refused(result, 'accept', ({ code }) => {
+      if (code === 'NotFound') {
+        return core.startOver({ kind: 'proof-expired' });
+      }
+      if (code === 'Forbidden') {
+        return core.startOver({ kind: 'other-email' });
+      }
+      if (code === 'CommandConflict') {
+        return core.startOver({ kind: 'not-accepted' });
+      }
       return undefined;
     });
   }
 
   async function completeDetails(input: DetailsInput): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (mode !== 'register' || current?.proof === undefined) return;
     const problem = detailsNotice(input);
     if (problem !== undefined) {
-      show(problem);
+      core.show(problem);
       return;
     }
     displayName = input.displayName.trim();
-    password = input.password;
+    memory.password = input.password;
     await completeNow(current);
   }
 
   async function acceptInvitation(): Promise<void> {
-    const current = record;
+    const current = core.record;
     if (mode !== 'accept' || current?.proof === undefined) return;
     await acceptNow(current);
   }
 
   async function check(): Promise<void> {
+    const { notice, record } = core;
     if (notice?.kind !== 'unknown') return;
     switch (notice.action) {
       case 'begin':
         return begin();
       case 'verify':
-        if (record !== undefined) await sendCode(record, lastCode);
+        if (record !== undefined) await sendCode(record, memory.lastCode);
         return;
       case 'resend':
         return resend();
@@ -557,33 +474,28 @@ export function createInvitationAcceptance({
   }
 
   function open(id: string, next: AcceptMode): void {
-    if (invitationID === id && (finished || mode === next)) return;
+    if (invitationID === id && (core.finished || mode === next)) return;
     const saved = storage.load();
     clear(false, false);
     invitationID = id;
     mode = next;
     if (saved?.invitationID === id && saved.mode === next) {
-      record = saved;
+      core.adopt(saved);
       displayName = saved.displayName;
     } else if (saved !== undefined) {
       storage.clear();
     }
-    show(undefined);
+    core.show(undefined);
   }
 
   function restart(): void {
     clear(false);
-    show(undefined);
+    core.show(undefined);
   }
 
   return {
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    getSnapshot: () => snapshot,
+    subscribe: core.subscribe,
+    getSnapshot: core.getSnapshot,
     open,
     register,
     requestCode,
