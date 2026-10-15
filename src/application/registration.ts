@@ -53,7 +53,8 @@ export type RegisterNotice =
   // The code is past its time: a new one is needed.
   | { readonly kind: 'expired' }
   | { readonly kind: 'resent' }
-  // Registration is switched off in Auth.
+  // Registration is switched off in Auth, or the service answered 403 to a
+  // guest (a signed-in user gets the same status and is led to the app).
   | { readonly kind: 'closed' }
   // A new code was asked for on the code step and Auth did not take it.
   | { readonly kind: 'not-sent' }
@@ -120,10 +121,19 @@ export interface Registration {
 export interface RegisterOptions {
   readonly api: RegistrationApi;
   readonly commands: CommandRunner;
-  readonly session: Pick<SessionStore, 'adopt'>;
+  readonly session: Pick<SessionStore, 'adopt' | 'check'>;
   readonly access: Pick<AccessStore, 'refresh'>;
   readonly storage: RegisterStorage;
   readonly now: () => number;
+}
+
+function sameUser(a: NewUser, b: NewUser): boolean {
+  return (
+    a.challengeID === b.challengeID &&
+    a.proof === b.proof &&
+    a.displayName === b.displayName &&
+    a.password === b.password
+  );
 }
 
 export const registerKeys = {
@@ -162,6 +172,10 @@ export function createRegistration({
   now,
 }: RegisterOptions): Registration {
   const initial = storage.load();
+  // The body of the last completion that went out: while its outcome is
+  // unknown the same body is repeated under the same commandID, another one
+  // is a new command (Auth answers 409 CommandConflict to a changed body).
+  let lastCompletion: NewUser | undefined;
   let email = initial?.email ?? '';
   let displayName = initial?.displayName ?? '';
 
@@ -187,6 +201,7 @@ export function createRegistration({
   // when the form is to be shown again.
   function clear(keepInputs: boolean): void {
     core.reset();
+    lastCompletion = undefined;
     if (!keepInputs) {
       email = '';
       displayName = '';
@@ -351,6 +366,7 @@ export function createRegistration({
       // A wrong code is committed: the attempt counts against the five.
       if (refusal === 'InvalidArgument') return { kind: 'wrong-code' };
       if (refusal === 'ChallengeLocked') return { kind: 'locked' };
+      if (refusal === 'Forbidden') return { kind: 'closed' };
       return refusal === 'NotFound' ? { kind: 'expired' } : undefined;
     });
   }
@@ -370,9 +386,12 @@ export function createRegistration({
       core.show({ kind: 'resent' });
       return;
     }
-    core.refused(result, 'resend', ({ code }) =>
-      code === 'NotFound' ? core.startOver({ kind: 'expired' }) : undefined,
-    );
+    core.refused(result, 'resend', ({ code }) => {
+      if (code === 'Forbidden') return { kind: 'closed' };
+      return code === 'NotFound'
+        ? core.startOver({ kind: 'expired' })
+        : undefined;
+    });
   }
 
   async function completeNow(current: RegisterRecord): Promise<void> {
@@ -384,15 +403,26 @@ export function createRegistration({
       password: memory.password,
       displayName,
     };
+    // A pending attempt of the key resends its own body: with other values
+    // it is dropped, and the new body goes out under a new commandID.
+    if (lastCompletion !== undefined && !sameUser(lastCompletion, user)) {
+      commands.discard(registerKeys.complete);
+    }
+    lastCompletion = user;
     const result = await core.send(own, 'complete', (commandID) =>
       api.complete(user, commandID),
     );
     if (core.dropped(own)) return;
     if (result.kind === 'committed') {
       core.finish();
+      lastCompletion = undefined;
       session.adopt(result.value);
       void access.refresh();
       core.show(undefined);
+      return;
+    }
+    if (result.kind === 'rejected' && result.failure.code === 'Forbidden') {
+      await refusedForbidden(own);
       return;
     }
     core.refused(result, 'complete', ({ code }) => {
@@ -401,11 +431,6 @@ export function createRegistration({
       }
       if (code === 'CommandConflict') {
         return core.startOver({ kind: 'email-taken' });
-      }
-      if (code === 'Forbidden') {
-        // Signed in meanwhile: nothing to register.
-        clear(true);
-        return 'silent';
       }
       if (code === 'InvalidArgument') {
         return {
@@ -418,6 +443,25 @@ export function createRegistration({
       }
       return undefined;
     });
+  }
+
+  // 403 is both «registration is off» and «called with a session»: the
+  // session tells which. A signed-in user is led to the app by the page, a
+  // guest is told that registration is closed.
+  async function refusedForbidden(own: number): Promise<void> {
+    core.hold();
+    const status = await session.check();
+    if (core.dropped(own)) return;
+    if (status === 'active') {
+      clear(true);
+      core.show(undefined);
+    } else if (status === 'ended') {
+      core.show(core.startOver({ kind: 'closed' }));
+    } else {
+      // The session is not known: the attempt stays for another try.
+      core.release(own);
+      core.show({ kind: 'unavailable' });
+    }
   }
 
   async function completeDetails(input: DetailsInput): Promise<void> {

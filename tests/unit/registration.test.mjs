@@ -94,10 +94,18 @@ function setup({ stored, storage = memory(stored), clock } = {}) {
   const fake = backend();
   const adopted = [];
   const refreshed = { count: 0 };
+  // What the check of the session answers: 'ended' is a guest.
+  const session = { status: 'ended', checks: 0 };
   const registration = createRegistration({
     api: fake.api,
     commands,
-    session: { adopt: (view) => adopted.push(view) },
+    session: {
+      adopt: (view) => adopted.push(view),
+      check: () => {
+        session.checks += 1;
+        return Promise.resolve(session.status);
+      },
+    },
     access: {
       refresh: () => {
         refreshed.count += 1;
@@ -115,6 +123,7 @@ function setup({ stored, storage = memory(stored), clock } = {}) {
     commands,
     adopted,
     refreshed,
+    session,
   };
 }
 
@@ -445,15 +454,81 @@ test('an email that got an account meanwhile is told, and the dead attempt is dr
   assert.deepEqual(adopted, []);
 });
 
-test('a registration refused for a signed-in user starts over silently', async () => {
-  const { registration, fake, storage } = await atCode();
+test('a completion refused with a session behind it starts over silently', async () => {
+  const { registration, fake, storage, session } = await atCode();
+  session.status = 'active';
   fake.answers.verify.push(verified());
   fake.answers.complete.push(refused(403, 'Forbidden', 'not_committed'));
   await registration.verify('482913');
   const snapshot = registration.getSnapshot();
+  assert.equal(session.checks, 1);
   assert.equal(snapshot.step, 'form');
   assert.equal(snapshot.notice, undefined);
+  assert.equal(snapshot.busy, false);
   assert.equal(storage.box.record, undefined);
+});
+
+test('a completion refused without a session says that registration is closed', async () => {
+  const { registration, fake, storage, session, adopted } = await atCode();
+  session.status = 'ended';
+  fake.answers.verify.push(verified());
+  fake.answers.complete.push(refused(403, 'Forbidden', 'not_committed'));
+  await registration.verify('482913');
+  const snapshot = registration.getSnapshot();
+  assert.equal(session.checks, 1);
+  assert.equal(snapshot.step, 'form');
+  assert.deepEqual(snapshot.notice, { kind: 'closed' });
+  assert.equal(snapshot.busy, false);
+  assert.equal(snapshot.email, 'i.kovaleva@example.test');
+  assert.equal(storage.box.record, undefined);
+  assert.deepEqual(adopted, []);
+});
+
+test('a completion refused while the session cannot be checked keeps the attempt', async () => {
+  const { registration, fake, storage, session } = await atCode();
+  session.status = 'unknown';
+  fake.answers.verify.push(verified());
+  fake.answers.complete.push(refused(403, 'Forbidden', 'not_committed'));
+  await registration.verify('482913');
+  const snapshot = registration.getSnapshot();
+  assert.equal(snapshot.step, 'details');
+  assert.deepEqual(snapshot.notice, { kind: 'unavailable' });
+  assert.equal(snapshot.busy, false);
+  assert.ok(storage.box.record.proof);
+});
+
+test('a completion refused on the details step after a reload is told the same way', async () => {
+  const { storage } = await atCode();
+  storage.box.record = { ...storage.box.record, proof: 'proof-1' };
+  const reloaded = setup({ storage });
+  reloaded.session.status = 'ended';
+  reloaded.fake.answers.complete.push(
+    refused(403, 'Forbidden', 'not_committed'),
+  );
+  await reloaded.registration.completeDetails({
+    displayName: 'Ирина Ковалёва',
+    password: 'correct horse',
+    repeat: 'correct horse',
+  });
+  assert.deepEqual(reloaded.registration.getSnapshot().notice, {
+    kind: 'closed',
+  });
+  assert.equal(reloaded.registration.getSnapshot().step, 'form');
+  assert.equal(storage.box.record, undefined);
+});
+
+test('a code check and a new code refused with 403 say that registration is closed', async () => {
+  const { registration, fake, storage, session } = await atCode();
+  fake.answers.verify.push(refused(403, 'Forbidden', 'not_committed'));
+  await registration.verify('482913');
+  assert.deepEqual(registration.getSnapshot().notice, { kind: 'closed' });
+  fake.answers.resend.push(refused(403, 'Forbidden', 'not_committed'));
+  await registration.resend();
+  assert.deepEqual(registration.getSnapshot().notice, { kind: 'closed' });
+  // Only a completion has to tell a signed-in user from a closed service.
+  assert.equal(session.checks, 0);
+  assert.equal(registration.getSnapshot().step, 'code');
+  assert.ok(storage.box.record);
 });
 
 test('the server refusing a checked form is told as a form problem', async () => {
@@ -716,4 +791,85 @@ test('a new code that Auth does not take is a message on the code step', async (
   assert.equal(snapshot.step, 'code');
   assert.equal(storage.box.record.challenge.challengeID, C1);
   assert.equal(snapshot.busy, false);
+});
+
+async function atLostCompletion() {
+  const context = await atCode();
+  context.fake.answers.verify.push(verified());
+  context.fake.answers.complete.push(lost());
+  await context.registration.verify('482913');
+  assert.deepEqual(context.registration.getSnapshot().notice, {
+    kind: 'unknown',
+    action: 'complete',
+  });
+  return context;
+}
+
+const completions = (fake) =>
+  fake.calls.filter(([name]) => name === 'complete');
+
+test('check() and the same name and password send one body under one commandID', async () => {
+  const { registration, fake } = await atLostCompletion();
+  fake.answers.complete.push(lost(), userView);
+  await registration.check();
+  await registration.completeDetails({
+    displayName: 'Ирина Ковалёва',
+    password: 'correct horse',
+    repeat: 'correct horse',
+  });
+  const sent = completions(fake);
+  assert.equal(sent.length, 3);
+  for (const call of sent) {
+    assert.equal(call[2], sent[0][2]);
+    assert.deepEqual(call[1], sent[0][1]);
+  }
+  assert.equal(sent[0][1].password, 'correct horse');
+  assert.equal(registration.getSnapshot().step, 'done');
+});
+
+test('another name or password after a lost completion is a new command, not a conflict', async () => {
+  const cases = [
+    ['Ирина К.', 'correct horse'],
+    ['Ирина Ковалёва', 'another horse'],
+  ];
+  for (const [displayName, password] of cases) {
+    const { registration, fake, commands } = await atLostCompletion();
+    fake.answers.complete.push(userView);
+    await registration.completeDetails({
+      displayName,
+      password,
+      repeat: password,
+    });
+    const sent = completions(fake);
+    assert.equal(sent.length, 2, displayName + password);
+    assert.notEqual(sent[1][2], sent[0][2]);
+    assert.equal(sent[1][1].displayName, displayName);
+    assert.equal(sent[1][1].password, password);
+    assert.equal(sent[1][1].proof, sent[0][1].proof);
+    assert.equal(registration.getSnapshot().step, 'done');
+    assert.deepEqual(commands.getSnapshot(), []);
+  }
+});
+
+test('another name or password after a reload drops the attempt of the old key', async () => {
+  const { storage } = await atLostCompletion();
+  // The tab was reloaded: the runner starts empty, the proof is in storage.
+  const reloaded = setup({ storage });
+  reloaded.fake.answers.complete.push(lost(), userView);
+  await reloaded.registration.completeDetails({
+    displayName: 'Ирина Ковалёва',
+    password: 'correct horse',
+    repeat: 'correct horse',
+  });
+  assert.equal(reloaded.registration.getSnapshot().notice.kind, 'unknown');
+  await reloaded.registration.completeDetails({
+    displayName: 'Ирина Ковалёва',
+    password: 'another horse',
+    repeat: 'another horse',
+  });
+  const sent = completions(reloaded.fake);
+  assert.equal(sent.length, 2);
+  assert.notEqual(sent[1][2], sent[0][2]);
+  assert.equal(sent[1][1].password, 'another horse');
+  assert.equal(reloaded.registration.getSnapshot().step, 'done');
 });

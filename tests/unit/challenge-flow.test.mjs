@@ -182,3 +182,16 @@ test('a lost answer becomes the unknown notice of its action', async () => {
   flow.refused(result, 'done', () => undefined);
   assert.deepEqual(flow.notice, { kind: 'unknown', action: 'done' });
 });
+
+test('hold() keeps the flow busy until release() of its own generation', () => {
+  const { flow } = setup();
+  const own = flow.generation;
+  flow.hold();
+  assert.equal(flow.busy, true);
+  flow.reset();
+  flow.hold();
+  flow.release(own);
+  assert.equal(flow.busy, true);
+  flow.release(flow.generation);
+  assert.equal(flow.busy, false);
+});

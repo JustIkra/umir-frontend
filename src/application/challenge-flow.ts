@@ -82,6 +82,8 @@ export interface ChallengeFlow<
   reset(wipeStorage?: boolean): void;
   // The scenario is over: the result stays, the record and inputs go.
   finish(): void;
+  // The action that held the flow busy is over (its generation is current).
+  release(own: number): void;
   // True if the answer belongs to an older generation (and was told to the
   // subscribers as it stands).
   dropped(own: number): boolean;
@@ -152,6 +154,10 @@ export function createChallengeFlow<
     else storage.save(next);
   }
 
+  function release(own: number): void {
+    if (own === generation) busy = false;
+  }
+
   function forgetInputs(): void {
     memory.password = '';
     memory.lastCode = '';
@@ -210,6 +216,7 @@ export function createChallengeFlow<
       finished = true;
       busy = false;
     },
+    release,
     dropped(own) {
       if (own === generation) return false;
       show(notice);
@@ -225,7 +232,7 @@ export function createChallengeFlow<
         label: labels[action],
         execute,
       });
-      if (own === generation) busy = false;
+      release(own);
       return result;
     },
     refused(result, action, specific) {

@@ -251,9 +251,10 @@ export const registerSnapshot = (overrides = {}) => ({
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
 // «Данные обновились» notice of models; invite is the snapshot of the
-// invitation page; register the snapshot of the registration page. organizations carries the snapshots of the organization
-// models (members, invitations, profile; loading by default), operations (the
-// followed preparations and deletions), pending (command keys without a known
+// invitation page; register the snapshot of the registration page.
+// organizations carries the snapshots of the organization models (members,
+// invitations, profile; loading by default), operations (the followed
+// preparations and deletions), pending (command keys without a known
 // outcome, none on its way; inFlight is the keys whose request is on its way;
 // pendingOrganization and pendingRestaurantName are the inputs of their
 // attempts) and commands (replacements of command methods; pendingMembership
