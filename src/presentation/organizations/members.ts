@@ -7,6 +7,7 @@ import {
 import type {
   DurableResult,
   Member,
+  Membership,
   RoleGrant,
 } from '@/application/organizations';
 import { roleTitle } from '@/presentation/app-shell/shell-context';
@@ -229,6 +230,104 @@ export function assignmentsOutcomeState(
       return { kind: 'forbidden' };
     case 'unknown':
       return { kind: 'unknown' };
+    case 'invalid':
+    case 'invited':
+    case 'closed':
+    case 'limited':
+    case 'delivery':
+    case 'unavailable':
+      return { kind: 'unavailable' };
+  }
+}
+
+// The card «Администратор организации» of the member page.
+export type AdminState =
+  | { readonly kind: 'view' }
+  | { readonly kind: 'saving' }
+  | { readonly kind: 'done'; readonly admin: boolean }
+  | { readonly kind: 'last-admin' }
+  | { readonly kind: 'conflict' }
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'forbidden' };
+
+const adminNotChanged = 'Роль не изменена';
+
+// What the card says after the answer. The view state has no message.
+export function adminMessage(
+  state: AdminState,
+): AssignmentsMessage | undefined {
+  switch (state.kind) {
+    case 'view':
+      return undefined;
+    case 'saving':
+      return { text: 'Сохраняем…', tone: 'info' };
+    case 'done':
+      return state.admin
+        ? {
+            title: 'Роль администратора назначена',
+            text: 'Участник управляет участниками, приглашениями, ресторанами и настройками организации.',
+            tone: 'success',
+          }
+        : {
+            title: 'Роль администратора снята',
+            text: 'Участник больше не управляет организацией. Его назначения в ресторанах сохранены.',
+            tone: 'success',
+          };
+    case 'last-admin':
+      return {
+        title: 'Роль не снята',
+        text: 'В организации должен остаться хотя бы один администратор.',
+        tone: 'error',
+      };
+    case 'conflict':
+      return {
+        title: adminNotChanged,
+        text: 'После открытия страницы данные участника изменились — например, в другой вкладке. Обновите страницу и повторите.',
+        tone: 'error',
+      };
+    case 'unavailable':
+      return {
+        title: adminNotChanged,
+        text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+        tone: 'error',
+      };
+    case 'unknown':
+      return {
+        title: 'Результат изменения роли неизвестен',
+        text: 'Ответ сервиса не получен. Роль могла измениться. Проверка продолжит ту же попытку.',
+        tone: 'info',
+      };
+    case 'forbidden':
+      return {
+        title: adminNotChanged,
+        text: 'Изменять роль администратора может администратор организации.',
+        tone: 'error',
+      };
+  }
+}
+
+// The state after the answer of Auth to «Назначить» or «Снять роль».
+// admin: the value that was asked for.
+export function adminOutcomeState(
+  outcome: Outcome<Membership>,
+  admin: boolean,
+): AdminState {
+  switch (outcome.kind) {
+    case 'done':
+      return { kind: 'done', admin };
+    // A membership that is gone is the same news as one that moved on.
+    case 'conflict':
+    case 'gone':
+      return { kind: 'conflict' };
+    case 'last-admin':
+      return { kind: 'last-admin' };
+    case 'forbidden':
+      return { kind: 'forbidden' };
+    case 'unknown':
+      return { kind: 'unknown' };
+    case 'ended':
+      return { kind: 'view' };
     case 'invalid':
     case 'invited':
     case 'closed':

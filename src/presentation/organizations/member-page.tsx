@@ -26,6 +26,7 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import { ServiceUnavailableAlert, StateCard } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
 import userIcon from '@/presentation/assets/icons/user-24.svg';
+import { AdminRoleCard } from './admin-role-card';
 import { AssignmentMatrix } from './assignment-matrix';
 import { organizationPath } from './format';
 import { type MemberRoute } from './loaders';
@@ -255,7 +256,8 @@ function MemberCards({
   useAttempts();
   const editable = editableRestaurants(organization.restaurants);
   const offered = offeredRestaurants(organization.restaurants);
-  const revoking = commands.pendingMembership(membershipID)?.kind === 'revoke';
+  const pendingKind = commands.pendingMembership(membershipID)?.kind;
+  const revoking = pendingKind === 'revoke';
   return (
     <>
       <AssignmentsCard
@@ -264,6 +266,12 @@ function MemberCards({
         editable={editable}
         model={model}
         revoking={revoking}
+      />
+      <AdminRoleCard
+        member={member}
+        organization={organization}
+        model={model}
+        blocked={pendingKind !== undefined && pendingKind !== 'admin'}
       />
       <Card as="section">
         <chakra.h2 textStyle="heading.h3">Доступ к организации</chakra.h2>

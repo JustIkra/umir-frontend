@@ -42,6 +42,12 @@ const OTHER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const OTHER_MEMBERSHIP = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const OWN_MEMBERSHIP = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const notFound = 'Страница не найдена';
+// The role card of the page has a dialog as well as the revoke dialog.
+const revokeDialog = (html) =>
+  [...html.matchAll(/<dialog[\s\S]*?<\/dialog>/g)]
+    .map((match) => match[0])
+    .find((dialog) => /Отозвать доступ|Результат отзыва/.test(text(dialog))) ??
+  '';
 const main = (html) => /<main[^>]*>([\s\S]*?)<\/main>/.exec(html)?.[1] ?? '';
 
 const turgenev = sampleRestaurant({
@@ -472,7 +478,7 @@ test('a membership action without a known outcome locks the whole card', async (
 
 test('RV01 names the member, the organization and the assignments', async () => {
   const html = await renderRoute(cardPath, withMembers());
-  const dialog = text(/<dialog[\s\S]*?<\/dialog>/.exec(html)?.[0] ?? '');
+  const dialog = text(revokeDialog(html));
   assert.match(dialog, /Отозвать доступ участника\?/);
   assert.match(
     dialog,
@@ -546,7 +552,7 @@ test('a remembered revoke keeps «Отозвать доступ» open for the c
       pendingMembership: { kind: 'revoke' },
     }),
   );
-  const dialog = text(/<dialog[\s\S]*?<\/dialog>/.exec(html)?.[0] ?? '');
+  const dialog = text(revokeDialog(html));
   assert.match(dialog, /Результат отзыва неизвестен/);
   assert.match(dialog, /Проверить результат/);
 });

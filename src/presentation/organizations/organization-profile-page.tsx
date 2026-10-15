@@ -1,17 +1,19 @@
 import { Flex, Skeleton, Stack, Text, chakra } from '@chakra-ui/react';
-import { useState } from 'react';
-import { Navigate, useLoaderData } from 'react-router';
+import { useRef, useState } from 'react';
+import { Navigate, useLoaderData, useNavigate } from 'react-router';
 import { failureOf } from '@/application/api';
 import { orgKeys, type Outcome } from '@/application/organization-commands';
 import type { OrganizationProfile } from '@/application/organizations';
 import { useServices } from '@/presentation/services';
-import { useReadModel } from '@/presentation/session/hooks';
+import { useAttempts, useReadModel } from '@/presentation/session/hooks';
 import { Button } from '@/presentation/ui/actions';
 import { Card, CardForm } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { ServiceUnavailableAlert } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
+import { DeleteOrganizationDialog } from './delete-organization-dialog';
+import { DeletionNotice } from './deletion-notice';
 import { zoneLine, organizationPath } from './format';
 import { type OrganizationRoute } from './loaders';
 import {
@@ -21,6 +23,7 @@ import {
   OrganizationTabs,
 } from './organization-layout';
 import { TimezoneField, zoneUnsupported } from './timezone-field';
+import { useOrganizationDeletion } from './use-deletion';
 
 // The zone section of the profile: TZ06 to TZ13.
 export type ZoneState =
@@ -129,6 +132,62 @@ export function zoneOutcomeState(
     case 'delivery':
       return { kind: 'unavailable' };
   }
+}
+
+// The section «Удаление организации». The dialog asks for the name; a deletion
+// whose answer was lost is checked here, with the name of the profile.
+function DeletionSection({ profile }: { profile: OrganizationProfile }) {
+  const { commands } = useServices().organizations;
+  const { orgID, name } = profile;
+  const navigate = useNavigate();
+  const dialog = useRef<HTMLDialogElement>(null);
+  useAttempts();
+  // The list of organizations says that the organization is being deleted.
+  const leave = () => {
+    void navigate('/app/organizations');
+  };
+  const { stored, run } = useOrganizationDeletion(orgID, name, leave);
+  const unsettled = commands.isPending(orgKeys.deleteOrganization(orgID));
+  const state =
+    stored.kind === 'deleting' || stored.kind === 'done'
+      ? stored
+      : unsettled
+        ? ({ kind: 'unknown' } as const)
+        : stored;
+  return (
+    <Card as="section" aria-labelledby="organization-deletion-title">
+      <chakra.h2 id="organization-deletion-title" textStyle="heading.h3">
+        Удаление организации
+      </chakra.h2>
+      <Text textStyle="body.default" color="text.secondary">
+        Удаление закрывает доступ всем участникам ко всем ресторанам
+        организации. Учётные записи сохранятся. Отменить удаление нельзя.
+      </Text>
+      <DeletionNotice
+        subject="organization"
+        name={name}
+        state={state}
+        onCheck={() => {
+          void run();
+        }}
+      />
+      <Button
+        variant="danger"
+        alignSelf={{ base: 'stretch', sm: 'flex-start' }}
+        aria-haspopup="dialog"
+        disabled={state.kind === 'deleting' || unsettled}
+        onClick={() => dialog.current?.showModal()}
+      >
+        Удалить организацию
+      </Button>
+      <DeleteOrganizationDialog
+        dialogRef={dialog}
+        orgID={orgID}
+        name={name}
+        onDeleted={leave}
+      />
+    </Card>
+  );
 }
 
 function ProfileSkeleton() {
@@ -272,6 +331,7 @@ function ProfileSections({ profile }: { profile: OrganizationProfile }) {
           </Flex>
         )}
       </CardForm>
+      <DeletionSection profile={profile} />
     </>
   );
 }

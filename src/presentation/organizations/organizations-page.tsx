@@ -6,9 +6,11 @@ import {
 } from '@/application/access';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useServices } from '@/presentation/services';
-import { useAccess } from '@/presentation/session/hooks';
+import { useAccess, useStore } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { Card } from '@/presentation/ui/card';
+import { InfoNotice } from '@/presentation/ui/states';
+import { organizationDeletionNotice } from './deletion';
 import { organizationPath, restaurantCount, zoneLine } from './format';
 import {
   CardSkeletons,
@@ -77,8 +79,12 @@ function NoOrganizations() {
 // OG05 (reading) and OG06 (not received). An earlier answer stays shown while
 // a new check fails.
 export function OrganizationsPage() {
-  const { access } = useServices();
+  const { access, organizations: services } = useServices();
   const state = useAccess();
+  const notices = useStore(services.lifecycles).flatMap((operation) => {
+    const notice = organizationDeletionNotice(operation);
+    return notice === undefined ? [] : [{ operation, notice }];
+  });
   const organizations = knownOrganizations(state);
   let body;
   if (organizations === undefined) {
@@ -123,6 +129,11 @@ export function OrganizationsPage() {
         />
       }
     >
+      {notices.map(({ operation, notice }) => (
+        <InfoNotice key={operation.operationID} title={notice.title}>
+          {notice.text}
+        </InfoNotice>
+      ))}
       {body}
     </OrganizationLayout>
   );

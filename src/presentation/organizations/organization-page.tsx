@@ -8,6 +8,7 @@ import { Card } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { AddRestaurantDialog } from './add-restaurant-dialog';
+import { restaurantDeletingTitle } from './deletion';
 import { zoneLine, zoneValue } from './format';
 import { type OrganizationRoute } from './loaders';
 import {
@@ -28,6 +29,9 @@ function AdminRestaurants({
   // RS05: the restaurant that was just added; its row comes with the access
   // read that the command asks for.
   const [added, setAdded] = useState<string>();
+  // The restaurant whose deletion was just accepted; its row goes with the
+  // access read that the command asks for.
+  const [deleted, setDeleted] = useState<string>();
   return (
     <OrganizationLayout
       header={
@@ -40,6 +44,7 @@ function AdminRestaurants({
         aria-haspopup="dialog"
         onClick={() => {
           setAdded(undefined);
+          setDeleted(undefined);
           dialog.current?.showModal();
         }}
       >
@@ -51,14 +56,27 @@ function AdminRestaurants({
           title={`Ресторан «${added}» добавлен. Подготовка обычно занимает до минуты.`}
         />
       )}
+      {deleted !== undefined && (
+        <FormMessage tone="success" title={restaurantDeletingTitle(deleted)} />
+      )}
       <Card>
-        <RestaurantList restaurants={organization.restaurants} admin />
+        <RestaurantList
+          restaurants={organization.restaurants}
+          admin
+          onDeleted={(name) => {
+            setAdded(undefined);
+            setDeleted(name);
+          }}
+        />
       </Card>
       <AddRestaurantDialog
         dialogRef={dialog}
         orgID={organization.orgID}
         timeZone={organization.settings.timeZone}
-        onAdded={setAdded}
+        onAdded={(name) => {
+          setDeleted(undefined);
+          setAdded(name);
+        }}
       />
     </OrganizationLayout>
   );
