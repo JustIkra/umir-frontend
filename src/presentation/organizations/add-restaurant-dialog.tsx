@@ -1,4 +1,5 @@
-import type { RefObject } from 'react';
+import { useRef, useState, type RefObject } from 'react';
+import { orgKeys, type Refusal } from '@/application/organization-commands';
 import { useServices } from '@/presentation/services';
 import { Button } from '@/presentation/ui/actions';
 import { ModalPanel } from '@/presentation/ui/dialog';
@@ -8,47 +9,211 @@ import {
   FieldMessage,
   TextInput,
 } from '@/presentation/ui/form';
+import { FormMessage } from '@/presentation/ui/form-message';
+import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import { zoneLine } from './format';
+import { nameError, restaurantNameMessage } from './names';
 
-// Figma RS01. «Добавить» only closes the dialog: nothing is created yet.
+export type RestaurantState =
+  | { readonly kind: 'editing' }
+  | { readonly kind: 'invalid' } // RS02
+  | { readonly kind: 'sending' } // RS04
+  | { readonly kind: 'unknown' } // RS06
+  // Auth refused the name although the screen had checked it (D16).
+  | { readonly kind: 'rejected' }
+  | { readonly kind: 'forbidden' }
+  | { readonly kind: 'gone' }
+  | {
+      readonly kind: 'not-added';
+      readonly seconds?: number;
+      // The attempt was sent again and Auth says it did not complete.
+      readonly checked?: boolean;
+    };
+
+// The state of the dialog after the answer to «Добавить» (checked: the answer
+// to the same attempt sent again).
+export function restaurantStateOf(
+  refusal: Refusal,
+  checked: boolean,
+): RestaurantState {
+  switch (refusal.kind) {
+    case 'unknown':
+      return { kind: 'unknown' };
+    case 'invalid':
+      return { kind: 'rejected' };
+    case 'forbidden':
+      return { kind: 'forbidden' };
+    case 'gone':
+      return { kind: 'gone' };
+    case 'limited':
+      return { kind: 'not-added', seconds: refusal.seconds };
+    case 'ended':
+      return { kind: 'editing' };
+    case 'conflict':
+    case 'last-admin':
+    case 'invited':
+    case 'closed':
+    case 'delivery':
+    case 'unavailable':
+      return checked ? { kind: 'not-added', checked } : { kind: 'not-added' };
+  }
+}
+
+// Figma RS06 and the refusals of Auth; RS02 and RS04 live in the field and the
+// button.
+export function addRestaurantMessage(
+  state: RestaurantState,
+  name: string,
+): { title: string; text: string } | undefined {
+  switch (state.kind) {
+    case 'unknown':
+      return {
+        title: 'Результат добавления неизвестен',
+        text: 'Ответ сервиса не получен. Ресторан мог быть добавлен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+      };
+    case 'rejected':
+      return {
+        title: 'Ресторан не добавлен',
+        text: `Сервис не принял название «${name.trim()}». Проверьте его и повторите отправку.`,
+      };
+    case 'forbidden':
+      return {
+        title: 'Добавление недоступно',
+        text: 'Добавлять рестораны может только администратор организации. Роль могли снять — обновите страницу.',
+      };
+    case 'gone':
+      return {
+        title: 'Организация недоступна',
+        text: 'Организация удалена или больше не доступна этой учётной записи. Вернитесь к списку организаций.',
+      };
+    case 'not-added':
+      return {
+        title: 'Ресторан не добавлен',
+        text:
+          state.seconds !== undefined
+            ? `Слишком много попыток. Название сохранено в поле, повторите отправку через ${String(state.seconds)} с.`
+            : state.checked
+              ? 'Проверка показала, что попытка не завершена. Название сохранено в поле, форму можно отправить повторно.'
+              : 'Сервис авторизации не отвечает. Название сохранено в поле, повторите отправку через несколько минут.',
+      };
+    case 'editing':
+    case 'invalid':
+    case 'sending':
+      return undefined;
+  }
+}
+
+// Figma RS01–RS06: the dialog stays open until Auth accepts the restaurant;
+// then onAdded tells the page, which shows RS05 above the list. An unknown
+// answer locks the field: the check sends the earlier attempt, not the input.
 export function AddRestaurantDialog({
   dialogRef,
+  orgID,
   timeZone,
+  onAdded,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
+  orgID: string;
   timeZone: string;
+  onAdded: (name: string) => void;
 }) {
-  const { now } = useServices();
+  const { organizations, now } = useServices();
+  const { commands } = organizations;
+  const key = orgKeys.addRestaurant(orgID);
+  const [name, setName] = useState('');
+  const [state, setState] = useState<RestaurantState>(() =>
+    commands.isPending(key) ? { kind: 'unknown' } : { kind: 'editing' },
+  );
+  const input = useRef<HTMLInputElement>(null);
+  const locked = state.kind === 'sending' || state.kind === 'unknown';
+  const error = state.kind === 'invalid' ? nameError(name) : undefined;
+  const message = addRestaurantMessage(state, name);
+
+  const submit = async () => {
+    const resending = commands.isPending(key);
+    if (!resending && nameError(name) !== undefined) {
+      setState({ kind: 'invalid' });
+      input.current?.focus();
+      return;
+    }
+    setState({ kind: 'sending' });
+    const added = name.trim();
+    const outcome = await commands.addRestaurant(orgID, added);
+    if (outcome.kind === 'done') {
+      dialogRef.current?.close();
+      setName('');
+      setState({ kind: 'editing' });
+      onAdded(added);
+      return;
+    }
+    setState(restaurantStateOf(outcome, resending));
+  };
+
   return (
     <ModalPanel
       dialogRef={dialogRef}
       width={480}
       title="Добавить ресторан"
+      locked={state.kind === 'sending'}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (state.kind !== 'sending') void submit();
+      }}
       actions={
         <>
           <Button
             variant="secondary"
+            disabled={state.kind === 'sending'}
             onClick={() => dialogRef.current?.close()}
           >
-            Отмена
+            {state.kind === 'unknown' ? 'Закрыть' : 'Отмена'}
           </Button>
-          <Button type="submit">Добавить</Button>
+          <Button
+            type="submit"
+            disabled={locked}
+            aria-busy={state.kind === 'sending' ? true : undefined}
+          >
+            {state.kind === 'sending' ? 'Добавляем…' : 'Добавить'}
+          </Button>
         </>
       }
     >
       <FieldGroup>
         <FieldLabel htmlFor="restaurant-name">Название ресторана</FieldLabel>
         <TextInput
+          ref={input}
           id="restaurant-name"
           name="restaurantName"
           placeholder="Например, На Ленина"
+          value={name}
+          disabled={locked}
+          invalid={error !== undefined}
           aria-describedby="restaurant-name-hint"
+          onChange={(event) => {
+            setName(event.currentTarget.value);
+          }}
         />
         <FieldMessage
           id="restaurant-name-hint"
+          error={error && restaurantNameMessage(error)}
           hint={`Часовой пояс — как у организации: ${zoneLine(timeZone, now())}.`}
         />
       </FieldGroup>
+      {message &&
+        (state.kind === 'unknown' ? (
+          <UnknownOutcomeAlert
+            title={message.title}
+            onCheck={() => {
+              void submit();
+            }}
+          >
+            {message.text}
+          </UnknownOutcomeAlert>
+        ) : (
+          <FormMessage tone="error" title={message.title}>
+            {message.text}
+          </FormMessage>
+        ))}
     </ModalPanel>
   );
 }

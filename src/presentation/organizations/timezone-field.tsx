@@ -3,25 +3,36 @@ import { useId, useRef, useState } from 'react';
 import checkIcon from '@/presentation/assets/icons/check-secondary-24.svg';
 import chevronIcon from '@/presentation/assets/icons/chevron-down-24.svg';
 import closeIcon from '@/presentation/assets/icons/close-24.svg';
-import { type Zone, zones } from '@/presentation/placeholder-organizations';
+import { useServices } from '@/presentation/services';
 import { atLeast, scrim } from '@/presentation/theme/system';
 import { FieldLabel, FieldMessage, SearchInput } from '@/presentation/ui/form';
 import { Icon } from '@/presentation/ui/icon';
+import { formatOffset } from '@/presentation/ui/time';
 import { rem } from '@/presentation/ui/units';
+import { organizationZones, zoneCity } from '@/presentation/ui/zones';
+import { zoneValue } from './format';
 
 // Figma Timezone field and list (TZ01, TZ02). From 1024 the list opens in
 // place under the hint (a non-modal dialog, Esc handled here); on 390 it is a
-// modal bottom sheet. Search is for show and the choice is not saved.
+// modal bottom sheet. The field is controlled: value is an IANA identifier and
+// onChange hears the chosen one; the offsets are those of the current moment.
+// Search is for show until the zone list is filtered.
 export function TimezoneField({
   id,
   hint,
-  initial,
+  value,
+  onChange,
+  disabled = false,
+  error,
 }: {
   id: string;
   hint: string;
-  initial: Zone;
+  value: string;
+  onChange: (timeZone: string) => void;
+  disabled?: boolean;
+  error?: string | undefined;
 }) {
-  const [zone, setZone] = useState(initial);
+  const { now } = useServices();
   const [open, setOpen] = useState(false);
   const list = useRef<HTMLDialogElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -49,6 +60,8 @@ export function TimezoneField({
         aria-expanded={open}
         aria-controls={listId}
         aria-describedby={`${id}-hint`}
+        aria-invalid={error ? true : undefined}
+        disabled={disabled}
         onClick={() => {
           if (open) close();
           else show();
@@ -65,13 +78,17 @@ export function TimezoneField({
         textAlign="start"
         cursor="pointer"
         _expanded={{ borderWidth: '2px', borderColor: 'border.focus' }}
+        _disabled={{ cursor: 'not-allowed', color: 'text.disabled' }}
+        {...(error
+          ? { borderWidth: '2px', borderColor: 'border.error' }
+          : undefined)}
       >
         <Text id={valueId} as="span" flex="1" minW="0" textStyle="body.default">
-          {`${zone.city} — ${zone.id} · ${zone.offset}`}
+          {zoneValue(value, now())}
         </Text>
         <Icon src={chevronIcon} size={24} />
       </chakra.button>
-      <FieldMessage id={`${id}-hint`} hint={hint} />
+      <FieldMessage id={`${id}-hint`} hint={hint} error={error} />
       <chakra.dialog
         ref={list}
         id={listId}
@@ -145,15 +162,15 @@ export function TimezoneField({
             listStyleType="none"
             aria-label="Часовые пояса"
           >
-            {zones.map((option) => {
-              const selected = option.id === zone.id;
+            {organizationZones.map((option) => {
+              const selected = option === value;
               return (
-                <li key={option.id}>
+                <li key={option}>
                   <chakra.button
                     type="button"
                     aria-pressed={selected}
                     onClick={() => {
-                      setZone(option);
+                      onChange(option);
                       close();
                     }}
                     display="flex"
@@ -175,21 +192,21 @@ export function TimezoneField({
                       minW="0"
                       textStyle={selected ? 'body.strong' : 'body.default'}
                     >
-                      {option.city}
+                      {zoneCity(option)}
                     </Text>
                     <Text
                       as="span"
                       textStyle="mono.default"
                       color="text.secondary"
                     >
-                      {option.id}
+                      {option}
                     </Text>
                     <Text
                       as="span"
                       textStyle="caption.default"
                       color="text.secondary"
                     >
-                      {option.offset}
+                      {formatOffset(now(), option)}
                     </Text>
                     {selected && (
                       <Box flexShrink="0">

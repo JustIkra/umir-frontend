@@ -1,11 +1,12 @@
 import { chakra } from '@chakra-ui/react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useLoaderData } from 'react-router';
 import { type OrganizationAccess } from '@/application/access';
 import { useServices } from '@/presentation/services';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Card } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
+import { FormMessage } from '@/presentation/ui/form-message';
 import { AddRestaurantDialog } from './add-restaurant-dialog';
 import { zoneLine, zoneValue } from './format';
 import { type OrganizationRoute } from './loaders';
@@ -24,6 +25,9 @@ function AdminRestaurants({
   organization: OrganizationAccess;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  // RS05: the restaurant that was just added; its row comes with the access
+  // read that the command asks for.
+  const [added, setAdded] = useState<string>();
   return (
     <OrganizationLayout
       header={
@@ -34,16 +38,27 @@ function AdminRestaurants({
       <Button
         alignSelf="flex-start"
         aria-haspopup="dialog"
-        onClick={() => dialog.current?.showModal()}
+        onClick={() => {
+          setAdded(undefined);
+          dialog.current?.showModal();
+        }}
       >
         Добавить ресторан
       </Button>
+      {added !== undefined && (
+        <FormMessage
+          tone="success"
+          title={`Ресторан «${added}» добавлен. Подготовка обычно занимает до минуты.`}
+        />
+      )}
       <Card>
         <RestaurantList restaurants={organization.restaurants} admin />
       </Card>
       <AddRestaurantDialog
         dialogRef={dialog}
+        orgID={organization.orgID}
         timeZone={organization.settings.timeZone}
+        onAdded={setAdded}
       />
     </OrganizationLayout>
   );

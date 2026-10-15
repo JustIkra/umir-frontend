@@ -1,5 +1,10 @@
 import { Flex, Stack, chakra, type SystemStyleObject } from '@chakra-ui/react';
-import { useId, type ReactNode, type RefObject } from 'react';
+import {
+  useId,
+  type SyntheticEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { media, scrim } from '@/presentation/theme/system';
 import { rem } from './units';
 
@@ -50,7 +55,9 @@ export function Dialog({
 // Figma dialogs RS01, RV01 and CX01: a card in the middle of the screen, a
 // bottom sheet with stacked buttons on 390. The content sits in a
 // method="dialog" form, so a submit button or Enter in a field closes it. The
-// first button gets the initial focus, so the safe action goes first.
+// first button gets the initial focus, so the safe action goes first. A dialog
+// that must stay open until a command is answered passes onSubmit, which
+// prevents the closing and decides.
 export function ModalPanel({
   dialogRef,
   title,
@@ -58,9 +65,11 @@ export function ModalPanel({
   children,
   actions,
   locked = false,
+  onSubmit,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
   locked?: boolean;
+  onSubmit?: (event: SyntheticEvent<HTMLFormElement>) => void;
   title: string;
   width: number;
   children: ReactNode;
@@ -97,7 +106,7 @@ export function ModalPanel({
         borderBottomRadius={{ base: '0', sm: 'md' }}
         boxShadow="overlay"
       >
-        <form method="dialog" noValidate>
+        <form method="dialog" noValidate onSubmit={onSubmit}>
           <chakra.h2 id={titleId} textStyle="heading.h2">
             {title}
           </chakra.h2>
