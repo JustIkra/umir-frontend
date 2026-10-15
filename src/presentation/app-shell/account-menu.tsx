@@ -101,7 +101,7 @@ function RestaurantOption({
         </Flex>
         {preparing && (
           <Text textStyle="caption.default" color="text.secondary">
-            Подготавливается
+            Настраивается
           </Text>
         )}
       </Stack>
@@ -226,7 +226,7 @@ export function AccountMenu({
   return (
     <Dialog
       dialogRef={dialogRef}
-      label="Учётная запись"
+      label="Аккаунт"
       css={{
         position: 'fixed',
         insetInline: '0',
@@ -266,7 +266,7 @@ export function AccountMenu({
             bg="border.default"
           />
           <Flex align="center" justify="space-between" gap="2" pl="3">
-            <Text textStyle="heading.h3">Учётная запись</Text>
+            <Text textStyle="heading.h3">Аккаунт</Text>
             <chakra.button
               type="button"
               display="flex"
@@ -301,7 +301,7 @@ export function AccountMenu({
         )}
         <MenuItem to="/app/settings" onClick={onLeave}>
           <Icon src={settingsIcon} size={20} />
-          Учётная запись
+          Аккаунт
         </MenuItem>
         <MenuItem to="/app/organizations" onClick={onLeave}>
           <Icon src={organizationIcon} size={20} />

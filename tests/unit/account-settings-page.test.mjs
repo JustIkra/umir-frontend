@@ -54,14 +54,14 @@ test('the name messages follow S06–S10', () => {
     { kind: 'storage', code: 'AuthStorageUnavailable' },
     'Марина',
   );
-  assert.equal(storage.title, 'Сервис учётных записей недоступен');
+  assert.equal(storage.title, 'Не получилось сохранить имя');
   assert.equal(
     storage.text,
-    'Имя не подтверждено. Показано последнее подтверждённое имя — «Марина». Черновик остался в поле.',
+    'Сейчас в профиле имя «Марина». Новое имя осталось в поле — попробуйте через пару минут.',
   );
   assert.deepEqual(storage.action, {
     kind: 'check-name',
-    label: 'Обновить данные профиля',
+    label: 'Обновить профиль',
   });
   assert.equal(storage.details, 'AuthStorageUnavailable');
   assert.equal(
@@ -70,19 +70,19 @@ test('the name messages follow S06–S10', () => {
   );
   assert.equal(
     nameMessage({ kind: 'unchanged', serverName: 'Марина' }, 'Марина').text,
-    'Сервер вернул прежнее имя — «Марина». Черновик остался в поле: сохраните его ещё раз, если нужно.',
+    'Имя осталось прежним — «Марина». Новое имя всё ещё в поле: сохраните его ещё раз.',
   );
   assert.equal(
     nameMessage({ kind: 'unconfirmed', code: 'AuthUnavailable' }, 'Марина')
       .action.label,
-    'Повторить чтение профиля',
+    'Проверить результат',
   );
   assert.equal(
     nameMessage(
       { kind: 'recovering', code: 'AuthUpdateOutcomeUnknown' },
       'Марина',
     ).action.label,
-    'Проверить доступность учётной записи',
+    'Проверить ещё раз',
   );
 });
 
@@ -121,7 +121,11 @@ test('a profile read settles the name, or keeps S06 and S10 when it fails', () =
 test('the password messages follow S18–S22 and the field texts S14–S17', () => {
   assert.equal(
     passwordMessage({ kind: 'limited', untilMs: NOW + 30_000 }, NOW).text,
-    'Повторите через 30 с.',
+    'Попробуйте через 30 секунд.',
+  );
+  assert.equal(
+    passwordMessage({ kind: 'limited', untilMs: NOW + 1_000 }, NOW).text,
+    'Попробуйте через 1 секунду.',
   );
   assert.equal(
     passwordMessage({ kind: 'limited', untilMs: NOW }, NOW),
@@ -130,7 +134,7 @@ test('the password messages follow S18–S22 and the field texts S14–S17', () 
   assert.equal(
     passwordMessage({ kind: 'storage', code: 'AuthStorageUnavailable' }, NOW)
       .text,
-    'Изменение пароля не подтверждено и повторно не отправляется. Сначала обновите данные профиля.',
+    'Обновите профиль — после этого можно попробовать снова.',
   );
   assert.deepEqual(passwordMessage({ kind: 'unknown' }, NOW).action, {
     kind: 'sign-in-to-check',
@@ -141,20 +145,20 @@ test('the password messages follow S18–S22 and the field texts S14–S17', () 
       { kind: 'recovering', code: 'AuthUpdateOutcomeUnknown' },
       NOW,
     ).text,
-    'Изменение пароля ещё не подтверждено. Не входите заново, пока доступ не восстановится.',
+    'Пока не можем это проверить. Не входите заново — попробуйте через пару минут.',
   );
   assert.equal(
     passwordMessage({ kind: 'checking' }, NOW).title,
-    'Проверяем доступность учётной записи',
+    'Проверяем, изменился ли пароль',
   );
   assert.deepEqual(passwordMessage({ kind: 'unchanged' }, NOW), {
     tone: 'info',
-    title: 'Пароль не изменён',
-    text: 'Изменение пароля не применилось. Повторите изменение.',
+    title: 'Пароль не изменился',
+    text: 'Пароль остался прежним. Попробуйте изменить его ещё раз.',
   });
   assert.deepEqual(passwordFieldText, {
     'current-required': 'Введите текущий пароль',
-    'current-wrong': 'Текущий пароль указан неверно.',
+    'current-wrong': 'Неверный текущий пароль.',
     'new-length': 'Нужно от 8 до 32 символов.',
     'new-rejected': 'Пароль должен содержать от 8 до 32 символов.',
     mismatch: 'Пароли не совпадают.',
@@ -237,7 +241,7 @@ test('the page keeps a pending name closed', async () => {
       pending: { name: 'Новое имя', password: undefined },
     }),
   );
-  assert.ok(plain.includes('Результат сохранения неизвестен'));
+  assert.ok(plain.includes('Не знаем, сохранилось ли имя'));
   const html = await renderRoute('/app/settings', {
     pending: { name: 'Новое имя', password: undefined },
   });
@@ -250,7 +254,7 @@ test('the page keeps a pending password closed', async () => {
       pending: { name: undefined, password: 'unknown' },
     }),
   );
-  assert.ok(plain.includes('Результат изменения пароля неизвестен'));
+  assert.ok(plain.includes('Не знаем, изменился ли пароль'));
 });
 
 test('the leave dialog is as wide as the S11 frame, 600 px', async () => {
@@ -268,22 +272,20 @@ test('the leave dialog is as wide as the S11 frame, 600 px', async () => {
 
 test('the sessions section offers signing out on every device', async () => {
   const plain = text(await renderRoute('/app/settings'));
-  assert.ok(plain.includes('Сеансы'));
+  assert.ok(plain.includes('Устройства'));
   assert.ok(
-    plain.includes(
-      'Завершает все сеансы учётной записи на всех устройствах, включая этот.',
-    ),
+    plain.includes('Выйти из аккаунта на всех устройствах, включая это.'),
   );
   assert.ok(plain.includes('Выйти на всех устройствах'));
   assert.ok(plain.includes('Выйти на всех устройствах?'));
   assert.ok(
     plain.includes(
-      'Все сеансы учётной записи будут завершены, включая этот. Незавершённые действия будут прерваны.',
+      'Вы выйдете на всех устройствах, включая это. Неотправленные данные пропадут.',
     ),
   );
   assert.ok(plain.includes('Выйти везде'));
   assert.ok(plain.includes('Отмена'));
-  assert.ok(!plain.includes('Результат выхода неизвестен'));
+  assert.ok(!plain.includes('Не знаем, удалось ли выйти'));
 });
 
 test('the dialog puts «Отмена» first, so it gets the initial focus', async () => {
@@ -296,13 +298,13 @@ test('the sign-out messages follow the unknown and refused outcomes', () => {
   assert.equal(sessionsMessage({ kind: 'sending' }), undefined);
   assert.deepEqual(sessionsMessage({ kind: 'unknown' }), {
     tone: 'unknown',
-    title: 'Результат выхода неизвестен',
-    text: 'Ответ сервиса не получен. Сеансы могли быть завершены. Проверка продолжит ту же попытку.',
+    title: 'Не знаем, удалось ли выйти',
+    text: 'Связь прервалась. Возможно, вы уже вышли на всех устройствах. Нажмите «Проверить результат» — повторно ничего не отправится.',
   });
   assert.deepEqual(sessionsMessage({ kind: 'failed' }), {
     tone: 'error',
-    title: 'Выход не выполнен',
-    text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+    title: 'Не получилось выйти',
+    text: 'Попробуйте через пару минут.',
   });
 });
 
@@ -320,6 +322,6 @@ test('a pending sign-out opens the page on the unknown result', async () => {
       ],
     }),
   );
-  assert.ok(plain.includes('Результат выхода неизвестен'));
+  assert.ok(plain.includes('Не знаем, удалось ли выйти'));
   assert.ok(plain.includes('Проверить результат'));
 });

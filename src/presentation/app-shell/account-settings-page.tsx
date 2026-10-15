@@ -27,6 +27,7 @@ import {
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon } from '@/presentation/ui/icon';
+import { plural } from '@/presentation/ui/plural';
 import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
 import { PageHeader } from './pages';
@@ -111,39 +112,36 @@ export function nameMessage(
     case 'storage':
       return {
         tone: 'error',
-        title: 'Сервис учётных записей недоступен',
-        text: `Имя не подтверждено. Показано последнее подтверждённое имя — «${confirmed}». Черновик остался в поле.`,
-        action: { kind: 'check-name', label: 'Обновить данные профиля' },
+        title: 'Не получилось сохранить имя',
+        text: `Сейчас в профиле имя «${confirmed}». Новое имя осталось в поле — попробуйте через пару минут.`,
+        action: { kind: 'check-name', label: 'Обновить профиль' },
         details: status.code,
       };
     case 'checking':
       return {
         tone: 'unknown',
         title: 'Проверяем, сохранилось ли имя',
-        text: 'Ответ на сохранение не получен. Читаем данные профиля — имя повторно не отправляется.',
+        text: 'Связь прервалась, поэтому проверяем результат. Повторно имя не отправится.',
       };
     case 'unchanged':
       return {
         tone: 'info',
         title: 'Имя не изменилось',
-        text: `Сервер вернул прежнее имя — «${status.serverName}». Черновик остался в поле: сохраните его ещё раз, если нужно.`,
+        text: `Имя осталось прежним — «${status.serverName}». Новое имя всё ещё в поле: сохраните его ещё раз.`,
       };
     case 'unconfirmed':
       return {
         tone: 'unknown',
-        title: 'Результат сохранения неизвестен',
-        text: `Не удалось прочитать данные профиля. Показано последнее подтверждённое имя — «${confirmed}».`,
-        action: { kind: 'check-name', label: 'Повторить чтение профиля' },
+        title: 'Не знаем, сохранилось ли имя',
+        text: `Связь прервалась. Сейчас в профиле имя «${confirmed}». Нажмите «Проверить результат» — повторно имя не отправится.`,
+        action: { kind: 'check-name', label: 'Проверить результат' },
       };
     case 'recovering':
       return {
         tone: 'unknown',
-        title: 'Учётная запись временно недоступна',
-        text: `Изменение имени ещё не подтверждено. Показано последнее подтверждённое имя — «${confirmed}».`,
-        action: {
-          kind: 'check-name',
-          label: 'Проверить доступность учётной записи',
-        },
+        title: 'Не знаем, сохранилось ли имя',
+        text: `Пока не можем это проверить. Сейчас в профиле имя «${confirmed}». Попробуйте через пару минут — повторно имя не отправится.`,
+        action: { kind: 'check-name', label: 'Проверить ещё раз' },
         details: status.code,
       };
     case 'idle':
@@ -173,7 +171,7 @@ export function nameAfterCheck(
 
 export const passwordFieldText: Record<PasswordFieldError, string> = {
   'current-required': 'Введите текущий пароль',
-  'current-wrong': 'Текущий пароль указан неверно.',
+  'current-wrong': 'Неверный текущий пароль.',
   'new-length': 'Нужно от 8 до 32 символов.',
   'new-rejected': 'Пароль должен содержать от 8 до 32 символов.',
   mismatch: 'Пароли не совпадают.',
@@ -191,46 +189,43 @@ export function passwordMessage(
       return {
         tone: 'error',
         title: 'Слишком много попыток',
-        text: `Повторите через ${String(seconds)} с.`,
+        text: `Попробуйте через ${String(seconds)} ${plural(seconds, 'секунду', 'секунды', 'секунд')}.`,
       };
     }
     case 'storage':
       return {
         tone: 'error',
-        title: 'Сервис учётных записей недоступен',
-        text: 'Изменение пароля не подтверждено и повторно не отправляется. Сначала обновите данные профиля.',
-        action: { kind: 'refresh-profile', label: 'Обновить данные профиля' },
+        title: 'Не получилось изменить пароль',
+        text: 'Обновите профиль — после этого можно попробовать снова.',
+        action: { kind: 'refresh-profile', label: 'Обновить профиль' },
         details: status.code,
       };
     case 'unknown':
       return {
         tone: 'unknown',
-        title: 'Результат изменения пароля неизвестен',
-        text: 'Ответ не получен — пароль мог измениться. Изменение повторно не отправляется. Чтобы проверить, войдите с новым паролем.',
+        title: 'Не знаем, изменился ли пароль',
+        text: 'Связь прервалась, и пароль мог измениться. Чтобы проверить, войдите с новым паролем — повторно ничего не отправится.',
         action: { kind: 'sign-in-to-check', label: 'Войти с новым паролем' },
       };
     case 'recovering':
       return {
         tone: 'unknown',
-        title: 'Учётная запись временно недоступна',
-        text: 'Изменение пароля ещё не подтверждено. Не входите заново, пока доступ не восстановится.',
-        action: {
-          kind: 'check-password',
-          label: 'Проверить доступность учётной записи',
-        },
+        title: 'Не знаем, изменился ли пароль',
+        text: 'Пока не можем это проверить. Не входите заново — попробуйте через пару минут.',
+        action: { kind: 'check-password', label: 'Проверить ещё раз' },
         details: status.code,
       };
     case 'checking':
       return {
         tone: 'unknown',
-        title: 'Проверяем доступность учётной записи',
-        text: 'Читаем данные профиля. Вход заново пока не нужен.',
+        title: 'Проверяем, изменился ли пароль',
+        text: 'Подождите немного. Входить заново пока не нужно.',
       };
     case 'unchanged':
       return {
         tone: 'info',
-        title: 'Пароль не изменён',
-        text: 'Изменение пароля не применилось. Повторите изменение.',
+        title: 'Пароль не изменился',
+        text: 'Пароль остался прежним. Попробуйте изменить его ещё раз.',
       };
     case 'idle':
     case 'invalid':
@@ -295,14 +290,14 @@ export function sessionsMessage(
     case 'unknown':
       return {
         tone: 'unknown',
-        title: 'Результат выхода неизвестен',
-        text: 'Ответ сервиса не получен. Сеансы могли быть завершены. Проверка продолжит ту же попытку.',
+        title: 'Не знаем, удалось ли выйти',
+        text: 'Связь прервалась. Возможно, вы уже вышли на всех устройствах. Нажмите «Проверить результат» — повторно ничего не отправится.',
       };
     case 'failed':
       return {
         tone: 'error',
-        title: 'Выход не выполнен',
-        text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+        title: 'Не получилось выйти',
+        text: 'Попробуйте через пару минут.',
       };
     case 'idle':
     case 'sending':
@@ -400,7 +395,7 @@ function LeaveNameDialog({
       }
     >
       <Text textStyle="body.default">
-        {`Имя «${draft.trim()}» ещё не сохранено. Если уйти, черновик пропадёт.`}
+        {`Имя «${draft.trim()}» ещё не сохранено. Если уйти, оно пропадёт.`}
       </Text>
     </ModalPanel>
   );
@@ -459,7 +454,7 @@ function NameEditor({ user }: { user: User }) {
       <Stack gap="3">
         <Flex align="center" justify="space-between" gap="4" wrap="wrap">
           <Stack gap="0" minW="0">
-            <Text textStyle="caption.strong">Отображаемое имя</Text>
+            <Text textStyle="caption.strong">Имя</Text>
             <Text textStyle="body.default" overflowWrap="anywhere">
               {user.displayName}
             </Text>
@@ -494,7 +489,7 @@ function NameEditor({ user }: { user: User }) {
         }}
       >
         <FieldGroup>
-          <FieldLabel htmlFor="settings-name">Отображаемое имя</FieldLabel>
+          <FieldLabel htmlFor="settings-name">Имя</FieldLabel>
           <TextInput
             id="settings-name"
             name="displayName"
@@ -511,10 +506,10 @@ function NameEditor({ user }: { user: User }) {
             id="settings-name-hint"
             error={
               status.kind === 'invalid'
-                ? 'Нужно от 2 до 80 символов без пробелов в начале и в конце.'
+                ? 'Введите имя от 2 до 80 символов.'
                 : undefined
             }
-            hint="От 2 до 80 символов. Пробелы в начале и в конце не сохраняются."
+            hint="От 2 до 80 символов."
           />
         </FieldGroup>
         <Flex gap="2" wrap="wrap">
@@ -626,7 +621,7 @@ function PasswordForm() {
   return (
     <>
       <Text textStyle="body.default" color="text.secondary">
-        После изменения пароля завершатся все сеансы, включая этот. Затем
+        После смены пароля вы выйдете на всех устройствах, включая это. Потом
         войдите с новым паролем.
       </Text>
       <chakra.form
@@ -745,9 +740,9 @@ function SessionsSection() {
     setStatus({ kind: outcome });
   };
   return (
-    <Section icon={signOutIcon} title="Сеансы">
+    <Section icon={signOutIcon} title="Устройства">
       <Text textStyle="body.default" color="text.secondary">
-        Завершает все сеансы учётной записи на всех устройствах, включая этот.
+        Выйти из аккаунта на всех устройствах, включая это.
       </Text>
       <Button
         type="button"
@@ -790,8 +785,8 @@ function SessionsSection() {
         }
       >
         <Text textStyle="body.default">
-          Все сеансы учётной записи будут завершены, включая этот. Незавершённые
-          действия будут прерваны.
+          Вы выйдете на всех устройствах, включая это. Неотправленные данные
+          пропадут.
         </Text>
         {message &&
           (status.kind === 'unknown' ? (
@@ -813,7 +808,7 @@ function SessionsSection() {
   );
 }
 
-// Figma S01 «Учётная запись». The app gate keeps this page for an active
+// Figma S01 «Аккаунт». The app gate keeps this page for an active
 // session; after a password change it opens sign-in by itself.
 export function AccountSettingsPage() {
   const session = useSession();
@@ -821,10 +816,7 @@ export function AccountSettingsPage() {
   const { user } = session;
   return (
     <>
-      <PageHeader
-        title="Учётная запись"
-        caption="Логин, почта, отображаемое имя и пароль"
-      />
+      <PageHeader title="Аккаунт" caption="Логин, почта, имя и пароль" />
       <Stack gap="6" w="full" maxW={rem(640)}>
         <Section icon={userIcon} title="Профиль">
           <ReadOnlyValue

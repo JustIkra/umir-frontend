@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import type { Attempt } from '@/application/commands';
 import { Button } from '@/presentation/ui/actions';
 import { ModalPanel } from '@/presentation/ui/dialog';
-import { formatInstant, formatOffset } from '@/presentation/ui/time';
+import { formatInstant } from '@/presentation/ui/time';
 
 // Figma W10. «Остаться» comes first: it gets the initial focus and is on top
 // on 390; from 768 it moves to the right.
@@ -41,7 +41,7 @@ export function UnsavedFormDialog({
       }
     >
       <Text textStyle="body.default">
-        {`${form} в ресторане «${restaurantName}» не отправлена. При переходе введённые данные будут удалены.`}
+        {`${form} в ресторане «${restaurantName}» не сохранена. Если перейти, введённое пропадёт.`}
       </Text>
     </ModalPanel>
   );
@@ -61,13 +61,12 @@ export function UnknownAttemptDialog({
   timeZone: string;
   onCheck: () => void;
 }) {
-  const time = formatInstant(attempt.startedAt, timeZone, 'timeSeconds');
-  const offset = formatOffset(attempt.startedAt, timeZone);
+  const time = formatInstant(attempt.startedAt, timeZone, 'time');
   return (
     <ModalPanel
       dialogRef={dialogRef}
       width={520}
-      title="Переход в другой ресторан недоступен"
+      title="Сначала проверьте последнее действие"
       actions={
         <>
           <Button
@@ -77,7 +76,7 @@ export function UnknownAttemptDialog({
               onCheck();
             }}
           >
-            Проверить попытку
+            Проверить результат
           </Button>
           <Button type="submit" variant="secondary">
             Закрыть
@@ -86,7 +85,7 @@ export function UnknownAttemptDialog({
       }
     >
       <Text textStyle="body.default">
-        {`Результат ${attempt.label} от ${time} (${offset}) в ресторане «${restaurantName}» неизвестен. Перейти в другой ресторан можно после проверки этой попытки.`}
+        {`Связь прервалась во время ${attempt.label} (${time}) в ресторане «${restaurantName}». Проверьте результат — после этого можно перейти в другой ресторан.`}
       </Text>
     </ModalPanel>
   );

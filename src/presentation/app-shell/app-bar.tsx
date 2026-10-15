@@ -57,7 +57,7 @@ export function AppBar({
       </HStack>
       <BarButton
         type="button"
-        aria-label={name ? `Учётная запись: ${name}` : 'Учётная запись'}
+        aria-label={name ? `Аккаунт: ${name}` : 'Аккаунт'}
         aria-haspopup="dialog"
         onClick={onOpenAccount}
       >

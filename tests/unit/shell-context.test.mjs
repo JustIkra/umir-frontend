@@ -49,15 +49,15 @@ test('W13, W15, W16 and W17 leave the sidebar empty with their captions', () => 
     [
       ['Нет доступных ресторанов', 0, 'Ровный ход'],
       ['Доступ к ресторану отозван', 0, 'Ровный ход'],
-      ['На Пушкинской · подготавливается', 0, 'На Пушкинской'],
-      ['Доступ не проверен', 0, 'Ровный ход'],
+      ['На Пушкинской · настраивается', 0, 'На Пушкинской'],
+      ['Не удалось загрузить рестораны', 0, 'Ровный ход'],
     ],
   );
 });
 
 test('without verified access a restaurant address keeps every section', () => {
   const context = shellContext(unverified, 'restaurant', R);
-  assert.equal(context.caption, 'Доступ не проверен');
+  assert.equal(context.caption, 'Не удалось загрузить рестораны');
   assert.equal(context.sections.length, 4);
 });
 

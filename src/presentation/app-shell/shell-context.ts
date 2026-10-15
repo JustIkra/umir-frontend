@@ -61,7 +61,7 @@ export function shellContext(
     case 'none':
       return empty('Нет доступных ресторанов');
     case 'unverified':
-      return empty('Доступ не проверен');
+      return empty('Не удалось загрузить рестораны');
     case 'revoked':
       return empty('Доступ к ресторану отозван', restaurantID);
     case 'preparing':
@@ -69,14 +69,16 @@ export function shellContext(
         restaurantID,
         restaurant,
         title: restaurant?.name ?? brand,
-        caption: `${restaurant?.name ?? 'Ресторан'} · подготавливается`,
+        caption: `${restaurant?.name ?? 'Ресторан'} · настраивается`,
         sections: [],
       };
     case 'restaurant': {
       if (restaurantID === undefined) {
         if (access.status === 'ready') return empty('Нет доступных ресторанов');
         return empty(
-          access.status === 'unverified' ? 'Доступ не проверен' : '',
+          access.status === 'unverified'
+            ? 'Не удалось загрузить рестораны'
+            : '',
         );
       }
       if (!restaurant) {
@@ -84,7 +86,10 @@ export function shellContext(
           restaurantID,
           restaurant: undefined,
           title: brand,
-          caption: access.status === 'unverified' ? 'Доступ не проверен' : '',
+          caption:
+            access.status === 'unverified'
+              ? 'Не удалось загрузить рестораны'
+              : '',
           sections: allSections,
         };
       }

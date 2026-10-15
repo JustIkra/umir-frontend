@@ -19,10 +19,14 @@ import { hrefs, renderElement, text } from './support/render-route.mjs';
 const noop = () => {};
 const R = '33333333-3333-4333-8333-333333333333';
 
-test('W13 offers to create an enterprise or refresh the list', () => {
+test('W13 offers to create an organization or refresh the list', () => {
   const html = renderElement(h(NoRestaurants, { onRefresh: noop }));
   assert.match(text(html), /Нет доступных ресторанов/);
-  assert.match(text(html), /Учётная запись не связана ни с одним рестораном\./);
+  assert.match(
+    text(html),
+    /У вас пока нет доступа ни к одному ресторану\. Попросите администратора прислать приглашение на почту — или создайте свою организацию\./,
+  );
+  assert.match(text(html), /Создать организацию/);
   assert.match(text(html), /Обновить список/);
   assert.ok(hrefs(html).includes('/app/organizations/new'));
 });
@@ -35,10 +39,10 @@ test('W14 names the section and the restaurant and leads to the overview', () =>
       overviewPath: `/app/r/${R}`,
     }),
   );
-  assert.match(text(html), /Раздел «Аналитика» недоступен/);
+  assert.match(text(html), /Нет доступа к разделу «Аналитика»/);
   assert.match(
     text(html),
-    /Роли в ресторане «На Тургеневской» не включают доступ к этому разделу\. Доступ назначает администратор организации\./,
+    /У вас нет доступа к этому разделу в ресторане «На Тургеневской»\. Если он нужен, обратитесь к администратору\./,
   );
   assert.ok(hrefs(html).includes(`/app/r/${R}`));
   const unnamed = renderElement(
@@ -48,7 +52,7 @@ test('W14 names the section and the restaurant and leads to the overview', () =>
       overviewPath: `/app/r/${R}`,
     }),
   );
-  assert.match(text(unnamed), /Роли в этом ресторане не включают доступ/);
+  assert.match(text(unnamed), /нет доступа к этому разделу в этом ресторане/);
 });
 
 test('W15 hides the restaurant and offers another one', () => {
@@ -58,7 +62,7 @@ test('W15 hides the restaurant and offers another one', () => {
   assert.match(text(html), /Доступ к ресторану отозван/);
   assert.match(
     text(html),
-    /Администратор организации отозвал доступ к ресторану «На Тургеневской»\. Данные ресторана скрыты, незавершённые формы не отправлены\./,
+    /Администратор отозвал ваш доступ к ресторану «На Тургеневской»\. Мы скрыли данные ресторана, а то, что вы не успели отправить, не сохранилось\./,
   );
   assert.deepEqual(
     hrefs(html).filter((href) => href.startsWith('/app')),
@@ -66,7 +70,7 @@ test('W15 hides the restaurant and offers another one', () => {
   );
   assert.match(
     text(renderElement(h(AccessRevoked, { restaurantName: undefined }))),
-    /отозвал доступ к этому ресторану/,
+    /отозвал ваш доступ к этому ресторану/,
   );
 });
 
@@ -76,10 +80,10 @@ test('W16 and W17 keep their texts and actions', () => {
       h(RestaurantPreparing, { restaurantName: 'На Чехова', onRetry: noop }),
     ),
   );
-  assert.match(preparing, /Ресторан подготавливается/);
+  assert.match(preparing, /Ресторан ещё настраивается/);
   assert.match(
     preparing,
-    /Ресторан «На Чехова» создан, рабочее пространство ещё не готово\. Подготовка обычно занимает до минуты\./,
+    /Ресторан «На Чехова» создан, мы его ещё настраиваем\. Обычно это занимает до минуты\./,
   );
   assert.match(preparing, /Проверить снова/);
   const unverified = text(
@@ -87,16 +91,17 @@ test('W16 and W17 keep their texts and actions', () => {
       h(AccessUnverified, { details: '404 NotFound', onRetry: noop }),
     ),
   );
-  assert.match(unverified, /Доступ не проверен/);
+  assert.match(unverified, /Не удалось загрузить рестораны/);
   assert.match(
     unverified,
-    /Сервис авторизации не отвечает, поэтому список ресторанов не получен\. Это не означает, что доступов нет\./,
+    /Список не загрузился, но ваш доступ к ресторанам не изменился\. Попробуйте ещё раз\./,
   );
-  assert.match(unverified, /Повторить проверку/);
+  assert.match(unverified, /Попробовать ещё раз/);
   assert.match(unverified, /Подробности для поддержки/);
   assert.match(unverified, /404 NotFound/);
   const session = text(renderElement(h(SessionUnverified, { onRetry: noop })));
-  assert.match(session, /Сессия не проверена/);
+  assert.match(session, /Не удалось проверить вход/);
+  assert.match(session, /Входить заново не нужно/);
 });
 
 test('data alerts follow MN04, RS06 and W12', () => {
@@ -124,7 +129,11 @@ test('data alerts follow MN04, RS06 and W12', () => {
     /Результат добавления неизвестен.*Проверить результат/,
   );
   const info = renderElement(
-    h(InfoNotice, { title: 'Данные обновились' }, 'Сервис перезапускался.'),
+    h(
+      InfoNotice,
+      { title: 'Данные обновлены' },
+      'Была короткая техническая пауза.',
+    ),
   );
   assert.match(info, /role="status"/);
   assert.match(info, /info-24/);

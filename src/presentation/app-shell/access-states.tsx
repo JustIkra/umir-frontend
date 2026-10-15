@@ -16,7 +16,7 @@ export function NoRestaurants({ onRefresh }: { onRefresh: () => void }) {
       actions={
         <>
           <ButtonLink to="/app/organizations/new">
-            Создать предприятие
+            Создать организацию
           </ButtonLink>
           <Button variant="secondary" onClick={onRefresh}>
             Обновить список
@@ -24,9 +24,8 @@ export function NoRestaurants({ onRefresh }: { onRefresh: () => void }) {
         </>
       }
     >
-      Учётная запись не связана ни с одним рестораном. Доступ предоставляет
-      администратор организации: приглашение приходит на почту. Также можно
-      создать собственное предприятие.
+      У вас пока нет доступа ни к одному ресторану. Попросите администратора
+      прислать приглашение на почту — или создайте свою организацию.
     </StateCard>
   );
 }
@@ -48,10 +47,10 @@ export function SectionUnavailable({
   return (
     <StateCard
       icon={lockIcon}
-      title={`Раздел «${section}» недоступен`}
+      title={`Нет доступа к разделу «${section}»`}
       actions={<ButtonLink to={overviewPath}>Перейти к обзору</ButtonLink>}
     >
-      {`Роли ${where} не включают доступ к этому разделу. Доступ назначает администратор организации.`}
+      {`У вас нет доступа к этому разделу ${where}. Если он нужен, обратитесь к администратору.`}
     </StateCard>
   );
 }
@@ -73,11 +72,11 @@ export function AccessRevoked({
       actions={
         <>
           <ButtonLink to="/app">Выбрать другой ресторан</ButtonLink>
-          <TextLink to="/app/settings">Открыть учётную запись</TextLink>
+          <TextLink to="/app/settings">Открыть аккаунт</TextLink>
         </>
       }
     >
-      {`Администратор организации отозвал доступ ${target}. Данные ресторана скрыты, незавершённые формы не отправлены.`}
+      {`Администратор отозвал ваш доступ ${target}. Мы скрыли данные ресторана, а то, что вы не успели отправить, не сохранилось.`}
     </StateCard>
   );
 }
@@ -93,10 +92,10 @@ export function RestaurantPreparing({
   return (
     <StateCard
       icon={clockIcon}
-      title="Ресторан подготавливается"
+      title="Ресторан ещё настраивается"
       actions={<Button onClick={onRetry}>Проверить снова</Button>}
     >
-      {`Ресторан «${restaurantName}» создан, рабочее пространство ещё не готово. Подготовка обычно занимает до минуты.`}
+      {`${restaurantName ? `Ресторан «${restaurantName}»` : 'Ресторан'} создан, мы его ещё настраиваем. Обычно это занимает до минуты.`}
     </StateCard>
   );
 }
@@ -112,16 +111,16 @@ export function AccessUnverified({
   return (
     <StateCard
       icon={alertIcon}
-      title="Доступ не проверен"
+      title="Не удалось загрузить рестораны"
       actions={
         <>
-          <Button onClick={onRetry}>Повторить проверку</Button>
+          <Button onClick={onRetry}>Попробовать ещё раз</Button>
           <DiagnosticDetails>{details}</DiagnosticDetails>
         </>
       }
     >
-      Сервис авторизации не отвечает, поэтому список ресторанов не получен. Это
-      не означает, что доступов нет.
+      Список не загрузился, но ваш доступ к ресторанам не изменился. Попробуйте
+      ещё раз.
     </StateCard>
   );
 }
@@ -131,11 +130,10 @@ export function SessionUnverified({ onRetry }: { onRetry: () => void }) {
   return (
     <StateCard
       icon={alertIcon}
-      title="Сессия не проверена"
-      actions={<Button onClick={onRetry}>Повторить проверку</Button>}
+      title="Не удалось проверить вход"
+      actions={<Button onClick={onRetry}>Попробовать ещё раз</Button>}
     >
-      Сервис авторизации не отвечает, поэтому вход не удалось проверить. Это не
-      означает, что сессия завершена.
+      Входить заново не нужно — просто попробуйте ещё раз.
     </StateCard>
   );
 }

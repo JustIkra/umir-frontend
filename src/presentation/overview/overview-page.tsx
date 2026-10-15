@@ -1,7 +1,7 @@
 import { Grid, Stack, Text } from '@chakra-ui/react';
 import { useLocation, useParams } from 'react-router';
 import { findRestaurant } from '@/application/access';
-import { canOpenSection } from '@/domain/access';
+import { canOpenSection, type SectionKey } from '@/domain/access';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import {
   missingSectionOf,
@@ -13,6 +13,13 @@ import { useAccess } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
 import { InfoNotice } from '@/presentation/ui/states';
 import { Card } from '@/presentation/ui/card';
+
+// One line under each tile title: what the section holds.
+const descriptions: Readonly<Partial<Record<SectionKey, string>>> = {
+  orders: 'Меню, стоп-лист и новый заказ',
+  warehouse: 'Остатки, сроки годности, поставки и списания',
+  catalog: 'Продукты, блюда и рецепты',
+};
 
 export function OverviewPage() {
   const { restaurantID = '' } = useParams();
@@ -38,10 +45,9 @@ export function OverviewPage() {
       />
       {missing !== undefined && (
         <InfoNotice
-          title={`Раздел «${sectionTitle(missing)}» недоступен в ресторане «${restaurant?.name ?? ''}»`}
+          title={`В ресторане «${restaurant?.name ?? ''}» у вас нет доступа к разделу «${sectionTitle(missing)}»`}
         >
-          Открыт обзор ресторана. Доступные разделы зависят от ролей в каждом
-          ресторане.
+          Мы открыли обзор. Доступ к разделам настраивает администратор.
         </InfoNotice>
       )}
       <Grid
@@ -51,7 +57,14 @@ export function OverviewPage() {
         {sections.map((section) => (
           <Card key={section.key} p="6">
             <Stack gap="3">
-              <Text textStyle="heading.h3">{section.title}</Text>
+              <Stack gap="1">
+                <Text textStyle="heading.h3">{section.title}</Text>
+                {descriptions[section.key] !== undefined && (
+                  <Text textStyle="body.default" color="text.secondary">
+                    {descriptions[section.key]}
+                  </Text>
+                )}
+              </Stack>
               <ButtonLink
                 variant="secondary"
                 to={path(section.suffix)}

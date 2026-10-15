@@ -160,9 +160,9 @@ export function AppShell({
             {mode === 'restaurant' &&
               notice !== undefined &&
               notice.restaurantID === context.restaurantID && (
-                <InfoNotice title="Данные обновились">
-                  Сервис перезапускался. Если вы отправляли действие до этого,
-                  проверьте результат.
+                <InfoNotice title="Данные обновлены">
+                  Была короткая техническая пауза. Если вы что-то отправляли,
+                  проверьте, сохранилось ли.
                 </InfoNotice>
               )}
             {children ?? <Outlet />}
