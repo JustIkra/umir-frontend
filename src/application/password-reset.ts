@@ -1,5 +1,10 @@
 import type { Challenge, RecoveryApi } from './account';
 import type { CommandResult, CommandRunner } from './commands';
+import {
+  defaultWaitSeconds,
+  normalizedCode,
+  passwordProblem,
+} from './credentials';
 import type { SessionStore } from './session';
 
 export type ResetStep = 'email' | 'code' | 'password';
@@ -86,14 +91,6 @@ const labels: Record<ResetAction, string> = {
   complete: 'сохранения пароля',
 };
 
-// The backend counts Unicode code points, not UTF-16 units; the password is
-// counted as typed (no trim, no normalization).
-const codePoints = (value: string) => value.match(/./gsu)?.length ?? 0;
-const defaultWaitSeconds = 60;
-const codePattern = /^[0-9]{6}$/;
-const minPassword = 8;
-const maxPassword = 32;
-
 type Refusal = Exclude<CommandResult<unknown>, { readonly kind: 'committed' }>;
 
 // R05 turns into R07 at expiresAt without a request.
@@ -109,10 +106,7 @@ function passwordFields(
   newPassword: string,
   repeat: string,
 ): ResetNotice | undefined {
-  const length = codePoints(newPassword);
-  let fresh: 'required' | 'length' | undefined;
-  if (newPassword === '') fresh = 'required';
-  else if (length < minPassword || length > maxPassword) fresh = 'length';
+  const fresh = passwordProblem(newPassword);
   const again = repeat === newPassword ? undefined : 'mismatch';
   if (fresh === undefined && again === undefined) return undefined;
   return { kind: 'password-fields', newPassword: fresh, repeat: again };
@@ -266,9 +260,8 @@ export function createPasswordResetFlow({
       show({ kind: 'expired' });
       return 'stay';
     }
-    // The email shows the code as «482 913».
-    const code = input.replace(/\s/g, '');
-    if (!codePattern.test(code)) {
+    const code = normalizedCode(input);
+    if (code === undefined) {
       show({ kind: 'code-format' });
       return 'stay';
     }
