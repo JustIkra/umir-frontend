@@ -651,3 +651,66 @@ test('the other lifecycle commands name their kind', async () => {
     'Сеть',
   ]);
 });
+
+test('a creation without a known outcome keeps the input it was sent with', async () => {
+  const { organizations, calls, events } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    lifecycle,
+  );
+  const sent = {
+    name: 'Северная кухня',
+    timeZone: 'Asia/Omsk',
+    firstRestaurantName: 'На Невском',
+  };
+  assert.equal(organizations.pendingOrganization(), undefined);
+  assert.equal((await organizations.createOrganization(sent)).kind, 'unknown');
+  assert.deepEqual(organizations.pendingOrganization(), sent);
+  // The screen came back with empty fields and checks the attempt.
+  const checked = await organizations.createOrganization({
+    name: '',
+    timeZone: 'Europe/Moscow',
+    firstRestaurantName: '',
+  });
+  assert.deepEqual(checked, { kind: 'done', value: lifecycle });
+  assert.deepEqual(events, [
+    ['access'],
+    ['started', 'create-organization', 'Северная кухня', lifecycle],
+  ]);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], calls[0]);
+  assert.equal(calls[1][1].name, 'Северная кухня');
+  assert.equal(organizations.pendingOrganization(), undefined);
+});
+
+test('a restaurant without a known outcome keeps its name per organization', async () => {
+  const { organizations, events } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    lifecycle,
+  );
+  await organizations.addRestaurant(ORG, 'На Ленина');
+  assert.equal(organizations.pendingRestaurantName(ORG), 'На Ленина');
+  assert.equal(organizations.pendingRestaurantName(R1), undefined);
+  await organizations.addRestaurant(ORG, '');
+  assert.deepEqual(events, [
+    ['access'],
+    ['started', 'create-restaurant', 'На Ленина', lifecycle],
+  ]);
+  assert.equal(organizations.pendingRestaurantName(ORG), undefined);
+});
+
+test('a refusal after the check clears the remembered input', async () => {
+  const { organizations } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    refusal(403, 'Forbidden'),
+  );
+  const input = {
+    name: 'Север',
+    timeZone: 'Europe/Moscow',
+    firstRestaurantName: 'Юг',
+  };
+  await organizations.createOrganization(input);
+  assert.deepEqual(await organizations.createOrganization(input), {
+    kind: 'forbidden',
+  });
+  assert.equal(organizations.pendingOrganization(), undefined);
+});

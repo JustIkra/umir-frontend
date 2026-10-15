@@ -106,6 +106,17 @@ test('NE02 from the service has no marked fields to point at', () => {
   assert.ok(!message?.text.includes('отмеченные ниже'));
 });
 
+test('a creation that can no longer be followed never opens the form again', () => {
+  const message = creationMessage({ kind: 'untracked' }, 'Северная кухня');
+  assert.equal(message?.title, 'Состояние подготовки неизвестно');
+  assert.equal(
+    message?.text,
+    'Организация создана, но получить состояние подготовки не удалось. Откройте список организаций, чтобы проверить ресторан.',
+  );
+  assert.equal(creationTone({ kind: 'untracked' }), 'unknown');
+  assert.ok(!message?.text.includes('не отвечает'));
+});
+
 test('NE05 tells the preparation takes up to a minute', () => {
   const message = creationMessage(
     { kind: 'preparing', operationID: OPERATION },
@@ -251,7 +262,7 @@ test('the followed operation decides the preparation states', () => {
     operationID: OPERATION,
   });
   assert.deepEqual(followedCreation(preparing, [operation('lost')]), {
-    kind: 'not-created',
+    kind: 'untracked',
   });
   const editing = { kind: 'editing' };
   assert.deepEqual(followedCreation(editing, [operation('finished')]), editing);
@@ -388,4 +399,44 @@ test('NE05 marks the second step as current and NE06 completes all three', () =>
   assert.match(text(ready), /Готово к работе — выполнено/);
   const stalled = renderElement(h(ReadinessSteps, { stage: 'stalled' }));
   assert.match(text(stalled), /Ресторан подготавливается — не завершено/);
+});
+
+test('the pending creation shows the values it was sent with', async () => {
+  const html = await renderRoute('/app/organizations/new', {
+    organizations: {
+      pending: new Set(['org.create']),
+      pendingOrganization: {
+        name: 'Северная кухня',
+        timeZone: 'Asia/Yekaterinburg',
+        firstRestaurantName: 'На Невском',
+      },
+    },
+  });
+  assert.ok(
+    inputTag(html, 'organizationName')?.includes('value="Северная кухня"'),
+  );
+  assert.ok(inputTag(html, 'restaurantName')?.includes('value="На Невском"'));
+  assert.match(text(html), /Екатеринбург — Asia\/Yekaterinburg · UTC\+5/);
+});
+
+test('the pending restaurant shows the name it was sent with', async () => {
+  const html = await renderRoute(`/app/organizations/${ORG}`, {
+    access: adminAccess,
+    organizations: {
+      pending: new Set([`org.restaurant.add.${ORG}`]),
+      pendingRestaurantName: 'На Ленина',
+    },
+  });
+  assert.ok(inputTag(html, 'restaurantName')?.includes('value="На Ленина"'));
+});
+
+test('NE06 names the enterprise as the followed operation does', () => {
+  const state = followedCreation(
+    { kind: 'preparing', operationID: OPERATION },
+    [operation('finished', { name: 'Северная кухня' })],
+  );
+  assert.equal(
+    creationMessage(state, 'Северная кухня')?.title,
+    'Предприятие «Северная кухня» готово к работе',
+  );
 });

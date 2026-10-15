@@ -176,6 +176,10 @@ export interface OrganizationCommands {
   ): Promise<Outcome<DurableResult>>;
   // True while a command of that key has no known outcome.
   isPending(key: string): boolean;
+  // The input of the creation that has no known outcome: the attempt that is
+  // checked is the one sent with it, whatever a screen holds now.
+  pendingOrganization(): NewOrganization | undefined;
+  pendingRestaurantName(orgID: string): string | undefined;
 }
 
 export const orgKeys = {
@@ -243,6 +247,11 @@ export function refusalOf(failure: ApiFailure, scope: RefusalScope): Refusal {
   }
 }
 
+interface Unsettled {
+  readonly name: string;
+  readonly organization?: NewOrganization;
+}
+
 export function createOrganizationCommands({
   api,
   commands,
@@ -272,20 +281,31 @@ export function createOrganizationCommands({
     }
   }
 
+  const isPending = (key: string) =>
+    commands.getSnapshot().some((attempt) => attempt.key === key);
+
+  // What the attempt of a key was sent with, while it has no known outcome.
+  // A call made meanwhile resends that attempt, so it is the name of the
+  // attempt, not the one of the new call, that the tracker is told.
+  const unsettled = new Map<string, Unsettled>();
+
   async function lifecycle(
     kind: OperationKind,
-    name: string,
+    given: Unsettled,
     key: string,
     label: string,
     execute: (commandID: string) => Promise<Lifecycle>,
   ): Promise<Outcome<Lifecycle>> {
+    const sent = (isPending(key) ? unsettled.get(key) : undefined) ?? given;
+    unsettled.set(key, sent);
     const result = outcome(
       await commands.run({ key, label, execute }),
       'organization',
     );
+    if (result.kind !== 'unknown') unsettled.delete(key);
     if (result.kind === 'done') {
       accessChanged();
-      started(kind, name, result.value);
+      started(kind, sent.name, result.value);
     }
     return result;
   }
@@ -294,7 +314,7 @@ export function createOrganizationCommands({
     createOrganization: (input) =>
       lifecycle(
         'create-organization',
-        input.name,
+        { name: input.name, organization: input },
         orgKeys.createOrganization,
         'создания организации',
         (commandID) => api.createOrganization(input, commandID),
@@ -302,7 +322,7 @@ export function createOrganizationCommands({
     addRestaurant: (orgID, name) =>
       lifecycle(
         'create-restaurant',
-        name,
+        { name },
         orgKeys.addRestaurant(orgID),
         'добавления ресторана',
         (commandID) => api.createRestaurant(orgID, name, commandID),
@@ -310,7 +330,7 @@ export function createOrganizationCommands({
     deleteRestaurant: (orgID, restaurantID, name) =>
       lifecycle(
         'delete-restaurant',
-        name,
+        { name },
         orgKeys.deleteRestaurant(restaurantID),
         'удаления ресторана',
         (commandID) => api.deleteRestaurant(orgID, restaurantID, commandID),
@@ -318,7 +338,7 @@ export function createOrganizationCommands({
     deleteOrganization: (orgID, name) =>
       lifecycle(
         'delete-organization',
-        name,
+        { name },
         orgKeys.deleteOrganization(orgID),
         'удаления организации',
         (commandID) => api.deleteOrganization(orgID, commandID),
@@ -504,7 +524,14 @@ export function createOrganizationCommands({
       if (result.kind !== 'unknown') invitationsChanged(orgID);
       return result;
     },
-    isPending: (key) =>
-      commands.getSnapshot().some((attempt) => attempt.key === key),
+    isPending,
+    pendingOrganization: () =>
+      isPending(orgKeys.createOrganization)
+        ? unsettled.get(orgKeys.createOrganization)?.organization
+        : undefined,
+    pendingRestaurantName: (orgID) => {
+      const key = orgKeys.addRestaurant(orgID);
+      return isPending(key) ? unsettled.get(key)?.name : undefined;
+    },
   };
 }

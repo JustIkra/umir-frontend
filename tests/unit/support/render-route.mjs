@@ -257,7 +257,8 @@ export const resetSnapshot = (overrides = {}) => ({
 // commands. organizations carries the snapshots of the organization models
 // (members, invitations, profile; loading by default), operations (the
 // followed preparations and deletions), pending (command keys without a known
-// outcome) and commands (replacements of command methods).
+// outcome; pendingOrganization and pendingRestaurantName are the inputs of
+// their attempts) and commands (replacements of command methods).
 export function fakeServices({
   session = activeSession,
   access: givenAccess = readyAccess(),
@@ -323,6 +324,8 @@ export function fakeServices({
         resendLink: done,
         cancelInvitation: done,
         isPending: (key) => (organizations.pending ?? new Set()).has(key),
+        pendingOrganization: () => organizations.pendingOrganization,
+        pendingRestaurantName: () => organizations.pendingRestaurantName,
         ...organizations.commands,
       },
       lifecycles: {

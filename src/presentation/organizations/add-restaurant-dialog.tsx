@@ -120,7 +120,10 @@ export function AddRestaurantDialog({
   const { organizations, now } = useServices();
   const { commands } = organizations;
   const key = orgKeys.addRestaurant(orgID);
-  const [name, setName] = useState('');
+  // An attempt without a known outcome keeps the name it was sent with.
+  const [name, setName] = useState(
+    () => commands.pendingRestaurantName(orgID) ?? '',
+  );
   const [state, setState] = useState<RestaurantState>(() =>
     commands.isPending(key) ? { kind: 'unknown' } : { kind: 'editing' },
   );
@@ -131,13 +134,14 @@ export function AddRestaurantDialog({
 
   const submit = async () => {
     const resending = commands.isPending(key);
+    const sent = commands.pendingRestaurantName(orgID);
     if (!resending && nameError(name) !== undefined) {
       setState({ kind: 'invalid' });
       input.current?.focus();
       return;
     }
     setState({ kind: 'sending' });
-    const added = name.trim();
+    const added = sent ?? name.trim();
     const outcome = await commands.addRestaurant(orgID, added);
     if (outcome.kind === 'done') {
       dialogRef.current?.close();

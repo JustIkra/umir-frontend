@@ -41,6 +41,9 @@ export type CreationState =
       readonly seconds?: number;
     }
   | { readonly kind: 'forbidden' } // NE11
+  // The organization was created, but its preparation can no longer be read.
+  // The form never opens again: another submit would create a second one.
+  | { readonly kind: 'untracked' }
   | { readonly kind: 'zone' }; // TZ09
 
 export type CreationTone = 'error' | 'unknown' | 'info' | 'success';
@@ -53,6 +56,8 @@ export function creationTone(state: CreationState): CreationTone {
       return 'info';
     case 'ready':
       return 'success';
+    case 'untracked':
+      return 'unknown';
     case 'editing':
     case 'invalid':
     case 'sending':
@@ -113,6 +118,11 @@ export function creationMessage(
         title: 'Создание предприятия недоступно',
         text: 'Политика сервиса не разрешает этой учётной записи создавать организации. Доступ к существующей организации предоставляет её администратор.',
       };
+    case 'untracked':
+      return {
+        title: 'Состояние подготовки неизвестно',
+        text: 'Организация создана, но получить состояние подготовки не удалось. Откройте список организаций, чтобы проверить ресторан.',
+      };
     case 'zone':
       return {
         title: 'Предприятие не создано',
@@ -162,8 +172,8 @@ export function refusalState(
 }
 
 // The preparation after the answer is what the tracker has seen last: ready
-// when the restaurant is, stalled when it stopped waiting, not created when
-// the organization can no longer be read.
+// when the restaurant is, stalled when it stopped waiting, untracked when the
+// organization can no longer be read (it exists all the same).
 export function followedCreation(
   state: CreationState,
   operations: readonly FollowedOperation[],
@@ -182,7 +192,7 @@ export function followedCreation(
     case 'stalled':
       return { kind: 'stalled', operationID: state.operationID };
     case 'lost':
-      return { kind: 'not-created' };
+      return { kind: 'untracked' };
     case 'following':
     case undefined:
       return state;
@@ -198,9 +208,13 @@ export function NewOrganizationPage() {
   const { commands, lifecycles } = organizations;
   const key = orgKeys.createOrganization;
   const operations = useStore(lifecycles);
-  const [organizationName, setOrganizationName] = useState('');
-  const [restaurantName, setRestaurantName] = useState('');
-  const [timeZone, setTimeZone] = useState(defaultZone);
+  // An attempt without a known outcome keeps the input it was sent with.
+  const [pending] = useState(() => commands.pendingOrganization());
+  const [organizationName, setOrganizationName] = useState(pending?.name ?? '');
+  const [restaurantName, setRestaurantName] = useState(
+    pending?.firstRestaurantName ?? '',
+  );
+  const [timeZone, setTimeZone] = useState(pending?.timeZone ?? defaultZone);
   const [stored, setStored] = useState<CreationState>(() =>
     commands.isPending(key) ? { kind: 'unknown' } : { kind: 'editing' },
   );
@@ -235,7 +249,14 @@ export function NewOrganizationPage() {
     );
   };
 
-  const message = creationMessage(state, organizationName.trim());
+  const created =
+    stored.kind === 'preparing'
+      ? operations.find((item) => item.operationID === stored.operationID)
+      : undefined;
+  const message = creationMessage(
+    state,
+    created?.name ?? organizationName.trim(),
+  );
   const tone = creationTone(state);
   const header = (
     <PageHeader
@@ -243,6 +264,26 @@ export function NewOrganizationPage() {
       caption="Организация объединяет рестораны. Первый ресторан создаётся вместе с ней."
     />
   );
+
+  if (state.kind === 'untracked' && message) {
+    return (
+      <OrganizationLayout header={header}>
+        <Card>
+          <FormMessage
+            tone={tone}
+            title={message.title}
+            action={
+              <ButtonLink variant="secondary" to="/app/organizations">
+                Все организации
+              </ButtonLink>
+            }
+          >
+            {message.text}
+          </FormMessage>
+        </Card>
+      </OrganizationLayout>
+    );
+  }
 
   if (
     state.kind === 'preparing' ||
