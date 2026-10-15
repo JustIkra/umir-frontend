@@ -20,6 +20,9 @@ import type {
 export type Refusal =
   | {
       readonly kind: 'invalid';
+      // The code of Auth: UnknownTimeZone names the zone, InvalidArgument
+      // says nothing about the field.
+      readonly code: string;
       readonly fields: Readonly<Partial<Record<string, string>>>;
     }
   | { readonly kind: 'conflict' }
@@ -216,7 +219,11 @@ export function refusalOf(failure: ApiFailure, scope: RefusalScope): Refusal {
     case 'InvalidArgument':
     case 'InvalidRequest':
     case 'UnknownTimeZone':
-      return { kind: 'invalid', fields: failure.fieldErrors };
+      return {
+        kind: 'invalid',
+        code: failure.code,
+        fields: failure.fieldErrors,
+      };
     case 'CommandConflict':
       return scope === 'invite' ? { kind: 'invited' } : { kind: 'conflict' };
     case 'SettingsChanged':

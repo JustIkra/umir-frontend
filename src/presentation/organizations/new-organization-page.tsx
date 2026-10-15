@@ -124,6 +124,10 @@ export function creationMessage(
   }
 }
 
+// TZ09 at the zone field.
+export const zoneUnsupported = (timeZone: string) =>
+  `Зона «${timeZone}» не поддерживается сервисом. Выберите зону из списка.`;
+
 // The state after the answer to «Создать предприятие» (checked: the answer to
 // the same attempt sent again). A refusal Auth gives without a screen of its
 // own means the same as no answer: nothing was created, the form stays.
@@ -135,7 +139,9 @@ export function refusalState(
     case 'unknown':
       return { kind: 'unknown' };
     case 'invalid':
-      return { kind: 'invalid', rejected: true };
+      return refusal.code === 'UnknownTimeZone'
+        ? { kind: 'zone' }
+        : { kind: 'invalid', rejected: true };
     case 'forbidden':
       return { kind: 'forbidden' };
     case 'limited':
@@ -376,11 +382,7 @@ export function NewOrganizationPage() {
           hint="Действует для всех ресторанов организации: даты, сроки и границы периодов отображаются в этой зоне."
           value={timeZone}
           disabled={locked}
-          error={
-            state.kind === 'zone'
-              ? `Зона «${timeZone}» не поддерживается сервисом. Выберите зону из списка.`
-              : undefined
-          }
+          error={state.kind === 'zone' ? zoneUnsupported(timeZone) : undefined}
           onChange={(next) => {
             setTimeZone(next);
             if (stored.kind === 'zone') setStored({ kind: 'editing' });

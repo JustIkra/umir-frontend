@@ -15,6 +15,7 @@ import {
   creationTone,
   followedCreation,
   refusalState,
+  zoneUnsupported,
 } from '../../src/presentation/organizations/new-organization-page.tsx';
 import { ReadinessSteps } from '../../src/presentation/organizations/readiness-steps.tsx';
 import {
@@ -183,10 +184,23 @@ test('only the states with news have a message', () => {
 });
 
 test('the refusals of Auth become the screen states', () => {
-  assert.deepEqual(refusalState({ kind: 'invalid', fields: {} }, false), {
-    kind: 'invalid',
-    rejected: true,
-  });
+  assert.deepEqual(
+    refusalState(
+      { kind: 'invalid', code: 'InvalidArgument', fields: {} },
+      false,
+    ),
+    {
+      kind: 'invalid',
+      rejected: true,
+    },
+  );
+  assert.deepEqual(
+    refusalState(
+      { kind: 'invalid', code: 'UnknownTimeZone', fields: {} },
+      false,
+    ),
+    { kind: 'zone' },
+  );
   assert.deepEqual(refusalState({ kind: 'forbidden' }, false), {
     kind: 'forbidden',
   });
@@ -208,6 +222,17 @@ test('the refusals of Auth become the screen states', () => {
   assert.deepEqual(refusalState({ kind: 'ended' }, false), {
     kind: 'editing',
   });
+});
+
+test('TZ09 names the zone Auth does not know', () => {
+  assert.equal(
+    zoneUnsupported('Etc/GMT-3'),
+    'Зона «Etc/GMT-3» не поддерживается сервисом. Выберите зону из списка.',
+  );
+  assert.equal(
+    creationMessage({ kind: 'zone' }, '')?.text,
+    'Зона не поддерживается сервисом. Выберите зону из списка.',
+  );
 });
 
 test('the followed operation decides the preparation states', () => {
@@ -323,9 +348,15 @@ test('the dialog states come from the outcomes', () => {
   assert.deepEqual(restaurantStateOf({ kind: 'gone' }, false), {
     kind: 'gone',
   });
-  assert.deepEqual(restaurantStateOf({ kind: 'invalid', fields: {} }, false), {
-    kind: 'rejected',
-  });
+  assert.deepEqual(
+    restaurantStateOf(
+      { kind: 'invalid', code: 'InvalidArgument', fields: {} },
+      false,
+    ),
+    {
+      kind: 'rejected',
+    },
+  );
   assert.deepEqual(restaurantStateOf({ kind: 'unknown', code: 'T' }, true), {
     kind: 'unknown',
   });
