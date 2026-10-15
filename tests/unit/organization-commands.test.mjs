@@ -714,3 +714,138 @@ test('a refusal after the check clears the remembered input', async () => {
   });
   assert.equal(organizations.pendingOrganization(), undefined);
 });
+
+const A3 = '55555555-5555-4555-8555-555555555553';
+const keepWaiter = [{ restaurantID: R2, roles: ['Waiter'] }];
+
+test('an unknown save is remembered and checked with the same commandID and body', async () => {
+  const { organizations, calls, events } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    {},
+  );
+  const desired = [
+    { restaurantID: R1, roles: ['Waiter', 'Warehouse'] },
+    { restaurantID: R2, roles: ['Waiter'] },
+  ];
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+  const first = await organizations.saveAssignments(
+    memberOf(),
+    desired,
+    everything,
+  );
+  assert.equal(first.kind, 'unknown');
+  assert.deepEqual(organizations.pendingMembership(MEMBERSHIP), {
+    kind: 'assignments',
+    grants: desired,
+  });
+  assert.deepEqual(events, []);
+  // The member was read again meanwhile: the check still sends the attempt.
+  const reread = memberOf({ membershipVersion: '9' });
+  const checked = await organizations.checkMembership(reread);
+  assert.deepEqual(checked, { kind: 'saved' });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], calls[0]);
+  assert.equal(calls[1].at(-1), 'c1');
+  assert.deepEqual(events, [['members', ORG]]);
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+});
+
+test('checkMembership is unchanged when nothing is pending', async () => {
+  const { organizations, calls } = setup();
+  assert.deepEqual(await organizations.checkMembership(memberOf()), {
+    kind: 'unchanged',
+  });
+  assert.deepEqual(calls, []);
+});
+
+test('a revoke of assignments with the second step unknown checks only that key', async () => {
+  const { organizations, calls, events } = setup(
+    {},
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    {},
+  );
+  const member = memberOf({
+    assignments: [
+      assignment(R1, A1, ['Warehouse'], '7'),
+      assignment(R2, A2, ['Waiter'], '8'),
+      assignment(R3, A3, ['Waiter'], '9'),
+    ],
+  });
+  const first = await organizations.saveAssignments(
+    member,
+    [{ restaurantID: R3, roles: ['Waiter'] }],
+    everything,
+  );
+  assert.equal(first.kind, 'unknown');
+  assert.deepEqual(organizations.pendingMembership(MEMBERSHIP), {
+    kind: 'revoke-assignments',
+    assignmentIDs: [A1, A2],
+  });
+  assert.equal(organizations.isPending(orgKeys.revokeAssignment(A1)), false);
+  assert.equal(organizations.isPending(orgKeys.revokeAssignment(A2)), true);
+  const checked = await organizations.checkMembership(member);
+  assert.deepEqual(checked, { kind: 'saved' });
+  assert.deepEqual(
+    calls.map((call) => [call[0], call[3], call.at(-1)]),
+    [
+      ['revokeAssignment', A1, 'c1'],
+      ['revokeAssignment', A2, 'c2'],
+      ['revokeAssignment', A2, 'c2'],
+    ],
+  );
+  // The committed first step and the check both ask for the list again.
+  assert.deepEqual(events, [
+    ['members', ORG],
+    ['members', ORG],
+  ]);
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+});
+
+test('a refusal on the check ends the pending change', async () => {
+  const { organizations } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    refusal(409, 'CommandConflict'),
+  );
+  await organizations.saveAssignments(memberOf(), keepWaiter, everything);
+  assert.equal(
+    organizations.pendingMembership(MEMBERSHIP)?.kind,
+    'revoke-assignments',
+  );
+  assert.deepEqual(await organizations.checkMembership(memberOf()), {
+    kind: 'conflict',
+  });
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+});
+
+test('setAdmin and revokeMember remember what they were sent with', async () => {
+  const { organizations } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+  );
+  await organizations.setAdmin(memberOf(), true, everything);
+  assert.deepEqual(organizations.pendingMembership(MEMBERSHIP), {
+    kind: 'admin',
+    admin: true,
+  });
+  const other = '77777777-7777-4777-8777-777777777777';
+  const second = memberOf({ membershipID: other });
+  await organizations.revokeMember(second);
+  assert.deepEqual(organizations.pendingMembership(other), { kind: 'revoke' });
+});
+
+test('clear forgets the remembered inputs', async () => {
+  const { organizations } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+  );
+  const input = {
+    name: 'Север',
+    timeZone: 'Europe/Moscow',
+    firstRestaurantName: 'Юг',
+  };
+  await organizations.createOrganization(input);
+  await organizations.saveAssignments(memberOf(), keepWaiter, everything);
+  organizations.clear();
+  assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
+  assert.equal(organizations.pendingOrganization(), undefined);
+});

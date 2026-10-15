@@ -5,12 +5,12 @@ import {
   type OrganizationAccess,
   type RestaurantAccess,
 } from '@/application/access';
-import { orgKeys } from '@/application/organization-commands';
 import type {
   Member,
   MemberList,
   RoleGrant,
 } from '@/application/organizations';
+import type { SaveAssignmentsOutcome } from '@/application/organization-commands';
 import type { ReadModel } from '@/application/read-model';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { NotFoundPage } from '@/presentation/documents/not-found-page';
@@ -44,11 +44,6 @@ import {
 } from './organization-layout';
 import { RevokeAccessDialog } from './revoke-access-dialog';
 
-// The roles of a save whose outcome is not known, by membership. A save that
-// is checked again resends the attempt it was sent with, and its roles are
-// the ones of that attempt, so they outlive the card (the page may be closed
-// and opened again before the check).
-const unsettled = new Map<string, readonly RoleGrant[]>();
 const noChanges: ReadonlySet<string> = new Set();
 
 function MemberHeader({
@@ -95,23 +90,31 @@ function AssignmentsCard({
   const { membershipID } = member.membership;
   useAttempts();
   const storedGrants = grantsOf(member);
-  const [draft, setDraft] = useState<readonly RoleGrant[] | undefined>(() =>
-    unsettled.get(membershipID),
-  );
+  const [draft, setDraft] = useState<readonly RoleGrant[]>();
   const [stored, setStored] = useState<AssignmentsState>({ kind: 'view' });
-  const value = draft ?? storedGrants;
+  // The change that has no known outcome is shown as it was sent.
+  const pending = commands.pendingMembership(membershipID);
+  const unsettledSave =
+    pending?.kind === 'assignments' || pending?.kind === 'revoke-assignments';
+  const value =
+    pending?.kind === 'assignments'
+      ? pending.grants
+      : pending?.kind === 'revoke-assignments'
+        ? storedGrants.filter((grant) =>
+            member.membership.assignments.every(
+              (assignment) =>
+                assignment.restaurantID !== grant.restaurantID ||
+                !pending.assignmentIDs.includes(assignment.assignmentID),
+            ),
+          )
+        : (draft ?? storedGrants);
   const changed = changedRestaurants(storedGrants, value);
   const differs = changed.size > 0;
 
-  const pendingSave =
-    commands.isPending(orgKeys.updateMembership(membershipID)) ||
-    member.membership.assignments.some((assignment) =>
-      commands.isPending(orgKeys.revokeAssignment(assignment.assignmentID)),
-    );
   const state: AssignmentsState =
     stored.kind === 'saving'
       ? stored
-      : pendingSave
+      : unsettledSave
         ? { kind: 'unknown' }
         : stored.kind === 'view' && differs
           ? { kind: 'changed' }
@@ -120,18 +123,24 @@ function AssignmentsCard({
   const saving = state.kind === 'saving';
   // While the membership has an attempt without an outcome, or the answer is
   // awaited, nothing of the card may change it.
-  const locked = saving || pendingSave || revoking;
+  const locked = saving || pending !== undefined || revoking;
   const canSave =
     differs && !locked && state.kind !== 'saved' && state.kind !== 'conflict';
 
-  const save = async () => {
-    setStored({ kind: 'saving' });
-    unsettled.set(membershipID, value);
-    const outcome = await commands.saveAssignments(member, value, editable);
-    if (outcome.kind !== 'unknown') unsettled.delete(membershipID);
+  const settle = (outcome: SaveAssignmentsOutcome) => {
     // A membership that is gone is not reread by the command itself.
     if (outcome.kind === 'gone') model.refresh();
     setStored(assignmentsOutcomeState(outcome));
+  };
+  const save = async () => {
+    setStored({ kind: 'saving' });
+    settle(await commands.saveAssignments(member, value, editable));
+  };
+  // The same attempts again: nothing is planned anew from the form.
+  const check = async () => {
+    setDraft(value);
+    setStored({ kind: 'saving' });
+    settle(await commands.checkMembership(member));
   };
   const cancel = () => {
     setDraft(undefined);
@@ -178,7 +187,7 @@ function AssignmentsCard({
             <Button
               variant="secondary"
               onClick={() => {
-                void save();
+                void check();
               }}
             >
               Проверить сохранение
@@ -216,7 +225,7 @@ function AssignmentsCard({
         >
           Сохранить назначения
         </Button>
-        {differs && !saving && !pendingSave && (
+        {differs && !saving && pending === undefined && (
           <Button variant="secondary" onClick={cancel}>
             Отменить изменения
           </Button>
@@ -247,7 +256,7 @@ function MemberCards({
   const offered = organization.restaurants.filter((restaurant) =>
     editable.has(restaurant.restaurantID),
   );
-  const revoking = commands.isPending(orgKeys.revokeMembership(membershipID));
+  const revoking = commands.pendingMembership(membershipID)?.kind === 'revoke';
   return (
     <>
       <AssignmentsCard
@@ -326,9 +335,10 @@ function MemberBody({
     return <NotFoundPage />;
   }
   const dialogMember = found ?? lastSeen;
-  const locked =
-    commands.isPending(orgKeys.updateMembership(membershipID)) ||
-    commands.isPending(orgKeys.revokeMembership(membershipID));
+  // Another change of the membership has no known outcome: «Отозвать доступ»
+  // waits. A revoke that is unsettled is checked in the dialog.
+  const pending = commands.pendingMembership(membershipID);
+  const locked = pending !== undefined && pending.kind !== 'revoke';
 
   let content;
   if (snapshot.value === undefined) {

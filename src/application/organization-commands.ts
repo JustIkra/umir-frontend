@@ -136,6 +136,17 @@ export type OperationKind =
   | 'delete-restaurant'
   | 'delete-organization';
 
+// The change of a membership whose outcome is not known, with what it was
+// sent with. The screen shows it and checks it; it never plans it again.
+export type MembershipChange =
+  | { readonly kind: 'assignments'; readonly grants: readonly RoleGrant[] }
+  | {
+      readonly kind: 'revoke-assignments';
+      readonly assignmentIDs: readonly string[];
+    }
+  | { readonly kind: 'admin'; readonly admin: boolean }
+  | { readonly kind: 'revoke' };
+
 export interface OrganizationCommands {
   createOrganization(input: NewOrganization): Promise<Outcome<Lifecycle>>;
   addRestaurant(orgID: string, name: string): Promise<Outcome<Lifecycle>>;
@@ -161,6 +172,13 @@ export interface OrganizationCommands {
     editable: ReadonlySet<string>,
   ): Promise<Outcome<Membership>>;
   revokeMember(member: Member): Promise<Outcome<DurableResult>>;
+  // The change of the membership that has no known outcome, undefined when
+  // none: derived from the keys that are pending, so it ends with them.
+  pendingMembership(membershipID: string): MembershipChange | undefined;
+  // Sends the pending attempts of an assignments change again (the same
+  // commandID and body as before) and never plans anew. 'unchanged' when none
+  // of them is pending.
+  checkMembership(member: Member): Promise<SaveAssignmentsOutcome>;
   invite(
     orgID: string,
     email: string,
@@ -180,6 +198,8 @@ export interface OrganizationCommands {
   // checked is the one sent with it, whatever a screen holds now.
   pendingOrganization(): NewOrganization | undefined;
   pendingRestaurantName(orgID: string): string | undefined;
+  // Sign-out or another user: the remembered inputs are dropped.
+  clear(): void;
 }
 
 export const orgKeys = {
@@ -289,6 +309,42 @@ export function createOrganizationCommands({
   // attempt, not the one of the new call, that the tracker is told.
   const unsettled = new Map<string, Unsettled>();
 
+  // What the membership changes without a known outcome were sent with.
+  const changes = new Map<string, MembershipChange>();
+  function pendingMembership(
+    membershipID: string,
+  ): MembershipChange | undefined {
+    const change = changes.get(membershipID);
+    if (change === undefined) return undefined;
+    switch (change.kind) {
+      case 'assignments':
+      case 'admin':
+        return isPending(orgKeys.updateMembership(membershipID))
+          ? change
+          : undefined;
+      case 'revoke-assignments':
+        return change.assignmentIDs.some((id) =>
+          isPending(orgKeys.revokeAssignment(id)),
+        )
+          ? change
+          : undefined;
+      case 'revoke':
+        return isPending(orgKeys.revokeMembership(membershipID))
+          ? change
+          : undefined;
+    }
+  }
+  // The first call keeps what it was sent with; a call that finds the attempt
+  // pending resends it and keeps the remembered input.
+  function remember(membershipID: string, change: MembershipChange): void {
+    if (pendingMembership(membershipID) === undefined) {
+      changes.set(membershipID, change);
+    }
+  }
+  function settled(membershipID: string, result: { kind: string }): void {
+    if (result.kind !== 'unknown') changes.delete(membershipID);
+  }
+
   async function lifecycle(
     kind: OperationKind,
     given: Unsettled,
@@ -370,6 +426,15 @@ export function createOrganizationCommands({
       }
       const plan = planAssignments(membership, desired, editable);
       if (plan.kind === 'none') return { kind: 'unchanged' };
+      remember(
+        membership.membershipID,
+        plan.kind === 'replace'
+          ? { kind: 'assignments', grants: desired }
+          : {
+              kind: 'revoke-assignments',
+              assignmentIDs: plan.assignments.map((item) => item.assignmentID),
+            },
+      );
       let result: Outcome<unknown>;
       // A revoke that committed changes the membership even when a later
       // step fails: the list must be read again then.
@@ -419,10 +484,40 @@ export function createOrganizationCommands({
       if (committed || result.kind === 'done' || result.kind === 'conflict') {
         membersChanged(membership.orgID);
       }
+      settled(membership.membershipID, result);
+      return result.kind === 'done' ? { kind: 'saved' } : result;
+    },
+    async checkMembership(member) {
+      const { membership } = member;
+      const change = pendingMembership(membership.membershipID);
+      let keys: readonly string[];
+      if (change?.kind === 'assignments') {
+        keys = [orgKeys.updateMembership(membership.membershipID)];
+      } else if (change?.kind === 'revoke-assignments') {
+        keys = change.assignmentIDs
+          .map(orgKeys.revokeAssignment)
+          .filter(isPending);
+      } else {
+        return { kind: 'unchanged' };
+      }
+      let result: Outcome<unknown> = { kind: 'done', value: undefined };
+      let committed = false;
+      for (const key of keys) {
+        const again = commands.retry(key);
+        if (again === undefined) continue;
+        result = outcome(await again, 'membership');
+        if (result.kind !== 'done') break;
+        committed = true;
+      }
+      if (committed || result.kind === 'conflict') {
+        membersChanged(membership.orgID);
+      }
+      settled(membership.membershipID, result);
       return result.kind === 'done' ? { kind: 'saved' } : result;
     },
     async setAdmin(member, admin, editable) {
       const { membership } = member;
+      remember(membership.membershipID, { kind: 'admin', admin });
       const result = outcome(
         await commands.run({
           key: orgKeys.updateMembership(membership.membershipID),
@@ -451,10 +546,13 @@ export function createOrganizationCommands({
       if (result.kind === 'done' || result.kind === 'conflict') {
         membersChanged(membership.orgID);
       }
+      settled(membership.membershipID, result);
       return result;
     },
+    pendingMembership,
     async revokeMember(member) {
       const { membership } = member;
+      remember(membership.membershipID, { kind: 'revoke' });
       const result = outcome(
         await commands.run({
           key: orgKeys.revokeMembership(membership.membershipID),
@@ -472,6 +570,7 @@ export function createOrganizationCommands({
       if (result.kind === 'done' || result.kind === 'conflict') {
         membersChanged(membership.orgID);
       }
+      settled(membership.membershipID, result);
       return result;
     },
     async invite(orgID, email, grants) {
@@ -532,6 +631,10 @@ export function createOrganizationCommands({
     pendingRestaurantName: (orgID) => {
       const key = orgKeys.addRestaurant(orgID);
       return isPending(key) ? unsettled.get(key)?.name : undefined;
+    },
+    clear() {
+      unsettled.clear();
+      changes.clear();
     },
   };
 }

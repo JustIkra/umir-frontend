@@ -224,6 +224,7 @@ const session = createSessionStore({
     deliveryFlows.forget();
     writeoffCommands.clear();
     organizationReads.clear();
+    organizationCommands.clear();
     lifecycles.clear();
     client.clearCsrfToken();
   },
@@ -244,6 +245,7 @@ const session = createSessionStore({
     deliveryFlows.forget();
     writeoffCommands.clear();
     organizationReads.clear();
+    organizationCommands.clear();
     lifecycles.clear();
     void access.refresh();
   },

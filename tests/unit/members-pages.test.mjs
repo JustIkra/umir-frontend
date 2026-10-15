@@ -436,16 +436,14 @@ test('a failed read of the card is not a revoked member', async () => {
   assert.ok(!page.includes('Участник больше не состоит'));
 });
 
-test('MM08 locks the card while the save has no known outcome', async () => {
+test('a membership action without a known outcome locks the whole card', async () => {
   const html = await renderRoute(
     cardPath,
     withMembers(members, {
       pending: new Set([orgKeys.updateMembership(MEMBERSHIP)]),
+      pendingMembership: { kind: 'admin', admin: true },
     }),
   );
-  const page = text(html);
-  assert.match(page, /Результат сохранения неизвестен/);
-  assert.match(page, /Проверить сохранение/);
   const boxes = html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
   assert.ok(boxes.length > 0);
   for (const box of boxes) assert.match(box, /disabled/);
@@ -501,4 +499,40 @@ test('readyOnly leaves the preparing restaurants unavailable', () => {
   const all = matrix({ disabled: true });
   const every = all.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
   assert.ok(every.every((box) => /disabled/.test(box)));
+});
+
+test('a remembered save locks the matrix and offers the check', async () => {
+  const html = await renderRoute(
+    cardPath,
+    withMembers(members, {
+      pending: new Set([orgKeys.updateMembership(MEMBERSHIP)]),
+      pendingMembership: {
+        kind: 'assignments',
+        grants: [{ restaurantID: R, roles: ['Warehouse', 'Waiter'] }],
+      },
+    }),
+  );
+  assert.match(text(html), /Результат сохранения неизвестен/);
+  assert.match(text(html), /Проверить сохранение/);
+  const boxes = html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
+  assert.ok(boxes.length > 0);
+  for (const box of boxes) assert.match(box, /disabled/);
+  // The boxes show what was sent: both roles in the first restaurant.
+  assert.equal(
+    boxes.filter((box) => /checked/.test(box) && /-0-/.test(box)).length,
+    2,
+  );
+});
+
+test('a remembered revoke keeps «Отозвать доступ» open for the check', async () => {
+  const html = await renderRoute(
+    cardPath,
+    withMembers(members, {
+      pending: new Set([orgKeys.revokeMembership(MEMBERSHIP)]),
+      pendingMembership: { kind: 'revoke' },
+    }),
+  );
+  const dialog = text(/<dialog[\s\S]*?<\/dialog>/.exec(html)?.[0] ?? '');
+  assert.match(dialog, /Результат отзыва неизвестен/);
+  assert.match(dialog, /Проверить результат/);
 });

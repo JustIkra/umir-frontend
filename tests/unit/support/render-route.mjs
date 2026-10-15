@@ -258,7 +258,7 @@ export const resetSnapshot = (overrides = {}) => ({
 // (members, invitations, profile; loading by default), operations (the
 // followed preparations and deletions), pending (command keys without a known
 // outcome; pendingOrganization and pendingRestaurantName are the inputs of
-// their attempts) and commands (replacements of command methods).
+// their attempts) and commands (replacements of command methods; pendingMembership is the remembered membership change).
 export function fakeServices({
   session = activeSession,
   access: givenAccess = readyAccess(),
@@ -320,6 +320,9 @@ export function fakeServices({
         saveAssignments: done,
         setAdmin: done,
         revokeMember: done,
+        pendingMembership: () => organizations.pendingMembership,
+        checkMembership: () => Promise.resolve({ kind: 'unchanged' }),
+        clear() {},
         invite: done,
         resendLink: done,
         cancelInvitation: done,
