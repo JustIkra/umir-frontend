@@ -16,6 +16,11 @@ import {
   AuthLead,
   AuthTitle,
 } from '@/presentation/auth/auth-layout';
+import { CodeEntry } from '@/presentation/auth/code-entry';
+import {
+  NameField,
+  PasswordFields,
+} from '@/presentation/auth/credential-fields';
 import { rolesCaption } from '@/presentation/app-shell/shell-context';
 import { NotFound } from '@/presentation/documents/not-found-page';
 import {
@@ -25,15 +30,7 @@ import {
 import { useAccess, useSession, useStore } from '@/presentation/session/hooks';
 import { Button, ButtonLink, TextLink } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
-import { formatCountdown, useNow } from '@/presentation/ui/countdown';
-import {
-  CodeInput,
-  FieldGroup,
-  FieldLabel,
-  FieldMessage,
-  PasswordInput,
-  TextInput,
-} from '@/presentation/ui/form';
+import { useNow } from '@/presentation/ui/countdown';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import {
@@ -46,8 +43,6 @@ import {
 
 export { acceptMessage } from './invite-messages';
 
-const passwordHint =
-  'От 8 до 32 символов. Можно вставить пароль из менеджера паролей.';
 const help = 'Письмо не пришло — обратитесь к администратору организации.';
 
 // The sign-in page reads the address to return to from «return».
@@ -180,50 +175,12 @@ function DetailsForm({
       }}
     >
       <chakra.fieldset disabled={unknown || snapshot.busy} display="contents">
-        <FieldGroup>
-          <FieldLabel htmlFor="invite-name">Имя</FieldLabel>
-          <TextInput
-            id="invite-name"
-            name="displayName"
-            autoComplete="name"
-            defaultValue={snapshot.displayName}
-            invalid={errors.name !== undefined}
-            aria-describedby="invite-name-error"
-          />
-          <FieldMessage
-            id="invite-name-error"
-            error={errors.name}
-            hint="От 2 до 80 символов. Так вас увидят коллеги."
-          />
-        </FieldGroup>
-        <FieldGroup>
-          <FieldLabel htmlFor="invite-password">Пароль</FieldLabel>
-          <PasswordInput
-            id="invite-password"
-            name="password"
-            autoComplete="new-password"
-            invalid={errors.password !== undefined}
-            aria-describedby="invite-password-hint"
-          />
-          <FieldMessage
-            id="invite-password-hint"
-            error={errors.password}
-            hint={passwordHint}
-          />
-        </FieldGroup>
-        <FieldGroup>
-          <FieldLabel htmlFor="invite-repeat">Повторите пароль</FieldLabel>
-          <PasswordInput
-            id="invite-repeat"
-            name="repeat"
-            autoComplete="new-password"
-            invalid={errors.repeat !== undefined}
-            aria-describedby={
-              errors.repeat === undefined ? undefined : 'invite-repeat-error'
-            }
-          />
-          <FieldMessage id="invite-repeat-error" error={errors.repeat} />
-        </FieldGroup>
+        <NameField
+          idPrefix="invite"
+          defaultValue={snapshot.displayName}
+          error={errors.name}
+        />
+        <PasswordFields idPrefix="invite" errors={errors} />
       </chakra.fieldset>
       <Button
         type="submit"
@@ -338,103 +295,27 @@ function CodeStep({
   flow: InvitationAcceptance;
   snapshot: AcceptSnapshot;
 }) {
-  const now = useNow(true);
-  const { notice } = snapshot;
-  const locked = notice?.kind === 'locked';
-  const unknown = notice?.kind === 'unknown';
-  const expired =
-    isAcceptCodeExpired(snapshot, now) || notice?.kind === 'expired';
-  // The notice's own message wins over the expiry text.
-  const own = acceptMessage(notice, now);
-  const shown =
-    own ?? (expired ? acceptMessage({ kind: 'expired' }, now) : undefined);
-  const limited = notice?.kind === 'limited' && own !== undefined;
-  const error = codeError(notice);
-  const resendIn = (snapshot.resendAtMs ?? now) - now;
-  const closed = unknown || snapshot.busy || locked || expired;
   return (
-    <>
-      <AuthTitle>Введите код из письма</AuthTitle>
-      <AuthLead>
-        Код отправлен на почту, указанную в приглашении. Он действует 10 минут.
-      </AuthLead>
-      <Unknown flow={flow} notice={notice} />
-      <chakra.form
-        noValidate
-        display="flex"
-        flexDirection="column"
-        gap="6"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          void flow.verify(field(data.get('code')));
-        }}
-      >
-        <chakra.fieldset disabled={closed} display="contents">
-          <FieldGroup>
-            <FieldLabel htmlFor="invite-code">Код из письма</FieldLabel>
-            <CodeInput
-              id="invite-code"
-              name="code"
-              aria-invalid={error === undefined ? undefined : true}
-              aria-describedby="invite-code-hint"
-            />
-            <FieldMessage
-              id="invite-code-hint"
-              error={error}
-              hint="6 цифр из письма. Код можно вставить целиком."
-            />
-          </FieldGroup>
-        </chakra.fieldset>
-        {expired || locked ? null : resendIn > 0 ? (
-          <Text textStyle="caption.default" color="text.secondary">
-            {`Отправить код повторно можно через ${formatCountdown(resendIn)}`}
-          </Text>
-        ) : (
-          <Button
-            type="button"
-            variant="link"
-            alignSelf="flex-start"
-            disabled={unknown || snapshot.busy || limited}
-            onClick={() => {
-              void flow.resend();
-            }}
-          >
-            Отправить код повторно
-          </Button>
-        )}
-        <Button
-          type="submit"
-          w="full"
-          disabled={closed}
-          aria-busy={snapshot.busy}
-        >
-          {snapshot.busy ? 'Проверяем…' : 'Подтвердить'}
-        </Button>
-        {shown !== undefined && (
-          <FormMessage
-            tone={shown.tone}
-            title={shown.title}
-            action={
-              expired || locked ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={unknown || snapshot.busy}
-                  onClick={() => {
-                    void flow.requestCode();
-                  }}
-                >
-                  Получить новый код
-                </Button>
-              ) : undefined
-            }
-          >
-            {shown.text}
-          </FormMessage>
-        )}
-      </chakra.form>
-    </>
+    <CodeEntry
+      idPrefix="invite"
+      lead="Код отправлен на почту, указанную в приглашении. Он действует 10 минут."
+      state={snapshot}
+      isExpired={(nowMs) => isAcceptCodeExpired(snapshot, nowMs)}
+      notice={snapshot.notice}
+      expiredNotice={{ kind: 'expired' }}
+      messageOf={acceptMessage}
+      codeError={codeError(snapshot.notice)}
+      unknown={<Unknown flow={flow} notice={snapshot.notice} />}
+      onVerify={(code) => {
+        void flow.verify(code);
+      }}
+      onResend={() => {
+        void flow.resend();
+      }}
+      onRenew={() => {
+        void flow.requestCode();
+      }}
+    />
   );
 }
 

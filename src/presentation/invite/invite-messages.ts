@@ -2,6 +2,10 @@ import type {
   AcceptAction,
   AcceptNotice,
 } from '@/application/invitation-acceptance';
+import {
+  credentialErrors,
+  type CredentialErrors,
+} from '@/presentation/auth/credential-fields';
 import { resetMessage } from '@/presentation/auth/password-reset-pages';
 
 export interface AcceptMessage {
@@ -96,28 +100,11 @@ export function acceptMessage(
   return fixedMessages[notice.kind];
 }
 
-export interface DetailsErrors {
-  readonly name: string | undefined;
-  readonly password: string | undefined;
-  readonly repeat: string | undefined;
-}
+export type DetailsErrors = CredentialErrors;
 
 // The faults of the name and the password fields.
 export function detailsErrors(notice: AcceptNotice | undefined): DetailsErrors {
-  if (notice?.kind !== 'fields') {
-    return { name: undefined, password: undefined, repeat: undefined };
-  }
-  let name: string | undefined;
-  if (notice.name === 'required') name = 'Введите имя';
-  if (notice.name === 'length') name = 'Нужно от 2 до 80 символов.';
-  let password: string | undefined;
-  if (notice.password === 'required') password = 'Введите пароль';
-  if (notice.password === 'length') password = 'Нужно от 8 до 32 символов.';
-  return {
-    name,
-    password,
-    repeat: notice.repeat === 'mismatch' ? 'Пароли не совпадают.' : undefined,
-  };
+  return credentialErrors(notice?.kind === 'fields' ? notice : undefined);
 }
 
 export function codeError(
