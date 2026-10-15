@@ -19,8 +19,17 @@ const zoneCities: Readonly<Record<string, string>> = {
   'Asia/Tashkent': 'Ташкент',
 };
 
+// The zones of the list in the order of Figma TZ02: Russia from Moscow
+// eastwards, then foreign zones. The list is static: Auth sends none.
+export const organizationZones: readonly string[] = Object.keys(zoneCities);
+
+// «Москва»; a zone without a Russian name keeps its identifier.
+export function zoneCity(timeZone: string): string {
+  return zoneCities[timeZone] ?? timeZone;
+}
+
 export function zoneLabel(timeZone: string, epochMs: number): string {
-  return `${zoneCities[timeZone] ?? timeZone}, ${formatOffset(epochMs, timeZone)}`;
+  return `${zoneCity(timeZone)}, ${formatOffset(epochMs, timeZone)}`;
 }
 
 // The caption under a section title: «Среда, 14 октября 2026 · Москва, UTC+3».

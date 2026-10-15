@@ -1,13 +1,20 @@
 import { Stack, Text, chakra } from '@chakra-ui/react';
 import { Link as RouterLink } from 'react-router';
-import { PageHeader } from '@/presentation/app-shell/pages';
 import {
-  organizations,
-  type Organization,
-} from '@/presentation/placeholder-organizations';
+  knownOrganizations,
+  type OrganizationAccess,
+} from '@/application/access';
+import { PageHeader } from '@/presentation/app-shell/pages';
+import { useServices } from '@/presentation/services';
+import { useAccess } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
-import { organizationPath, zoneLine } from './format';
-import { OrganizationLayout } from './organization-layout';
+import { Card } from '@/presentation/ui/card';
+import { organizationPath, restaurantCount, zoneLine } from './format';
+import {
+  CardSkeletons,
+  OrganizationLayout,
+  OrganizationsUnavailable,
+} from './organization-layout';
 
 const CardLink = chakra(RouterLink, {
   base: {
@@ -25,25 +32,88 @@ const CardLink = chakra(RouterLink, {
 });
 
 // Figma Organization card: the whole card opens the organization.
-function OrganizationCard({ organization }: { organization: Organization }) {
+function OrganizationCard({
+  organization,
+}: {
+  organization: OrganizationAccess;
+}) {
+  const { now } = useServices();
   return (
-    <CardLink to={organizationPath(organization)}>
+    <CardLink to={organizationPath(organization.orgID)}>
       <chakra.h2 textStyle="heading.h3">{organization.name}</chakra.h2>
       <Text textStyle="body.default" color="text.secondary">
-        {organization.role}
+        {organization.admin ? 'Администратор' : 'Сотрудник'}
       </Text>
       <Text textStyle="caption.default" color="text.secondary">
-        {organization.count}
+        {restaurantCount(organization.restaurants.length)}
       </Text>
-      <Text textStyle="caption.default" color="text.secondary">
-        {zoneLine(organization.zone)}
-      </Text>
+      {organization.admin && (
+        <Text textStyle="caption.default" color="text.secondary">
+          {zoneLine(organization.settings.timeZone, now())}
+        </Text>
+      )}
     </CardLink>
   );
 }
 
-// Figma OG01 «Организации и рестораны».
+// Figma OG04: the account is in no organization.
+function NoOrganizations() {
+  return (
+    <Card as="section">
+      <chakra.h2 textStyle="heading.h3">Нет организаций</chakra.h2>
+      <Text textStyle="body.default" color="text.secondary">
+        Учётная запись пока не входит ни в одну организацию. Доступ
+        предоставляет администратор организации по приглашению на почту. Также
+        можно создать собственное предприятие.
+      </Text>
+      <ButtonLink to="/app/organizations/new" alignSelf="flex-start">
+        Создать предприятие
+      </ButtonLink>
+    </Card>
+  );
+}
+
+// Figma OG01 «Организации и рестораны» from GET /access, with OG04 (none),
+// OG05 (reading) and OG06 (not received). An earlier answer stays shown while
+// a new check fails.
 export function OrganizationsPage() {
+  const { access } = useServices();
+  const state = useAccess();
+  const organizations = knownOrganizations(state);
+  let body;
+  if (organizations === undefined) {
+    body =
+      state.status === 'loading' ? (
+        <CardSkeletons />
+      ) : (
+        <OrganizationsUnavailable
+          onRetry={() => {
+            void access.refresh();
+          }}
+        />
+      );
+  } else if (organizations.length === 0) {
+    body = <NoOrganizations />;
+  } else {
+    body = (
+      <>
+        <ButtonLink
+          variant="secondary"
+          to="/app/organizations/new"
+          alignSelf="flex-start"
+        >
+          Создать предприятие
+        </ButtonLink>
+        <Stack as="ul" gap={{ base: '4', sm: '6' }} listStyleType="none">
+          {organizations.map((organization) => (
+            <li key={organization.orgID}>
+              <OrganizationCard organization={organization} />
+            </li>
+          ))}
+        </Stack>
+      </>
+    );
+  }
   return (
     <OrganizationLayout
       header={
@@ -53,20 +123,7 @@ export function OrganizationsPage() {
         />
       }
     >
-      <ButtonLink
-        variant="secondary"
-        to="/app/organizations/new"
-        alignSelf="flex-start"
-      >
-        Создать предприятие
-      </ButtonLink>
-      <Stack as="ul" gap={{ base: '4', sm: '6' }} listStyleType="none">
-        {organizations.map((organization) => (
-          <li key={organization.id}>
-            <OrganizationCard organization={organization} />
-          </li>
-        ))}
-      </Stack>
+      {body}
     </OrganizationLayout>
   );
 }

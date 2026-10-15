@@ -37,7 +37,11 @@ export const sampleRestaurant = (overrides = {}) => {
   };
 };
 
-export const readyAccess = (restaurants = [sampleRestaurant()]) => ({
+// admin: true makes the organization one the user administers.
+export const readyAccess = (
+  restaurants = [sampleRestaurant()],
+  { admin = false } = {},
+) => ({
   status: 'ready',
   organizations:
     restaurants.length === 0
@@ -47,7 +51,7 @@ export const readyAccess = (restaurants = [sampleRestaurant()]) => ({
             orgID: ORG,
             name: 'Восток Фуд',
             settings: { timeZone: 'Europe/Moscow', settingsVersion: '1' },
-            admin: false,
+            admin,
             restaurants,
           },
         ],

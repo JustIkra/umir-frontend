@@ -13,10 +13,13 @@ import { organizationPath } from './format';
 // доступ» returns to the members list without changing anything.
 export function RevokeAccessDialog({
   dialogRef,
+  orgID,
   organization,
   member,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
+  // The organization of the address; organization is the sample until task 6.
+  orgID: string;
   organization: Organization;
   member: Member;
 }) {
@@ -39,9 +42,7 @@ export function RevokeAccessDialog({
             Отмена
           </Button>
           <Button
-            onClick={() =>
-              void navigate(`${organizationPath(organization)}/members`)
-            }
+            onClick={() => void navigate(`${organizationPath(orgID)}/members`)}
           >
             Отозвать доступ
           </Button>

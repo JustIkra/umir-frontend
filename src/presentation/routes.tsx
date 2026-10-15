@@ -36,9 +36,9 @@ import {
 } from './documents/pages';
 import { LandingPage } from './landing/landing-page';
 import {
-  adminOrganizationLoader,
-  memberLoader,
-  organizationLoader,
+  createAdminLoader,
+  createMemberLoader,
+  createOrganizationLoader,
 } from './organizations/loaders';
 import { OrdersPage } from './orders/orders-page';
 import { InvitationsPage } from './organizations/invitations-page';
@@ -173,32 +173,32 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
                 { path: 'organizations/new', element: <NewOrganizationPage /> },
                 {
                   path: 'organizations/:org',
-                  loader: organizationLoader,
+                  loader: createOrganizationLoader(services),
                   element: <OrganizationPage />,
                 },
                 {
                   path: 'organizations/:org/members',
-                  loader: adminOrganizationLoader,
+                  loader: createAdminLoader(services),
                   element: <MembersPage />,
                 },
                 {
                   path: 'organizations/:org/members/:member',
-                  loader: memberLoader,
+                  loader: createMemberLoader(services),
                   element: <MemberPage />,
                 },
                 {
                   path: 'organizations/:org/invitations',
-                  loader: adminOrganizationLoader,
+                  loader: createAdminLoader(services),
                   element: <InvitationsPage />,
                 },
                 {
                   path: 'organizations/:org/invitations/new',
-                  loader: adminOrganizationLoader,
+                  loader: createAdminLoader(services),
                   element: <InvitePage />,
                 },
                 {
                   path: 'organizations/:org/profile',
-                  loader: adminOrganizationLoader,
+                  loader: createAdminLoader(services),
                   element: <OrganizationProfilePage />,
                 },
               ],

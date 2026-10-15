@@ -8,7 +8,6 @@ import { atLeast, scrim } from '@/presentation/theme/system';
 import { FieldLabel, FieldMessage, SearchInput } from '@/presentation/ui/form';
 import { Icon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
-import { zoneValue } from './format';
 
 // Figma Timezone field and list (TZ01, TZ02). From 1024 the list opens in
 // place under the hint (a non-modal dialog, Esc handled here); on 390 it is a
@@ -68,7 +67,7 @@ export function TimezoneField({
         _expanded={{ borderWidth: '2px', borderColor: 'border.focus' }}
       >
         <Text id={valueId} as="span" flex="1" minW="0" textStyle="body.default">
-          {zoneValue(zone)}
+          {`${zone.city} — ${zone.id} · ${zone.offset}`}
         </Text>
         <Icon src={chevronIcon} size={24} />
       </chakra.button>

@@ -1,21 +1,28 @@
 import { chakra } from '@chakra-ui/react';
 import { useRef } from 'react';
 import { useLoaderData } from 'react-router';
-import { type Organization } from '@/presentation/placeholder-organizations';
+import { type OrganizationAccess } from '@/application/access';
+import { useServices } from '@/presentation/services';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Card } from '@/presentation/ui/card';
 import { ReadOnlyValue } from '@/presentation/ui/form';
 import { AddRestaurantDialog } from './add-restaurant-dialog';
 import { zoneLine, zoneValue } from './format';
+import { type OrganizationRoute } from './loaders';
 import {
   OrganizationHeader,
   OrganizationLayout,
+  OrganizationState,
   OrganizationTabs,
 } from './organization-layout';
 import { RestaurantList } from './restaurant-list';
 
 // Figma OG02: the administrator's «Рестораны» tab with «Добавить ресторан».
-function AdminRestaurants({ organization }: { organization: Organization }) {
+function AdminRestaurants({
+  organization,
+}: {
+  organization: OrganizationAccess;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   return (
     <OrganizationLayout
@@ -23,7 +30,7 @@ function AdminRestaurants({ organization }: { organization: Organization }) {
         <OrganizationHeader organization={organization} section="Рестораны" />
       }
     >
-      <OrganizationTabs organization={organization} />
+      <OrganizationTabs orgID={organization.orgID} />
       <Button
         alignSelf="flex-start"
         aria-haspopup="dialog"
@@ -32,15 +39,24 @@ function AdminRestaurants({ organization }: { organization: Organization }) {
         Добавить ресторан
       </Button>
       <Card>
-        <RestaurantList restaurants={organization.restaurants} />
+        <RestaurantList restaurants={organization.restaurants} admin />
       </Card>
-      <AddRestaurantDialog dialogRef={dialog} zone={organization.zone} />
+      <AddRestaurantDialog
+        dialogRef={dialog}
+        timeZone={organization.settings.timeZone}
+      />
     </OrganizationLayout>
   );
 }
 
 // Figma OG03: a staff member sees own restaurants and the zone, no tabs.
-function StaffOrganization({ organization }: { organization: Organization }) {
+function StaffOrganization({
+  organization,
+}: {
+  organization: OrganizationAccess;
+}) {
+  const { now } = useServices();
+  const { timeZone } = organization.settings;
   return (
     <OrganizationLayout
       header={<OrganizationHeader organization={organization} />}
@@ -52,8 +68,8 @@ function StaffOrganization({ organization }: { organization: Organization }) {
       <Card>
         <ReadOnlyValue
           label="Часовой пояс организации"
-          value={zoneValue(organization.zone)}
-          note={`Часовой пояс организации: ${zoneLine(organization.zone)}. Изменить его может администратор организации.`}
+          value={zoneValue(timeZone, now())}
+          note={`Часовой пояс организации: ${zoneLine(timeZone, now())}. Изменить его может администратор организации.`}
           mono={false}
         />
       </Card>
@@ -69,10 +85,16 @@ function StaffOrganization({ organization }: { organization: Organization }) {
 }
 
 export function OrganizationPage() {
-  const organization = useLoaderData<Organization>();
-  return organization.admin ? (
-    <AdminRestaurants organization={organization} />
-  ) : (
-    <StaffOrganization organization={organization} />
+  const { orgID } = useLoaderData<OrganizationRoute>();
+  return (
+    <OrganizationState orgID={orgID}>
+      {(organization) =>
+        organization.admin ? (
+          <AdminRestaurants organization={organization} />
+        ) : (
+          <StaffOrganization organization={organization} />
+        )
+      }
+    </OrganizationState>
   );
 }

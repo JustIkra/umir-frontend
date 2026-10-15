@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { type Zone } from '@/presentation/placeholder-organizations';
+import { useServices } from '@/presentation/services';
 import { Button } from '@/presentation/ui/actions';
 import { ModalPanel } from '@/presentation/ui/dialog';
 import {
@@ -13,11 +13,12 @@ import { zoneLine } from './format';
 // Figma RS01. «Добавить» only closes the dialog: nothing is created yet.
 export function AddRestaurantDialog({
   dialogRef,
-  zone,
+  timeZone,
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
-  zone: Zone;
+  timeZone: string;
 }) {
+  const { now } = useServices();
   return (
     <ModalPanel
       dialogRef={dialogRef}
@@ -45,7 +46,7 @@ export function AddRestaurantDialog({
         />
         <FieldMessage
           id="restaurant-name-hint"
-          hint={`Часовой пояс — как у организации: ${zoneLine(zone)}.`}
+          hint={`Часовой пояс — как у организации: ${zoneLine(timeZone, now())}.`}
         />
       </FieldGroup>
     </ModalPanel>

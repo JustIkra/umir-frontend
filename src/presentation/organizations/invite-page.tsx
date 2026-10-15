@@ -2,8 +2,8 @@ import { Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import { useLoaderData, useNavigate } from 'react-router';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import {
+  administeredSample,
   inviteValidity,
-  type Organization,
 } from '@/presentation/placeholder-organizations';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { CardForm } from '@/presentation/ui/card';
@@ -15,13 +15,24 @@ import {
 } from '@/presentation/ui/form';
 import { AssignmentMatrix } from './assignment-matrix';
 import { organizationPath } from './format';
-import { BackLink, OrganizationLayout } from './organization-layout';
+import { type OrganizationRoute } from './loaders';
+import {
+  BackLink,
+  OrganizationLayout,
+  OrganizationState,
+} from './organization-layout';
 
-// Figma IV01. Sending only returns to the invitations list.
-export function InvitePage() {
-  const organization = useLoaderData<Organization>();
+// Figma IV01. Sending only returns to the invitations list. The matrix lists
+// the sample restaurants until the real ones are read.
+function InviteForm({
+  orgID,
+  organizationName,
+}: {
+  orgID: string;
+  organizationName: string;
+}) {
   const navigate = useNavigate();
-  const listPath = `${organizationPath(organization)}/invitations`;
+  const listPath = `${organizationPath(orgID)}/invitations`;
   return (
     <OrganizationLayout
       header={
@@ -29,8 +40,8 @@ export function InvitePage() {
           <BackLink to={listPath}>Все приглашения</BackLink>
           <PageHeader
             title="Пригласить участника"
-            caption={organization.name}
-            documentTitle={`Пригласить участника · ${organization.name}`}
+            caption={organizationName}
+            documentTitle={`Пригласить участника · ${organizationName}`}
           />
         </Stack>
       }
@@ -60,7 +71,7 @@ export function InvitePage() {
         <chakra.h2 textStyle="heading.h3">Рестораны и роли</chakra.h2>
         <AssignmentMatrix
           id="invite-roles"
-          restaurants={organization.restaurants}
+          restaurants={administeredSample.restaurants}
         />
         <Text textStyle="caption.default" color="text.secondary">
           {inviteValidity}
@@ -73,5 +84,16 @@ export function InvitePage() {
         </Flex>
       </CardForm>
     </OrganizationLayout>
+  );
+}
+
+export function InvitePage() {
+  const { orgID } = useLoaderData<OrganizationRoute>();
+  return (
+    <OrganizationState orgID={orgID}>
+      {(organization) => (
+        <InviteForm orgID={orgID} organizationName={organization.name} />
+      )}
+    </OrganizationState>
   );
 }
