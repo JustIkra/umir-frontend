@@ -47,6 +47,12 @@ const server = http.createServer((request, response) => {
       }, 1500);
       return;
     }
+    // A body that Nginx would compress if gzip were on for the API.
+    if (url === '/api/compressible') {
+      response.writeHead(200, { 'Content-Type': 'text/css' });
+      response.end('.stand-in { color: #112233; }\n'.repeat(200));
+      return;
+    }
     const status = /^\/api\/respond\/(\d{3})$/.exec(url);
     if (status) {
       response.writeHead(Number(status[1]), {

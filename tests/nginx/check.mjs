@@ -1,5 +1,6 @@
 // Checks the frontend Nginx API proxy against the gateway stand-in (gateway#8, gateway#10).
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -20,6 +21,7 @@ function send(method, path, { headers = {}, body } = {}) {
           resolve({
             status: response.statusCode,
             headers: response.headers,
+            rawHeaders: response.rawHeaders,
             body: Buffer.concat(chunks).toString(),
           });
         });
@@ -81,6 +83,42 @@ function stream(path, headers = {}) {
 function json(response) {
   assert.match(response.headers['content-type'] ?? '', /^application\/json/);
   return JSON.parse(response.body);
+}
+
+const csp =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data:; font-src 'self'; connect-src 'self'; " +
+  "frame-src https://yandex.ru; manifest-src 'self'; object-src 'none'; " +
+  "base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+// Every value of one header as sent, so a doubled header is seen.
+function values(response, name) {
+  const found = [];
+  for (let i = 0; i < response.rawHeaders.length; i += 2) {
+    if (response.rawHeaders[i].toLowerCase() === name) {
+      found.push(response.rawHeaders[i + 1]);
+    }
+  }
+  return found;
+}
+
+function assertSecurityHeaders(response, referrer, where) {
+  assert.deepEqual(values(response, 'content-security-policy'), [csp], where);
+  assert.deepEqual(
+    values(response, 'x-content-type-options'),
+    ['nosniff'],
+    where,
+  );
+  assert.deepEqual(values(response, 'x-frame-options'), ['DENY'], where);
+  assert.deepEqual(values(response, 'referrer-policy'), [referrer], where);
+}
+
+const crossOrigin = 'strict-origin-when-cross-origin';
+
+function compose(...args) {
+  return execFileSync('docker', ['compose', '-f', 'compose.yaml', ...args], {
+    encoding: 'utf8',
+  });
 }
 
 const checks = {
@@ -268,16 +306,138 @@ const checks = {
       );
     },
 
-  'serves the invitation page without a referrer': async () => {
-    const id = '77777777-7777-4777-8777-777777777777';
-    const response = await send('GET', `/invite/${id}`);
+  'serves the invitation page without a referrer and without a cache':
+    async () => {
+      const id = '77777777-7777-4777-8777-777777777777';
+      const response = await send('GET', `/invite/${id}`);
+      assert.equal(response.status, 200);
+      assert.match(response.headers['content-type'] ?? '', /^text\/html/);
+      assert.equal(response.headers['cache-control'], 'no-cache');
+      // Exactly one policy: the general one is replaced, not added to.
+      assertSecurityHeaders(response, 'no-referrer', 'invitation');
+      // Only the invitation address carries it.
+      const other = await send('GET', '/login');
+      assert.equal(other.status, 200);
+      assert.deepEqual(values(other, 'referrer-policy'), [crossOrigin]);
+    },
+
+  'serves the pages with the security headers and no cache': async () => {
+    for (const path of ['/', '/login', '/app', '/index.html']) {
+      const response = await send('GET', path);
+      assert.equal(response.status, 200, path);
+      assert.match(response.headers['content-type'] ?? '', /^text\/html/);
+      assert.equal(response.headers['cache-control'], 'no-cache', path);
+      assertSecurityHeaders(response, crossOrigin, path);
+    }
+  },
+
+  'serves root files without long caching': async () => {
+    const response = await send('GET', '/favicon.svg');
     assert.equal(response.status, 200);
-    assert.equal(response.headers['referrer-policy'], 'no-referrer');
-    assert.match(response.headers['content-type'] ?? '', /^text\/html/);
-    // Only the invitation address carries the policy.
-    const other = await send('GET', '/login');
-    assert.equal(other.status, 200);
-    assert.equal(other.headers['referrer-policy'], undefined);
+    assert.equal(response.headers['cache-control'], 'no-cache');
+    assertSecurityHeaders(response, crossOrigin, 'favicon');
+    const manifest = await send('GET', '/manifest.webmanifest');
+    assert.equal(manifest.headers['cache-control'], 'no-cache');
+    assertSecurityHeaders(manifest, crossOrigin, 'manifest');
+  },
+
+  'serves hashed assets compressed and cached for good': async () => {
+    for (const file of ['app-3f9a1c2b.js', 'app-3f9a1c2b.css']) {
+      const path = `/assets/${file}`;
+      const response = await send('GET', path, {
+        headers: { 'Accept-Encoding': 'gzip' },
+      });
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers['content-encoding'], 'gzip', path);
+      assert.match(response.headers['vary'] ?? '', /Accept-Encoding/i, path);
+      assert.equal(
+        response.headers['cache-control'],
+        'public, max-age=31536000, immutable',
+        path,
+      );
+      assertSecurityHeaders(response, crossOrigin, path);
+    }
+  },
+
+  'answers a missing asset with 404, not the page, and no long caching':
+    async () => {
+      const response = await send('GET', '/assets/missing.js');
+      assert.equal(response.status, 404);
+      assert.doesNotMatch(response.headers['cache-control'] ?? '', /immutable/);
+      assert.ok(!response.body.includes('id="root"'), 'got the page');
+      assertSecurityHeaders(response, crossOrigin, 'missing asset');
+    },
+
+  'puts the security headers on the contract errors and the status path':
+    async () => {
+      const lost = await send('GET', '/api/drop');
+      assert.equal(lost.status, 502);
+      assert.equal(lost.headers['cache-control'], 'no-store');
+      assertSecurityHeaders(lost, crossOrigin, '502');
+      const big = await send('POST', `/api/v2/r/${R}/serving/order-proposals`, {
+        body: 'x'.repeat(1024 * 1024 + 1),
+      });
+      assert.equal(big.status, 413);
+      assert.equal(big.headers['cache-control'], 'no-store');
+      assertSecurityHeaders(big, crossOrigin, '413');
+      const health = await send('GET', '/healthz');
+      assert.equal(health.status, 200);
+      assertSecurityHeaders(health, crossOrigin, 'healthz');
+    },
+
+  // The 504 answer needs a 30 s wait, so the file is read instead: nginx
+  // drops inherited add_header lines in a block with its own, so each such
+  // block must include the shared file again.
+  'includes the security headers in every block with its own add_header':
+    () => {
+      const config = readFileSync(
+        new URL('../../nginx.conf', import.meta.url),
+        'utf8',
+      );
+      const include = 'include /etc/nginx/security-headers.conf;';
+      assert.ok(
+        config.includes(include),
+        'the server does not include the file',
+      );
+      const blocks = [...config.matchAll(/^\s*location [^{]*\{([^}]*)\}/gm)];
+      assert.ok(blocks.length >= 10, 'could not read the location blocks');
+      let own = 0;
+      for (const [block, body] of blocks) {
+        if (!/\badd_header\b/.test(body)) continue;
+        own += 1;
+        assert.ok(
+          body.includes(include),
+          `no include in ${block.trim().split('\n')[0]}`,
+        );
+      }
+      assert.ok(own >= 6, 'expected the error, page and asset blocks');
+      assert.ok(/location @api_timeout/.test(config));
+    },
+
+  'does not compress API answers': async () => {
+    const response = await send('GET', '/api/compressible', {
+      headers: { 'Accept-Encoding': 'gzip' },
+    });
+    assert.equal(response.status, 200);
+    assert.ok(response.body.length > 2048, 'the stand-in body is too small');
+    assert.equal(response.headers['content-encoding'], undefined);
+  },
+
+  'logs a request without the client address, referrer and query': async () => {
+    const marker = `q${Date.now()}`;
+    const response = await send('GET', `/login?token=${marker}`, {
+      headers: { Referer: 'https://leak.example.test/from' },
+    });
+    assert.equal(response.status, 200);
+    await sleep(300);
+    const lines = compose('logs', '--no-log-prefix', 'frontend')
+      .split('\n')
+      .filter((line) => line.includes('/login'));
+    assert.ok(lines.length > 0, 'the request is not in the log');
+    for (const line of lines) {
+      assert.doesNotMatch(line, /\d{1,3}(\.\d{1,3}){3}/, `address in: ${line}`);
+      assert.ok(!line.includes(marker) && !line.includes('leak.example'), line);
+    }
   },
 
   // Nginx 1.30 already streams small chunks and speaks HTTP/1.1 upstream by
@@ -358,6 +518,32 @@ const checks = {
     const path = `${live}?cursor=a%2Fb%2Bc`;
     assert.equal((await stream(path)).status, 200);
     assert.equal((await recorded()).filter((r) => r.url === path).length, 1);
+  },
+
+  // The last check: it stops the stand-in and starts it again.
+  'answers /readyz without gateway and without caching': async () => {
+    compose('stop', 'gateway');
+    try {
+      const response = await send('GET', '/readyz');
+      assert.equal(response.status, 200);
+      assert.match(
+        response.headers['content-type'] ?? '',
+        /^application\/json/,
+      );
+      assert.equal(response.headers['cache-control'], 'no-store');
+      assert.deepEqual(JSON.parse(response.body), {
+        capabilities: { static: 'ok' },
+      });
+      assertSecurityHeaders(response, crossOrigin, 'readyz');
+      assert.equal((await send('GET', '/healthz')).status, 200);
+      await sleep(300);
+      assert.ok(
+        !compose('logs', '--no-log-prefix', 'frontend').includes('/readyz'),
+        'the probe is in the log',
+      );
+    } finally {
+      compose('start', 'gateway');
+    }
   },
 };
 
