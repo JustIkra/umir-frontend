@@ -42,6 +42,9 @@ const kindOf = (value: unknown): AttemptKind | undefined =>
   kinds.find((kind) => kind === value);
 
 const text = (value: unknown): value is string => typeof value === 'string';
+// Identifiers, names and times are filled in; their format is the owner's.
+const filled = (value: unknown): value is string =>
+  typeof value === 'string' && value !== '';
 
 function keyOf(ref: AttemptRef): string | undefined {
   const parts = [ref.kind, ref.userID, ref.restaurantID];
@@ -57,7 +60,12 @@ function refOfKey(key: string, userID: string): AttemptRef | undefined {
   const parts = key.slice(attemptKeyPrefix.length).split('.');
   const [name, owner, restaurantID, batchID] = parts;
   const kind = kindOf(name);
-  if (kind === undefined || owner !== userID || !isKeyPart(restaurantID)) {
+  if (
+    kind === undefined ||
+    !isKeyPart(owner) ||
+    owner !== userID ||
+    !isKeyPart(restaurantID)
+  ) {
     return undefined;
   }
   if (kind === 'writeoff') {
@@ -71,7 +79,7 @@ function refOfKey(key: string, userID: string): AttemptRef | undefined {
 function civilOf(value: unknown): CivilTime | undefined {
   if (!isObject(value) || !isObject(value.civil)) return undefined;
   const { localDateTime } = value.civil;
-  return text(localDateTime) ? { civil: { localDateTime } } : undefined;
+  return filled(localDateTime) ? { civil: { localDateTime } } : undefined;
 }
 
 function lineOf(value: unknown): DeliveryInput['lines'][number] | undefined {
@@ -84,12 +92,12 @@ function lineOf(value: unknown): DeliveryInput['lines'][number] | undefined {
       ? shelfLife.unit
       : undefined;
   if (
-    !text(productID) ||
+    !filled(productID) ||
     !text(quantity) ||
     !quantityPattern.test(quantity) ||
     manufacturedAt === undefined ||
     receivedAt === undefined ||
-    !text(shelfLife.value) ||
+    !filled(shelfLife.value) ||
     unit === undefined
   ) {
     return undefined;
@@ -122,9 +130,9 @@ function deliveryOf(value: unknown): DeliveryInput | undefined {
   const { deliveryID, number, expectedSettingsVersion } = value;
   const createdAt = civilOf(value.createdAt);
   const lines = listOf(value.lines, lineOf);
-  return text(deliveryID) &&
-    text(number) &&
-    text(expectedSettingsVersion) &&
+  return filled(deliveryID) &&
+    filled(number) &&
+    filled(expectedSettingsVersion) &&
     createdAt !== undefined &&
     lines !== undefined
     ? { deliveryID, number, createdAt, expectedSettingsVersion, lines }
@@ -138,7 +146,7 @@ function productOf(value: unknown): ProductInput | undefined {
   if (!isObject(value)) return undefined;
   const { productID, name } = value;
   const baseUnit = unitOf(value.baseUnit);
-  return text(productID) && text(name) && baseUnit !== undefined
+  return filled(productID) && filled(name) && baseUnit !== undefined
     ? { productID, name, baseUnit }
     : undefined;
 }
@@ -149,7 +157,7 @@ function ingredientOf(
   if (!isObject(value)) return undefined;
   const { productID, quantity } = value;
   const baseUnit = unitOf(value.baseUnit);
-  return text(productID) &&
+  return filled(productID) &&
     text(quantity) &&
     quantityPattern.test(quantity) &&
     baseUnit !== undefined
@@ -161,7 +169,7 @@ function dishOf(value: unknown): DishInput | undefined {
   if (!isObject(value)) return undefined;
   const { dishID, name } = value;
   const ingredients = listOf(value.ingredients, ingredientOf);
-  return text(dishID) && text(name) && ingredients !== undefined
+  return filled(dishID) && filled(name) && ingredients !== undefined
     ? { dishID, name, ingredients }
     : undefined;
 }
@@ -172,7 +180,7 @@ function bodyOf(kind: AttemptKind, payload: unknown): AttemptBody | undefined {
   switch (kind) {
     case 'delivery': {
       const input = deliveryOf(payload.input);
-      return input !== undefined && text(payload.timeZone)
+      return input !== undefined && filled(payload.timeZone)
         ? { kind, payload: { input, timeZone: payload.timeZone } }
         : undefined;
     }
@@ -200,8 +208,7 @@ function recordOf(value: unknown, ref: AttemptRef): AttemptRecord | undefined {
     value.kind !== ref.kind ||
     value.userID !== ref.userID ||
     value.restaurantID !== ref.restaurantID ||
-    !text(commandID) ||
-    commandID === '' ||
+    !filled(commandID) ||
     (epoch !== undefined && !text(epoch)) ||
     typeof startedAt !== 'number' ||
     !Number.isFinite(startedAt)
@@ -288,14 +295,16 @@ export function createAttemptStore(
       }
       return { status: 'ok', entries };
     },
+    // Ruling: a record that fails the same check as a read is not stored and
+    // answers 'unavailable', like storage that refuses the write.
     save(record): AttemptWrite {
       if (storage === undefined) return 'unavailable';
-      const ref = refOfRecord(record);
-      const key = keyOf(ref);
-      // Rebuilt from the known fields, so that nothing else is stored.
-      const clean = recordOf({ v: version, ...record }, ref);
-      if (key === undefined || clean === undefined) return 'unavailable';
       try {
+        const ref = refOfRecord(record);
+        const key = keyOf(ref);
+        // Rebuilt from the known fields, so that nothing else is stored.
+        const clean = recordOf({ v: version, ...record }, ref);
+        if (key === undefined || clean === undefined) return 'unavailable';
         storage.setItem(key, JSON.stringify({ v: version, ...clean }));
         return 'ok';
       } catch {

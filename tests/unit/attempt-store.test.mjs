@@ -507,6 +507,46 @@ for (const [line, field, value] of [
   };
 }
 
+for (const [title, mutate] of [
+  ['empty delivery id', (r) => (r.payload.input.deliveryID = '')],
+  ['empty delivery number', (r) => (r.payload.input.number = '')],
+  [
+    'empty settings version',
+    (r) => (r.payload.input.expectedSettingsVersion = ''),
+  ],
+  ['empty time zone', (r) => (r.payload.timeZone = '')],
+  ['empty creation time', (r) => (r.payload.input.createdAt = civil(''))],
+  [
+    'empty product id in a line',
+    (r) => (r.payload.input.lines[0].productID = ''),
+  ],
+  ['empty shelf life', (r) => (r.payload.input.lines[0].shelfLife.value = '')],
+]) {
+  damaged[title] = () => {
+    const record = delivery();
+    mutate(record);
+    return [JSON.stringify(wire(record)), delivery()];
+  };
+}
+for (const [title, build, mutate] of [
+  ['empty product id', product, (r) => (r.payload.productID = '')],
+  ['empty product name', product, (r) => (r.payload.name = '')],
+  ['empty dish id', dish, (r) => (r.payload.dishID = '')],
+  ['empty dish name', dish, (r) => (r.payload.name = '')],
+  [
+    'empty ingredient product',
+    dish,
+    (r) => (r.payload.ingredients[0].productID = ''),
+  ],
+  ['empty batch id', writeoff, (r) => (r.payload.batchID = '')],
+]) {
+  damaged[title] = () => {
+    const record = build();
+    mutate(record);
+    return [JSON.stringify(wire(record)), build()];
+  };
+}
+
 for (const [title, build] of Object.entries(damaged)) {
   test(`a record with ${title} is corrupt and stays`, () => {
     const [raw, record] = build();
@@ -521,13 +561,21 @@ for (const [title, build] of Object.entries(damaged)) {
   });
 }
 
-test('a delivery with several lines and no lines at all is readable', () => {
+test('a delivery with several lines is readable', () => {
   const record = delivery();
   const line = record.payload.input.lines[0];
   record.payload.input.lines = [line, { ...line, productID: 'p-3' }];
-  const storage = memoryStorage();
-  const store = createAttemptStore(storage);
+  const store = createAttemptStore(memoryStorage());
   store.save(record);
+  assert.deepEqual(store.load(refOf(record)), { status: 'ok', record });
+});
+
+// The type allows a list of any length; the owner judges an empty delivery.
+test('a delivery with no lines is readable', () => {
+  const record = delivery();
+  record.payload.input.lines = [];
+  const store = createAttemptStore(memoryStorage());
+  assert.equal(store.save(record), 'ok');
   assert.deepEqual(store.load(refOf(record)), { status: 'ok', record });
 });
 
@@ -562,4 +610,57 @@ test('discardCorrupt leaves a readable record in the storage', () => {
   store.save(writeoff());
   assert.equal(store.discardCorrupt(refOf(writeoff())), 'refused');
   assert.equal(storage.items.size, 1);
+});
+
+test('discardCorrupt keeps the record when removeItem throws', () => {
+  const storage = memoryStorage();
+  const ref = refOf(delivery());
+  storage.items.set(keyOf(delivery()), '{"v":1');
+  storage.broken.remove = true;
+  const store = createAttemptStore(storage);
+  assert.equal(store.discardCorrupt(ref), 'unavailable');
+  assert.equal(store.load(ref).status, 'corrupt');
+});
+
+test('discardCorrupt refuses a reference that cannot be a key', () => {
+  const storage = memoryStorage([[keyOf(delivery()), '{"v":1']]);
+  const store = createAttemptStore(storage);
+  assert.equal(store.discardCorrupt(refOf(delivery('a.b'))), 'refused');
+  assert.equal(store.discardCorrupt(refOf(delivery(U1, ''))), 'refused');
+  assert.equal(storage.items.size, 1);
+});
+
+test('list answers unavailable when storage throws in the middle', () => {
+  const storage = memoryStorage([
+    [keyOf(delivery()), JSON.stringify(wire(delivery()))],
+    [keyOf(product()), JSON.stringify(wire(product()))],
+  ]);
+  const getItem = storage.getItem;
+  let reads = 0;
+  storage.getItem = (key) => {
+    reads += 1;
+    if (reads === 2) throw new Error('blocked');
+    return getItem(key);
+  };
+  assert.deepEqual(createAttemptStore(storage).list(U1), {
+    status: 'unavailable',
+  });
+  const keyAt = storage.key;
+  let calls = 0;
+  storage.getItem = getItem;
+  storage.key = (index) => {
+    calls += 1;
+    if (calls === 2) throw new Error('blocked');
+    return keyAt(index);
+  };
+  assert.deepEqual(createAttemptStore(storage).list(U1), {
+    status: 'unavailable',
+  });
+});
+
+test('save does not throw even when the record breaks its type', () => {
+  const store = createAttemptStore(memoryStorage());
+  assert.equal(store.save(undefined), 'unavailable');
+  assert.equal(store.save({ kind: 'dish' }), 'unavailable');
+  assert.equal(store.save({ ...delivery(), payload: null }), 'unavailable');
 });
