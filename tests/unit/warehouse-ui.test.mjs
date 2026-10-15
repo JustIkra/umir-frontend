@@ -44,7 +44,7 @@ test('stock and M6 display actual quantities and partial-history facts', async (
   });
   const page = text(html);
   assert.match(page, /Продукт со стенда/);
-  assert.match(page, /12,345 г/);
+  assert.match(page, /Пригодно12,345 г/);
   assert.match(page, /Предложения поставок/);
   assert.match(page, /История расхода неполная/);
   assert.doesNotMatch(page, /P-0158/);

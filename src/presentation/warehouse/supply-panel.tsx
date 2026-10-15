@@ -2,7 +2,13 @@ import { Stack, Text, chakra } from '@chakra-ui/react';
 import type { SupplySuggestions } from '@/application/warehouse';
 import { formatQuantity, unitShort } from '@/domain/quantity';
 import { useRestaurantData } from '@/presentation/session/hooks';
-import { DataTable, TableCard, Th, Td } from '@/presentation/ui/table';
+import {
+  MobileCellLabel,
+  DataTable,
+  TableCard,
+  Th,
+  Td,
+} from '@/presentation/ui/table';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { WarehouseRead } from './warehouse-read';
 
@@ -58,13 +64,22 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                     </Text>
                   </Td>
                   <Td gridArea="stock" textStyle="mono.body">
+                    <MobileCellLabel aria-hidden="true">
+                      Пригодно
+                    </MobileCellLabel>
                     {formatQuantity(row.availableQuantity, row.baseUnit)}
                   </Td>
                   <Td gridArea="mean" textStyle="mono.body">
+                    <MobileCellLabel aria-hidden="true">
+                      Средний расход
+                    </MobileCellLabel>
                     {displayDecimal(row.averageDailyBaseUnits)}{' '}
                     {unitShort(row.baseUnit)}/день
                   </Td>
                   <Td gridArea="coverage">
+                    <MobileCellLabel aria-hidden="true">
+                      Покрытие
+                    </MobileCellLabel>
                     {row.coverageDays === null
                       ? 'Нет расхода'
                       : `${displayDecimal(row.coverageDays)} дн.`}
@@ -74,6 +89,9 @@ function SupplyRows({ value }: { value: SupplySuggestions }) {
                     textStyle="mono.body"
                     color="text.action"
                   >
+                    <MobileCellLabel aria-hidden="true">
+                      Пополнить
+                    </MobileCellLabel>
                     +{formatQuantity(row.suggestedQuantity, row.baseUnit)}
                   </Td>
                 </chakra.tr>

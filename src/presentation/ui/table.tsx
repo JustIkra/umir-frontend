@@ -88,3 +88,13 @@ export const Td = chakra('td', {
     borderColor: 'border.default',
   },
 });
+
+export const MobileCellLabel = chakra('span', {
+  base: {
+    display: 'block',
+    textStyle: 'caption.default',
+    fontFamily: 'body',
+    color: 'text.secondary',
+    [media.sm]: { display: 'none' },
+  },
+});

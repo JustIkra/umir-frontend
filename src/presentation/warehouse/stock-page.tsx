@@ -8,7 +8,13 @@ import { formatStamp } from '@/presentation/ui/zones';
 import { SearchInput } from '@/presentation/ui/form';
 import { Badge } from '@/presentation/ui/badge';
 import { Icon } from '@/presentation/ui/icon';
-import { DataTable, TableCard, Td, Th } from '@/presentation/ui/table';
+import {
+  MobileCellLabel,
+  DataTable,
+  TableCard,
+  Td,
+  Th,
+} from '@/presentation/ui/table';
 import { rem } from '@/presentation/ui/units';
 import { WarehouseLayout } from './warehouse-layout';
 import { WarehouseRead, warehouseStamp } from './warehouse-read';
@@ -199,6 +205,9 @@ export function StockPage() {
                             textAlign={{ sm: 'end' }}
                             overflowWrap="anywhere"
                           >
+                            <MobileCellLabel aria-hidden="true">
+                              Пригодно
+                            </MobileCellLabel>
                             {formatQuantity(
                               row.availableQuantity,
                               row.baseUnit,
@@ -214,6 +223,9 @@ export function StockPage() {
                                 : 'text.primary'
                             }
                           >
+                            <MobileCellLabel aria-hidden="true">
+                              К списанию
+                            </MobileCellLabel>
                             {row.pendingWriteoffQuantity === '0'
                               ? '—'
                               : formatQuantity(
