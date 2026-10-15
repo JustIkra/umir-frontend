@@ -8,7 +8,9 @@ import type {
   PasswordFieldError,
   RenameCheck,
 } from '@/application/account-settings';
+import { logoutAllKey } from '@/application/session';
 import lockIcon from '@/presentation/assets/icons/lock-24.svg';
+import signOutIcon from '@/presentation/assets/icons/sign-out-24.svg';
 import userIcon from '@/presentation/assets/icons/user-24.svg';
 import { useServices } from '@/presentation/services';
 import { useSession } from '@/presentation/session/hooks';
@@ -25,6 +27,7 @@ import {
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon } from '@/presentation/ui/icon';
+import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
 import { PageHeader } from './pages';
 
@@ -274,6 +277,37 @@ export function initialPassword(pending: PendingChanges): PasswordStatus {
     return { kind: 'recovering', code: 'AuthUpdateOutcomeUnknown' };
   }
   return { kind: 'idle' };
+}
+
+export type SessionsStatus =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'sending' }
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'failed' };
+
+// The dialog «Выйти на всех устройствах?» after the answer to «Выйти везде».
+export function sessionsMessage(
+  status: SessionsStatus,
+):
+  | { readonly tone: 'unknown' | 'error'; title: string; text: string }
+  | undefined {
+  switch (status.kind) {
+    case 'unknown':
+      return {
+        tone: 'unknown',
+        title: 'Результат выхода неизвестен',
+        text: 'Ответ сервиса не получен. Сеансы могли быть завершены. Проверка продолжит ту же попытку.',
+      };
+    case 'failed':
+      return {
+        tone: 'error',
+        title: 'Выход не выполнен',
+        text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+      };
+    case 'idle':
+    case 'sending':
+      return undefined;
+  }
 }
 
 const field = (value: FormDataEntryValue | null) =>
@@ -680,6 +714,105 @@ function PasswordForm() {
   );
 }
 
+// No Figma frame: the section and its dialog are built from the settings
+// components. The dialog stays open until the answer; an unknown result locks
+// it on the check, which sends the earlier attempt again.
+function SessionsSection() {
+  const { session, commands } = useServices();
+  const navigate = useNavigate();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [resumed] = useState(() =>
+    commands.getSnapshot().some((attempt) => attempt.key === logoutAllKey),
+  );
+  const [status, setStatus] = useState<SessionsStatus>(
+    resumed ? { kind: 'unknown' } : { kind: 'idle' },
+  );
+  const sending = status.kind === 'sending';
+  const message = sessionsMessage(status);
+  // A tab that comes back with an unknown attempt asks again at once.
+  useEffect(() => {
+    if (resumed) dialogRef.current?.showModal();
+  }, [resumed]);
+
+  const submit = async () => {
+    setStatus({ kind: 'sending' });
+    const outcome = await session.signOutEverywhere();
+    if (outcome === 'done') {
+      dialogRef.current?.close();
+      void navigate('/login');
+      return;
+    }
+    setStatus({ kind: outcome });
+  };
+  return (
+    <Section icon={signOutIcon} title="Сеансы">
+      <Text textStyle="body.default" color="text.secondary">
+        Завершает все сеансы учётной записи на всех устройствах, включая этот.
+      </Text>
+      <Button
+        type="button"
+        variant="secondary"
+        alignSelf="flex-start"
+        onClick={() => {
+          if (status.kind === 'failed') setStatus({ kind: 'idle' });
+          dialogRef.current?.showModal();
+        }}
+      >
+        Выйти на всех устройствах
+      </Button>
+      <ModalPanel
+        dialogRef={dialogRef}
+        width={480}
+        title="Выйти на всех устройствах?"
+        locked={sending}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!sending) void submit();
+        }}
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={sending}
+              onClick={() => dialogRef.current?.close()}
+            >
+              {status.kind === 'unknown' ? 'Закрыть' : 'Отмена'}
+            </Button>
+            <Button
+              type="submit"
+              disabled={sending || status.kind === 'unknown'}
+              aria-busy={sending ? true : undefined}
+            >
+              {sending ? 'Выходим…' : 'Выйти везде'}
+            </Button>
+          </>
+        }
+      >
+        <Text textStyle="body.default">
+          Все сеансы учётной записи будут завершены, включая этот. Незавершённые
+          действия будут прерваны.
+        </Text>
+        {message &&
+          (status.kind === 'unknown' ? (
+            <UnknownOutcomeAlert
+              title={message.title}
+              onCheck={() => {
+                void submit();
+              }}
+            >
+              {message.text}
+            </UnknownOutcomeAlert>
+          ) : (
+            <FormMessage tone="error" title={message.title}>
+              {message.text}
+            </FormMessage>
+          ))}
+      </ModalPanel>
+    </Section>
+  );
+}
+
 // Figma S01 «Учётная запись». The app gate keeps this page for an active
 // session; after a password change it opens sign-in by itself.
 export function AccountSettingsPage() {
@@ -711,6 +844,7 @@ export function AccountSettingsPage() {
         <Section icon={lockIcon} title="Пароль">
           <PasswordForm />
         </Section>
+        <SessionsSection />
       </Stack>
     </>
   );

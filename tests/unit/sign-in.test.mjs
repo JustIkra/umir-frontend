@@ -102,6 +102,22 @@ test('notices of L11, L13 and L10', () => {
   });
 });
 
+test('the notice after signing out on every device', async () => {
+  assert.deepEqual(noticeMessage({ kind: 'everywhere' }), {
+    tone: 'success',
+    title: 'Вы вышли на всех устройствах',
+    text: 'Все сеансы учётной записи завершены, включая этот. Войдите снова.',
+  });
+  const html = await renderRoute('/login', {
+    session: {
+      status: 'anonymous',
+      expired: false,
+      notice: { kind: 'everywhere' },
+    },
+  });
+  assert.ok(text(html).includes('Вы вышли на всех устройствах'));
+});
+
 test('the sign-in page shows the notice and fills in the login', async () => {
   const html = await renderRoute('/login', {
     session: {

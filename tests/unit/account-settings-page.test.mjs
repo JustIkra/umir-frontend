@@ -10,6 +10,7 @@ import {
   passwordFieldText,
   passwordLocked,
   passwordMessage,
+  sessionsMessage,
 } from '../../src/presentation/app-shell/account-settings-page.tsx';
 import {
   NOW,
@@ -263,4 +264,62 @@ test('the leave dialog is as wide as the S11 frame, 600 px', async () => {
   ).exec(html);
   assert.ok(style, 'the dialog has its own styles');
   assert.match(style[1], /@media \(min-width: [^)]+\)\{[^}]*width:37\.5rem;/);
+});
+
+test('the sessions section offers signing out on every device', async () => {
+  const plain = text(await renderRoute('/app/settings'));
+  assert.ok(plain.includes('Сеансы'));
+  assert.ok(
+    plain.includes(
+      'Завершает все сеансы учётной записи на всех устройствах, включая этот.',
+    ),
+  );
+  assert.ok(plain.includes('Выйти на всех устройствах'));
+  assert.ok(plain.includes('Выйти на всех устройствах?'));
+  assert.ok(
+    plain.includes(
+      'Все сеансы учётной записи будут завершены, включая этот. Незавершённые действия будут прерваны.',
+    ),
+  );
+  assert.ok(plain.includes('Выйти везде'));
+  assert.ok(plain.includes('Отмена'));
+  assert.ok(!plain.includes('Результат выхода неизвестен'));
+});
+
+test('the dialog puts «Отмена» first, so it gets the initial focus', async () => {
+  const plain = text(await renderRoute('/app/settings'));
+  assert.ok(plain.indexOf('Отмена') < plain.indexOf('Выйти везде'));
+});
+
+test('the sign-out messages follow the unknown and refused outcomes', () => {
+  assert.equal(sessionsMessage({ kind: 'idle' }), undefined);
+  assert.equal(sessionsMessage({ kind: 'sending' }), undefined);
+  assert.deepEqual(sessionsMessage({ kind: 'unknown' }), {
+    tone: 'unknown',
+    title: 'Результат выхода неизвестен',
+    text: 'Ответ сервиса не получен. Сеансы могли быть завершены. Проверка продолжит ту же попытку.',
+  });
+  assert.deepEqual(sessionsMessage({ kind: 'failed' }), {
+    tone: 'error',
+    title: 'Выход не выполнен',
+    text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+  });
+});
+
+test('a pending sign-out opens the page on the unknown result', async () => {
+  const plain = text(
+    await renderRoute('/app/settings', {
+      attempts: [
+        {
+          key: 'session.logout-all',
+          commandID: 'cmd-1',
+          label: 'выхода на всех устройствах',
+          restaurantID: undefined,
+          startedAt: 0,
+        },
+      ],
+    }),
+  );
+  assert.ok(plain.includes('Результат выхода неизвестен'));
+  assert.ok(plain.includes('Проверить результат'));
 });

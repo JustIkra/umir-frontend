@@ -7,6 +7,7 @@ import { createEpochRegistry } from '../../src/application/epochs.ts';
 import {
   createSessionStore,
   idleGraceMs,
+  logoutAllKey,
   returnPath,
 } from '../../src/application/session.ts';
 
@@ -119,6 +120,10 @@ function account(overrides = {}) {
     },
     signOut: () => {
       calls.push(['signOut']);
+      return Promise.resolve();
+    },
+    logoutAll: (commandID) => {
+      calls.push(['logoutAll', commandID]);
       return Promise.resolve();
     },
     ...overrides,
@@ -640,4 +645,65 @@ test('sign-out, forget and a guest 401 keep their own notice; no expiry notice l
     expired: false,
   });
   assert.equal(asked, 1);
+});
+
+test('signOutEverywhere() forgets the session with the «everywhere» notice and no DELETE', async () => {
+  const { api, calls } = account();
+  const { session, events, scheduler } = setup(api);
+  await session.ensure();
+  assert.equal(await session.signOutEverywhere(), 'done');
+  assert.deepEqual(session.getSnapshot(), {
+    status: 'anonymous',
+    expired: false,
+    notice: { kind: 'everywhere' },
+  });
+  assert.equal(events.signedOut, 1);
+  assert.deepEqual(scheduler.delays(), []);
+  assert.deepEqual(
+    calls.filter(([name]) => name !== 'me'),
+    [['logoutAll', 'cmd-1']],
+  );
+});
+
+test('a lost answer keeps the attempt; the check with the same commandID may meet 401, which means signed out', async () => {
+  let answer = Promise.reject(refused(0, 'Transport', 'unknown'));
+  const { api, calls } = account({
+    logoutAll: (commandID) => {
+      calls.push(['logoutAll', commandID]);
+      return answer;
+    },
+  });
+  const { session, commands, events } = setup(api);
+  await session.ensure();
+  assert.equal(await session.signOutEverywhere(), 'unknown');
+  assert.equal(session.getSnapshot().status, 'active');
+  assert.equal(events.signedOut, 0);
+  assert.deepEqual(
+    commands.getSnapshot().map(({ key, label }) => [key, label]),
+    [[logoutAllKey, 'выхода на всех устройствах']],
+  );
+  answer = Promise.reject(refused(401, 'Unauthenticated', 'not_committed'));
+  assert.equal(await session.signOutEverywhere(), 'done');
+  assert.deepEqual(session.getSnapshot().notice, { kind: 'everywhere' });
+  assert.equal(events.signedOut, 1);
+  assert.deepEqual(
+    calls.filter(([name]) => name === 'logoutAll'),
+    [
+      ['logoutAll', 'cmd-1'],
+      ['logoutAll', 'cmd-1'],
+    ],
+  );
+});
+
+test('another refusal of the sign-out everywhere keeps the session', async () => {
+  const { api } = account({
+    logoutAll: () =>
+      Promise.reject(refused(503, 'AuthUnavailable', 'not_committed')),
+  });
+  const { session, commands, events } = setup(api);
+  await session.ensure();
+  assert.equal(await session.signOutEverywhere(), 'failed');
+  assert.equal(session.getSnapshot().status, 'active');
+  assert.equal(events.signedOut, 0);
+  assert.deepEqual(commands.getSnapshot(), []);
 });

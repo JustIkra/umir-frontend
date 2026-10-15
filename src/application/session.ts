@@ -16,11 +16,13 @@ import type {
 } from './live-sync';
 
 // What the sign-in page says after the account settings ended the session:
-// L11 (password changed), L13 (outcome unknown), L10 (too many attempts).
+// L11 (password changed), L13 (outcome unknown), L10 (too many attempts),
+// and after signing out on every device.
 export type SignInNotice =
   | { readonly kind: 'password-changed'; readonly login: string }
   | { readonly kind: 'password-unknown'; readonly login: string }
-  | { readonly kind: 'password-limit' };
+  | { readonly kind: 'password-limit' }
+  | { readonly kind: 'everywhere' };
 
 // unknown: not checked yet. anonymous.expired: the server ended a session
 // this tab had (the sign-in page then says so). unavailable: /me got no
@@ -45,6 +47,9 @@ export interface SessionStore extends SessionCheck {
   ensure(): Promise<SessionState>;
   signIn(input: SignInInput): Promise<CommandResult<User>>;
   signOut(notice?: SignInNotice): Promise<'done' | 'failed'>;
+  // Ends every session of the user, this one too. unknown: the attempt is
+  // kept, and a repeat sends it again with the same commandID.
+  signOutEverywhere(): Promise<'done' | 'unknown' | 'failed'>;
   // Password reset issued a new session: the same as a sign-in.
   adopt(view: UserView): void;
   // A saved display name; another user's profile is ignored.
@@ -78,6 +83,7 @@ export interface SessionOptions {
 }
 
 export const signInKey = 'session.sign-in';
+export const logoutAllKey = 'session.logout-all';
 // The background check runs this long after the idle deadline, when the
 // server has already ended an idle session.
 export const idleGraceMs = 1000;
@@ -248,6 +254,22 @@ export function createSessionStore({
         if (failureOf(error)?.status !== 401) return 'failed';
       }
       end(false, notice);
+      onSignedOut();
+      return 'done';
+    },
+    async signOutEverywhere() {
+      const result = await commands.run({
+        key: logoutAllKey,
+        label: 'выхода на всех устройствах',
+        execute: (commandID) => api.logoutAll(commandID),
+      });
+      if (result.kind === 'unknown') return 'unknown';
+      // 401: the sessions are already closed (a repeat after a lost answer).
+      const ended =
+        result.kind === 'committed' ||
+        (result.kind === 'rejected' && result.failure.status === 401);
+      if (!ended) return 'failed';
+      end(false, { kind: 'everywhere' });
       onSignedOut();
       return 'done';
     },
