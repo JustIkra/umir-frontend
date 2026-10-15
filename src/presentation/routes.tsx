@@ -34,7 +34,20 @@ import {
   PrivacyPolicyPage,
 } from './documents/pages';
 import { LandingPage } from './landing/landing-page';
+import {
+  createAdminLoader,
+  createMemberLoader,
+  createOrganizationLoader,
+} from './organizations/loaders';
 import { OrdersPage } from './orders/orders-page';
+import { InvitationsPage } from './organizations/invitations-page';
+import { InvitePage } from './organizations/invite-page';
+import { MemberPage } from './organizations/member-page';
+import { NewOrganizationPage } from './organizations/new-organization-page';
+import { OrganizationProfilePage } from './organizations/organization-profile-page';
+import { MembersPage } from './organizations/members-page';
+import { OrganizationPage } from './organizations/organization-page';
+import { OrganizationsPage } from './organizations/organizations-page';
 import { OverviewPage } from './overview/overview-page';
 import { DeliveryPage } from './warehouse/delivery-page';
 import { ExpiryPage } from './warehouse/expiry-page';
@@ -143,6 +156,38 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
               element: <AppShell />,
               children: [
                 { path: 'settings', element: <AccountSettingsPage /> },
+                { path: 'organizations', element: <OrganizationsPage /> },
+                { path: 'organizations/new', element: <NewOrganizationPage /> },
+                {
+                  path: 'organizations/:org',
+                  loader: createOrganizationLoader(services),
+                  element: <OrganizationPage />,
+                },
+                {
+                  path: 'organizations/:org/members',
+                  loader: createAdminLoader(services),
+                  element: <MembersPage />,
+                },
+                {
+                  path: 'organizations/:org/members/:member',
+                  loader: createMemberLoader(services),
+                  element: <MemberPage />,
+                },
+                {
+                  path: 'organizations/:org/invitations',
+                  loader: createAdminLoader(services),
+                  element: <InvitationsPage />,
+                },
+                {
+                  path: 'organizations/:org/invitations/new',
+                  loader: createAdminLoader(services),
+                  element: <InvitePage />,
+                },
+                {
+                  path: 'organizations/:org/profile',
+                  loader: createAdminLoader(services),
+                  element: <OrganizationProfilePage />,
+                },
               ],
             },
             {

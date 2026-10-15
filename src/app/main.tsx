@@ -19,6 +19,7 @@ import {
 } from '@/adapters/api/restaurant-api';
 import { createRecoveryApi } from '@/adapters/api/recovery-api';
 import { createAccountApi } from '@/adapters/api/account-api';
+import { createOrganizationsApi } from '@/adapters/api/organizations-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
@@ -37,10 +38,13 @@ import {
 import { createCommandRunner } from '@/application/commands';
 import { createEpochRegistry } from '@/application/epochs';
 import { createFeedbackSubmitter } from '@/application/feedback';
+import { createLifecycleTracker } from '@/application/lifecycles';
 import { createLiveSync } from '@/application/live-sync';
 import { createModelRegistry } from '@/application/models';
 import { createOrderFlow } from '@/application/order-flow';
 import { createOrderFlowRegistry } from '@/application/order-flows';
+import { createOrganizationCommands } from '@/application/organization-commands';
+import { createOrganizationReads } from '@/application/organization-reads';
 import { createPasswordResetFlow } from '@/application/password-reset';
 import {
   createRestaurantData,
@@ -100,6 +104,20 @@ const commands = createCommandRunner({
 // 401 on /access: the session check sends an ended session to sign-in.
 const access = createAccessStore(createAccessApi(client), {
   onUnauthenticated: () => session.check(),
+});
+const organizationsApi = createOrganizationsApi(client);
+const organizationReads = createOrganizationReads({
+  api: organizationsApi,
+  now,
+  createCancellation: () => new AbortController(),
+});
+const lifecycles = createLifecycleTracker({
+  api: organizationsApi,
+  scheduler,
+  now,
+  onSettled: () => {
+    void access.refresh();
+  },
 });
 const live = createLiveSync({
   feed: createEventSourceFeed((url) => new EventSource(url)),
@@ -173,6 +191,9 @@ const session = createSessionStore({
     orderFlows.forget();
     catalogCommands.clear();
     warehouseCommands.clear();
+    organizationReads.clear();
+    organizationCommands.clear();
+    lifecycles.clear();
     client.clearCsrfToken();
   },
   onExpired: () => {
@@ -191,6 +212,9 @@ const session = createSessionStore({
     orderFlows.forget();
     catalogCommands.clear();
     warehouseCommands.clear();
+    organizationReads.clear();
+    organizationCommands.clear();
+    lifecycles.clear();
     void access.refresh();
   },
   // L13: the server ended the session while a password change is pending,
@@ -202,6 +226,28 @@ const session = createSessionStore({
     return accountSettings.pending().password === undefined
       ? undefined
       : { kind: 'password-unknown', login: state.user.login };
+  },
+});
+const organizationCommands = createOrganizationCommands({
+  api: organizationsApi,
+  commands,
+  accessChanged: () => {
+    void access.refresh();
+  },
+  membersChanged: (orgID) => {
+    organizationReads.members(orgID).refresh();
+  },
+  invitationsChanged: (orgID) => {
+    organizationReads.invitations(orgID).refresh();
+  },
+  profileChanged: (orgID) => {
+    organizationReads.profile(orgID).refresh();
+  },
+  started: (kind, name, lifecycle) => {
+    lifecycles.follow(kind, name, lifecycle);
+  },
+  onUnauthenticated: () => {
+    void session.check();
   },
 });
 const passwordReset = createPasswordResetFlow({
@@ -231,6 +277,11 @@ const services: PresentationServices = {
   now,
   passwordReset,
   accountSettings,
+  organizations: {
+    reads: organizationReads,
+    commands: organizationCommands,
+    lifecycles,
+  },
   restaurantData: (restaurantID) => {
     let data = restaurantData.get(restaurantID);
     if (data === undefined) {

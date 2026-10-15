@@ -8,6 +8,7 @@ import type {
 import type { User } from '@/application/account';
 import type { SectionKey } from '@/domain/access';
 import closeIcon from '@/presentation/assets/icons/close-24.svg';
+import organizationIcon from '@/presentation/assets/icons/organization-24.svg';
 import settingsIcon from '@/presentation/assets/icons/settings-24.svg';
 import signOutIcon from '@/presentation/assets/icons/sign-out-24.svg';
 import { documentLinks } from '@/presentation/documents/links';
@@ -297,6 +298,10 @@ export function AccountMenu({
         <MenuItem to="/app/settings" onClick={onLeave}>
           <Icon src={settingsIcon} size={20} />
           Учётная запись
+        </MenuItem>
+        <MenuItem to="/app/organizations" onClick={onLeave}>
+          <Icon src={organizationIcon} size={20} />
+          Организации и рестораны
         </MenuItem>
         <MenuItem to="/logout" onClick={onLeave}>
           <Icon src={signOutIcon} size={20} />

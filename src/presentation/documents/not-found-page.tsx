@@ -89,7 +89,7 @@ export function NotFoundPage() {
   );
 }
 
-// Thrown by route loaders for ids outside the sample: the /app boundary shows
+// Thrown by route loaders for unknown ids: the /app boundary shows
 // this page instead of an empty shell. Other errors keep propagating.
 export class NotFound extends Error {}
 
