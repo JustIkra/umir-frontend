@@ -149,6 +149,32 @@ test('the registration form shows the faults of its fields', async () => {
   assert.ok(plain.includes('Пароли не совпадают.'));
 });
 
+test('the fields with a fault are marked invalid, the others are not', async () => {
+  const input = (html, id) =>
+    new RegExp(`<input[^>]*id="${id}"[^>]*>`).exec(html)?.[0] ?? '';
+  const faulty = await page(
+    inviteSnapshot({
+      notice: {
+        kind: 'fields',
+        name: 'length',
+        password: 'required',
+        repeat: 'mismatch',
+      },
+    }),
+  );
+  for (const id of ['invite-name', 'invite-password', 'invite-repeat']) {
+    assert.match(input(faulty, id), /aria-invalid="true"/, id);
+  }
+  const fine = await page(
+    inviteSnapshot({
+      notice: { kind: 'fields', name: undefined, password: 'length' },
+    }),
+  );
+  assert.ok(!input(fine, 'invite-name').includes('aria-invalid'));
+  assert.match(input(fine, 'invite-password'), /aria-invalid="true"/);
+  assert.ok(!input(fine, 'invite-repeat').includes('aria-invalid'));
+});
+
 test('a signed-in user gets the code for the invitation straight away', async () => {
   const html = await renderRoute(path, { session: activeSession });
   const plain = text(html);

@@ -217,19 +217,24 @@ export function CheckboxField({
 // toggle only switches visibility; the value never leaves the field.
 export function PasswordInput({
   id,
+  invalid = false,
   ...props
-}: { id: string; ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>) {
+}: {
+  id: string;
+  invalid?: boolean;
+  ref?: Ref<HTMLInputElement>;
+} & HTMLChakraProps<'input'>) {
   const [shown, setShown] = useState(false);
   return (
     <Flex
       align="center"
       gap="1"
       h="2.75rem"
-      pl="3"
-      pr="0.5"
-      bg="bg.surface"
-      borderWidth="1px"
-      borderColor="border.strong"
+      pl={invalid ? 'calc({spacing.3} - 1px)' : '3'}
+      pr={invalid ? 'calc({spacing.0.5} - 1px)' : '0.5'}
+      bg={invalid ? 'bg.errorSubtle' : 'bg.surface'}
+      borderWidth={invalid ? '2px' : '1px'}
+      borderColor={invalid ? 'border.error' : 'border.strong'}
       borderRadius="md"
       _focusWithin={{
         outline: '2px solid {colors.border.focus}',
@@ -246,6 +251,7 @@ export function PasswordInput({
         textStyle="body.default"
         color="text.primary"
         _focusVisible={{ outline: 'none' }}
+        aria-invalid={invalid || undefined}
         {...props}
       />
       <chakra.button

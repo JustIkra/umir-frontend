@@ -202,6 +202,7 @@ function DetailsForm({
             id="invite-password"
             name="password"
             autoComplete="new-password"
+            invalid={errors.password !== undefined}
             aria-describedby="invite-password-hint"
           />
           <FieldMessage
@@ -216,6 +217,7 @@ function DetailsForm({
             id="invite-repeat"
             name="repeat"
             autoComplete="new-password"
+            invalid={errors.repeat !== undefined}
             aria-describedby={
               errors.repeat === undefined ? undefined : 'invite-repeat-error'
             }
