@@ -1,10 +1,10 @@
 import { Flex, Stack, Text, chakra } from '@chakra-ui/react';
+import { useState } from 'react';
 import { useLoaderData, useNavigate } from 'react-router';
+import { type OrganizationAccess } from '@/application/access';
+import { type RoleGrant } from '@/application/organizations';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import {
-  administeredSample,
-  inviteValidity,
-} from '@/presentation/placeholder-organizations';
+import { inviteValidity } from '@/presentation/placeholder-organizations';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { CardForm } from '@/presentation/ui/card';
 import {
@@ -24,13 +24,9 @@ import {
 
 // Figma IV01. Sending only returns to the invitations list. The matrix lists
 // the sample restaurants until the real ones are read.
-function InviteForm({
-  orgID,
-  organizationName,
-}: {
-  orgID: string;
-  organizationName: string;
-}) {
+function InviteForm({ organization }: { organization: OrganizationAccess }) {
+  const { orgID, name: organizationName } = organization;
+  const [grants, setGrants] = useState<readonly RoleGrant[]>([]);
   const navigate = useNavigate();
   const listPath = `${organizationPath(orgID)}/invitations`;
   return (
@@ -71,7 +67,14 @@ function InviteForm({
         <chakra.h2 textStyle="heading.h3">Рестораны и роли</chakra.h2>
         <AssignmentMatrix
           id="invite-roles"
-          restaurants={administeredSample.restaurants}
+          restaurants={organization.restaurants.filter(
+            (restaurant) =>
+              restaurant.lifecycle === 'ready' ||
+              restaurant.lifecycle === 'registering',
+          )}
+          value={grants}
+          onChange={setGrants}
+          readyOnly
         />
         <Text textStyle="caption.default" color="text.secondary">
           {inviteValidity}
@@ -91,9 +94,7 @@ export function InvitePage() {
   const { orgID } = useLoaderData<OrganizationRoute>();
   return (
     <OrganizationState orgID={orgID}>
-      {(organization) => (
-        <InviteForm orgID={orgID} organizationName={organization.name} />
-      )}
+      {(organization) => <InviteForm organization={organization} />}
     </OrganizationState>
   );
 }

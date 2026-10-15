@@ -20,12 +20,14 @@ import {
   instantOf,
   labels,
   loaded,
+  memberList,
   orderSnapshot,
   organizationProfile,
   readyAccess,
   redirectOf,
   renderRoute,
   resetSnapshot,
+  sampleMember,
   sampleRestaurant,
   text,
 } from './support/render-route.mjs';
@@ -60,13 +62,25 @@ const catalogDish = loaded({
   stateVersion: '1',
   dish: sampleDish,
 });
-// The sample member of the member card until Auth's members are read.
+// The member of the member card, read from Auth.
 const KOVALEVA = 'a2222222-2222-4222-8222-222222222222';
 // An organization the user administers.
 const administered = {
   access: readyAccess([sampleRestaurant({ roles: ['Admin'] })], {
     admin: true,
   }),
+};
+
+const withKovaleva = {
+  ...administered,
+  organizations: {
+    members: memberList([
+      sampleMember({
+        displayName: 'Ирина Ковалёва',
+        membership: { membershipID: KOVALEVA },
+      }),
+    ]),
+  },
 };
 
 const catalogData = {
@@ -314,7 +328,7 @@ const pages = [
     `/app/organizations/${ORG}/members/${KOVALEVA}`,
     'Ирина Ковалёва',
     ['Склад', 'Официант'],
-    administered,
+    withKovaleva,
   ],
   [`/app/organizations/${ORG}/invitations`, 'Восток Фуд', [], administered],
   [
@@ -481,32 +495,15 @@ test('organization pages leave the sidebar without a current item', async () => 
   );
 });
 
-test('the member page checks the sample roles', async () => {
+test('the member page checks the roles of the member', async () => {
   const html = await renderRoute(
     `/app/organizations/${ORG}/members/${KOVALEVA}`,
-    administered,
+    withKovaleva,
   );
   assert.equal(
     html.match(/<input[^>]*type="checkbox"[^>]*checked/g)?.length,
-    3,
+    1,
   );
-});
-
-test('a member outside the sample and the administrator card show 404', async () => {
-  for (const member of [
-    'a1111111-1111-4111-8111-111111111111',
-    'a9999999-9999-4999-8999-999999999999',
-  ])
-    assert.equal(
-      h1(
-        await renderRoute(
-          `/app/organizations/${ORG}/members/${member}`,
-          administered,
-        ),
-      ),
-      notFound,
-      member,
-    );
 });
 
 test('invitation actions follow the status', async () => {

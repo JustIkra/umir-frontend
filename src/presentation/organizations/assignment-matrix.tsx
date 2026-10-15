@@ -1,16 +1,21 @@
 import { Flex, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
 import {
-  type Member,
-  type Restaurant,
-  type Role,
-} from '@/presentation/placeholder-organizations';
+  type RestaurantAccess,
+  type StaffRoleName,
+} from '@/application/access';
+import { type RoleGrant } from '@/application/organizations';
 import { media } from '@/presentation/theme/system';
 import { CheckboxField } from '@/presentation/ui/form';
 import { rem } from '@/presentation/ui/units';
+import { toggleRole } from './members';
 
-const columns: readonly { role: Role; key: string }[] = [
-  { role: 'Склад', key: 'warehouse' },
-  { role: 'Официант', key: 'waiter' },
+const columns: readonly {
+  role: StaffRoleName;
+  title: string;
+  key: string;
+}[] = [
+  { role: 'Warehouse', title: 'Склад', key: 'warehouse' },
+  { role: 'Waiter', title: 'Официант', key: 'waiter' },
 ];
 
 // From 1024 the column heads name the roles, so the labels next to the boxes
@@ -28,15 +33,28 @@ const hiddenFromSm: SystemStyleObject = {
 
 // Figma Assignment matrix (MM01, IV01): one row per restaurant with «Склад»
 // and «Официант». Each row is a group named by the restaurant, so a box reads
-// as «На Береговой, Склад». The boxes are native and keep no state of ours.
+// as «На Береговой, Склад». The matrix is controlled: value holds the roles of
+// every restaurant and onChange hears the next value of one box.
+//
+// changed: the restaurants that show «Изменено» (MM02). A preparing
+// restaurant carries «Готовится — доступ откроется после подготовки»; readyOnly
+// leaves such a row unavailable (the invitation is refused for it).
 export function AssignmentMatrix({
   id,
   restaurants,
-  roles = {},
+  value,
+  onChange,
+  disabled = false,
+  changed,
+  readyOnly = false,
 }: {
   id: string;
-  restaurants: readonly Restaurant[];
-  roles?: Member['roles'];
+  restaurants: readonly RestaurantAccess[];
+  value: readonly RoleGrant[];
+  onChange: (next: readonly RoleGrant[]) => void;
+  disabled?: boolean;
+  changed?: ReadonlySet<string>;
+  readyOnly?: boolean;
 }) {
   return (
     <Stack gap="2">
@@ -54,16 +72,22 @@ export function AssignmentMatrix({
         </Text>
         {columns.map((column) => (
           <Text as="span" key={column.key} w={rem(96)} textAlign="center">
-            {column.role}
+            {column.title}
           </Text>
         ))}
       </Flex>
       <Stack gap="1">
         {restaurants.map((restaurant, index) => {
           const nameId = `${id}-${String(index)}`;
+          const preparing = restaurant.lifecycle === 'registering';
+          const marked = changed?.has(restaurant.restaurantID) ?? false;
+          const roles =
+            value.find(
+              (grant) => grant.restaurantID === restaurant.restaurantID,
+            )?.roles ?? [];
           return (
             <Flex
-              key={restaurant.name}
+              key={restaurant.restaurantID}
               role="group"
               aria-labelledby={nameId}
               direction={{ base: 'column', sm: 'row' }}
@@ -71,14 +95,20 @@ export function AssignmentMatrix({
               gap={{ base: '2', sm: '3' }}
               p="3"
               borderRadius="md"
+              bg={marked ? 'bg.actionSubtle' : undefined}
             >
               <Stack gap="1" flex="1" minW="0">
                 <Text id={nameId} textStyle="body.default">
                   {restaurant.name}
                 </Text>
-                {restaurant.preparing && (
+                {preparing && (
                   <Text textStyle="caption.default" color="text.secondary">
                     Готовится — доступ откроется после подготовки
+                  </Text>
+                )}
+                {marked && (
+                  <Text textStyle="caption.strong" color="text.action">
+                    Изменено
                   </Text>
                 )}
               </Stack>
@@ -92,11 +122,20 @@ export function AssignmentMatrix({
                   >
                     <CheckboxField
                       id={`${nameId}-${column.key}`}
-                      label={column.role}
+                      label={column.title}
                       labelCss={hiddenFromSm}
-                      defaultChecked={
-                        roles[restaurant.name]?.includes(column.role) ?? false
-                      }
+                      checked={roles.includes(column.role)}
+                      disabled={disabled || (readyOnly && preparing)}
+                      onChange={(event) => {
+                        onChange(
+                          toggleRole(
+                            value,
+                            restaurant.restaurantID,
+                            column.role,
+                            event.currentTarget.checked,
+                          ),
+                        );
+                      }}
                     />
                   </Flex>
                 ))}
