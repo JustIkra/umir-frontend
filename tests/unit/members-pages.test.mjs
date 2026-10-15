@@ -347,6 +347,14 @@ test('MB01 lists the members, the current user without a link', async () => {
   assert.ok(links.includes(`/app/organizations/${ORG}/invitations/new`));
 });
 
+test('the members page offers «Обновить» once the list is read', async () => {
+  assert.match(text(await renderRoute(listPath, withMembers())), /Обновить/);
+  const reading = text(
+    await renderRoute(listPath, { access, organizations: {} }),
+  );
+  assert.ok(!reading.includes('Обновить'));
+});
+
 test('a member without an address says so', async () => {
   const page = text(await renderRoute(listPath, withMembers()));
   assert.match(page, /Почта не указана/);

@@ -21,6 +21,7 @@ import {
   OrganizationState,
   OrganizationTabs,
 } from './organization-layout';
+import { RefreshButton, useRefreshOnOpen } from './refresh';
 
 // MB05.
 function MemberSkeleton() {
@@ -108,6 +109,7 @@ function MembersBody({ organization }: { organization: OrganizationAccess }) {
   const { organizations } = useServices();
   const model = organizations.reads.members(organization.orgID);
   const snapshot = useReadModel(model);
+  useRefreshOnOpen(model);
   const revoked = revokedName(useLocation().state);
   const notice = revoked === undefined ? undefined : revokedNotice(revoked);
   return (
@@ -118,7 +120,10 @@ function MembersBody({ organization }: { organization: OrganizationAccess }) {
         </FormMessage>
       )}
       {snapshot.value !== undefined ? (
-        <MembersLoaded organization={organization} list={snapshot.value} />
+        <>
+          <RefreshButton model={model} loading={snapshot.loading} />
+          <MembersLoaded organization={organization} list={snapshot.value} />
+        </>
       ) : snapshot.failed ? (
         <ServiceUnavailableAlert
           title="Список участников не получен"

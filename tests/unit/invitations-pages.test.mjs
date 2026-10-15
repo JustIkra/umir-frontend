@@ -608,6 +608,15 @@ test('a pending invitation that may not get a new link has no such button', asyn
   assert.ok(!page.includes('Отправить ссылку повторно'));
 });
 
+test('the invitations page offers «Обновить» once the list is read', async () => {
+  const page = text(await renderRoute(listPath, withInvitations([lebedeva])));
+  assert.match(page, /Обновить/);
+  const reading = text(
+    await renderRoute(listPath, { access, organizations: {} }),
+  );
+  assert.ok(!reading.includes('Обновить'));
+});
+
 test('IN02 invites when there is no invitation', async () => {
   const html = await renderRoute(listPath, withInvitations([]));
   const page = text(html);

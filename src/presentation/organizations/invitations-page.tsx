@@ -38,6 +38,7 @@ import {
   OrganizationState,
   OrganizationTabs,
 } from './organization-layout';
+import { RefreshButton, useRefreshOnOpen } from './refresh';
 
 interface Notice extends InvitationNotice {
   readonly tone: 'success' | 'error';
@@ -229,6 +230,7 @@ function InvitationsBody({
   const { organizations } = useServices();
   const model = organizations.reads.invitations(organization.orgID);
   const snapshot = useReadModel(model);
+  useRefreshOnOpen(model);
   const sent = invitedEmail(useLocation().state);
   const arrived: Notice | undefined =
     sent === undefined
@@ -236,11 +238,14 @@ function InvitationsBody({
       : { tone: 'success', ...invitedNotice(sent) };
   if (snapshot.value !== undefined) {
     return (
-      <InvitationsLoaded
-        organization={organization}
-        list={snapshot.value}
-        arrived={arrived}
-      />
+      <>
+        <RefreshButton model={model} loading={snapshot.loading} />
+        <InvitationsLoaded
+          organization={organization}
+          list={snapshot.value}
+          arrived={arrived}
+        />
+      </>
     );
   }
   return (

@@ -22,6 +22,7 @@ import {
   OrganizationState,
   OrganizationTabs,
 } from './organization-layout';
+import { useRefreshOnOpen } from './refresh';
 import { TimezoneField, zoneUnsupported } from './timezone-field';
 import { useOrganizationDeletion } from './use-deletion';
 
@@ -342,6 +343,7 @@ function ProfileBody({ orgID }: { orgID: string }) {
   const { organizations } = useServices();
   const model = organizations.reads.profile(orgID);
   const snapshot = useReadModel(model);
+  useRefreshOnOpen(model);
   const failure = snapshot.failed ? failureOf(snapshot.failure) : undefined;
   if (failure?.status === 403 || failure?.code === 'Forbidden') {
     return <Navigate to={organizationPath(orgID)} replace />;
