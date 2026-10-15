@@ -66,6 +66,9 @@ export interface AccountApi {
   changeDisplayName(displayName: string, commandID: string): Promise<User>;
   // 204: every session of the user, this one included, has ended.
   changePassword(input: PasswordChange, commandID: string): Promise<void>;
+  // 200: every session of the user ends, this one too; gateway clears the
+  // cookie. The same commandID afterwards answers 401.
+  logoutAll(commandID: string): Promise<void>;
 }
 
 // Password reset by an email code. Each rejects with ApiError.

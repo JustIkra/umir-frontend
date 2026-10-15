@@ -131,3 +131,30 @@ test('a malformed saved user is unknown', async () => {
       error.failure.code === 'Malformed' && error.failure.outcome === 'unknown',
   );
 });
+
+test('logoutAll() posts the commandID and checks the durable result', async () => {
+  const fake = client({
+    outcome: 'committed',
+    commandID: 'cmd-9',
+    aggregateRevision: '4',
+    resourceID: '11111111-1111-4111-8111-111111111111',
+    mailJobs: [],
+  });
+  await createAccountApi(fake).logoutAll('cmd-9');
+  assert.deepEqual(fake.calls, [
+    [
+      'send',
+      'POST',
+      '/api/v2/sessions/logout-all',
+      { body: { commandID: 'cmd-9' } },
+    ],
+  ]);
+});
+
+test('logoutAll() leaves the outcome unknown for an answer off the schema', async () => {
+  await assert.rejects(
+    createAccountApi(client({})).logoutAll('cmd-9'),
+    (error) =>
+      error.failure.code === 'Malformed' && error.failure.outcome === 'unknown',
+  );
+});

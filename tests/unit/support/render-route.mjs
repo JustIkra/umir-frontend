@@ -342,12 +342,16 @@ export function fakeServices({
     },
     cookieNotice: { isClosed: () => true, close: () => {} },
     feedback: {},
+    restaurantFeedback: () => ({
+      submit: () => Promise.reject(new Error('no feedback in render tests')),
+    }),
     session: {
       ...store(session),
       ensure: () => Promise.resolve(session),
       check: () => Promise.resolve('active'),
       signIn: () => Promise.reject(new Error('no sign-in in render tests')),
       signOut: () => Promise.resolve('done'),
+      signOutEverywhere: () => Promise.resolve('done'),
       adopt: () => {},
       updateUser: () => {},
       forget: () => {},

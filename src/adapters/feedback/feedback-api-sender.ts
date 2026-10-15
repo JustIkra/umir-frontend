@@ -31,10 +31,12 @@ function outcomeOf(error: unknown): FeedbackOutcome {
   };
 }
 
-// The landing contact form (umir-feedback#1). The submitter repeats the same
+// The contact form (umir-feedback#1): the landing posts to the anonymous
+// endpoint, the app to the one of a restaurant. The submitter repeats the same
 // submissionID after an unknown outcome, so the service stores it once.
 export function createFeedbackApiSender(
   client: Pick<GatewayClient, 'send'>,
+  path: string = anonymousFeedbackPath,
 ): FeedbackSender {
   return {
     async send({ submissionID, draft }) {
@@ -49,7 +51,7 @@ export function createFeedbackApiSender(
         website: draft.website,
       };
       try {
-        savedAnswer(await client.send('POST', anonymousFeedbackPath, { body }));
+        savedAnswer(await client.send('POST', path, { body }));
         return { kind: 'sent' };
       } catch (error) {
         return outcomeOf(error);

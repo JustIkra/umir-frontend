@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react';
 import { Outlet, useLocation, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from './app-shell/account-settings-page';
 import { AppShell } from './app-shell/app-shell';
+import { FeedbackPage } from './app-shell/feedback-page';
 import {
   AppEntry,
   AppGate,
@@ -82,6 +83,7 @@ function Root() {
 // restaurant's rights (W14).
 const restaurantRoutes: RouteObject[] = [
   { index: true, element: <OverviewPage /> },
+  { path: 'feedback', element: <FeedbackPage /> },
   {
     path: 'orders',
     element: <SectionGate section="orders" />,
