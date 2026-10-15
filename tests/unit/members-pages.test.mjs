@@ -46,7 +46,7 @@ const notFound = 'Страница не найдена';
 const revokeDialog = (html) =>
   [...html.matchAll(/<dialog[\s\S]*?<\/dialog>/g)]
     .map((match) => match[0])
-    .find((dialog) => /Отозвать доступ|Результат отзыва/.test(text(dialog))) ??
+    .find((dialog) => /Отозвать доступ|отозван ли доступ/.test(text(dialog))) ??
   '';
 const main = (html) => /<main[^>]*>([\s\S]*?)<\/main>/.exec(html)?.[1] ?? '';
 
@@ -229,38 +229,38 @@ test('assignmentsMessage says what the frames MM02 to MM08 say', () => {
     tone: 'info',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'saved' }), {
-    title: 'Назначения сохранены',
-    text: 'Изменения вступят в силу при следующем обновлении прав участника.',
+    title: 'Роли сохранены',
+    text: 'Участник увидит изменения после обновления страницы.',
     tone: 'success',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'no-roles' }), {
-    title: 'Назначения не сохранены',
-    text: 'Не выбрано ни одной роли. Выберите хотя бы одну роль или используйте «Отозвать доступ», чтобы закрыть доступ полностью.',
+    title: 'Роли не сохранены',
+    text: 'Не выбрано ни одной роли. Отметьте хотя бы одну или нажмите «Отозвать доступ», чтобы закрыть доступ полностью.',
     tone: 'error',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'conflict' }), {
-    title: 'Назначения не сохранены',
-    text: 'После открытия формы назначения участника изменились — например, в другой вкладке. Обновите форму и внесите изменения повторно.',
+    title: 'Роли не сохранены',
+    text: 'Пока форма была открыта, роли участника изменились — например, в другой вкладке. Обновите форму и внесите изменения заново.',
     tone: 'error',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'unavailable' }), {
-    title: 'Назначения не сохранены',
-    text: 'Сервис авторизации не отвечает. Выбор сохранён в форме, повторите сохранение через несколько минут.',
+    title: 'Роли не сохранены',
+    text: 'Не получилось. Попробуйте через пару минут. Данные остались в форме.',
     tone: 'error',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'unknown' }), {
-    title: 'Результат сохранения неизвестен',
-    text: 'Ответ сервиса не получен. Назначения могли измениться. Проверка продолжит ту же попытку.',
+    title: 'Не знаем, сохранились ли роли',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
     tone: 'info',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'last-admin' }), {
-    title: 'Назначения не сохранены',
+    title: 'Роли не сохранены',
     text: 'В организации должен остаться хотя бы один администратор.',
     tone: 'error',
   });
   assert.deepEqual(assignmentsMessage({ kind: 'forbidden' }), {
-    title: 'Назначения не сохранены',
-    text: 'Изменять назначения может администратор организации.',
+    title: 'Роли не сохранены',
+    text: 'Менять роли может только администратор организации.',
     tone: 'error',
   });
 });
@@ -294,23 +294,23 @@ test('revokeMessage says what the frames RV03 to RV06 say', () => {
   );
   assert.deepEqual(revokedNotice('Ирина Ковалёва'), {
     title: 'Доступ участника Ирина Ковалёва отозван',
-    text: 'Назначения участника в организации закрыты. Учётная запись сохранена.',
+    text: 'Участник больше не видит рестораны организации. Его аккаунт остался.',
   });
   assert.deepEqual(revokeMessage({ kind: 'unavailable' }, 'Ирина Ковалёва'), {
     title: 'Доступ не отозван',
-    text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+    text: 'Не получилось. Попробуйте через пару минут.',
   });
   assert.deepEqual(revokeMessage({ kind: 'unknown' }, 'Ирина Ковалёва'), {
-    title: 'Результат отзыва неизвестен',
-    text: 'Ответ сервиса не получен. Доступ мог быть отозван. Проверка продолжит ту же попытку.',
+    title: 'Не знаем, отозван ли доступ',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
   });
   assert.deepEqual(revokeMessage({ kind: 'already' }, 'Ирина Ковалёва'), {
     title: 'Доступ уже отозван',
-    text: 'Доступ участника Ирина Ковалёва к организации был отозван ранее — например, в другой вкладке.',
+    text: 'Доступ участника Ирина Ковалёва к организации уже отозвали — например, в другой вкладке.',
   });
   assert.deepEqual(revokeMessage({ kind: 'changed' }, 'Ирина Ковалёва'), {
     title: 'Доступ не отозван',
-    text: 'Данные участника изменились. Закройте окно и повторите.',
+    text: 'Данные участника изменились. Закройте окно и попробуйте ещё раз.',
   });
   assert.deepEqual(revokeMessage({ kind: 'last-admin' }, 'Ирина Ковалёва'), {
     title: 'Доступ не отозван',
@@ -368,7 +368,7 @@ test('MB05 shows no names while the list is read', async () => {
     }),
   );
   assert.ok(!page.includes('Ирина Ковалёва'));
-  assert.ok(!page.includes('Список участников не получен'));
+  assert.ok(!page.includes('Не удалось загрузить список участников'));
 });
 
 test('MB06 says the list was not received, not that it is empty', async () => {
@@ -378,12 +378,9 @@ test('MB06 says the list was not received, not that it is empty', async () => {
       organizations: { members: failedRead('AuthUnavailable', 503) },
     }),
   );
-  assert.match(page, /Список участников не получен/);
-  assert.match(
-    page,
-    /Сервис авторизации не отвечает\. Это не означает, что участников нет\./,
-  );
-  assert.match(page, /Повторить загрузку/);
+  assert.match(page, /Не удалось загрузить список участников/);
+  assert.match(page, /Попробуйте ещё раз\./);
+  assert.match(page, /Попробовать ещё раз/);
   assert.ok(!page.includes('Других участников нет'));
 });
 
@@ -393,7 +390,7 @@ test('MB04 invites when only the current user is a member', async () => {
   assert.match(page, /Других участников нет/);
   assert.match(
     page,
-    /Пригласите сотрудников по почте и назначьте им рестораны и роли\./,
+    /Пригласите сотрудников по почте и выберите им рестораны и роли\./,
   );
   assert.ok(hrefs(html).includes(`/app/organizations/${ORG}/invitations/new`));
 });
@@ -407,7 +404,7 @@ test('the members page leads to every tab of the organization', async () => {
 const checkedBoxes = (html) =>
   html.match(/<input[^>]*type="checkbox"[^>]*checked/g)?.length ?? 0;
 const saveButton = (html) =>
-  /<button[^>]*>(?:(?!<\/button>)[\s\S])*?Сохранить назначения/.exec(html)?.[0];
+  /<button[^>]*>(?:(?!<\/button>)[\s\S])*?Сохранить роли/.exec(html)?.[0];
 
 test('MM01 shows the member with the boxes set by the assignments', async () => {
   const html = await renderRoute(cardPath, withMembers());
@@ -415,7 +412,15 @@ test('MM01 shows the member with the boxes set by the assignments', async () => 
   assert.match(text(html), /i\.kovaleva@restoran\.example/);
   // Waiter on the first, both roles on the second; none on the others.
   assert.equal(checkedBoxes(html), 3);
-  assert.match(text(html), /Готовится — доступ откроется после подготовки/);
+  assert.match(text(html), /Роли в ресторанах/);
+  assert.match(
+    text(html),
+    /Настраивается — доступ откроется, когда ресторан будет готов/,
+  );
+  assert.match(
+    text(html),
+    /Участник потеряет доступ ко всем ресторанам организации\. Его аккаунт останется\./,
+  );
   // A deleted restaurant is not offered (the shell menu may still name it).
   assert.ok(!text(main(html)).includes('На Садовой'));
   assert.match(saveButton(html) ?? '', /disabled/);
@@ -425,13 +430,13 @@ test('MM01 shows the member with the boxes set by the assignments', async () => 
 
 test('MM09 says the member is no longer in the organization', async () => {
   const page = text(await renderRoute(cardPath, withMembers([marina, alexey])));
-  assert.match(page, /Участник больше не состоит в организации/);
+  assert.match(page, /Участника больше нет в организации/);
   assert.match(
     page,
-    /Доступ этого участника к организации отозван\. Назначения изменить нельзя\./,
+    /Доступ этого участника к организации отозвали, поэтому роли изменить нельзя\./,
   );
   assert.match(page, /Вернуться к участникам/);
-  assert.ok(!page.includes('Сохранить назначения'));
+  assert.ok(!page.includes('Сохранить роли'));
 });
 
 test('the card of the current user is a 404', async () => {
@@ -449,8 +454,8 @@ test('a member card read in progress shows no roles yet', async () => {
       organizations: { members: loadingRead },
     }),
   );
-  assert.ok(!page.includes('Сохранить назначения'));
-  assert.ok(!page.includes('Участник больше не состоит'));
+  assert.ok(!page.includes('Сохранить роли'));
+  assert.ok(!page.includes('Участника больше нет'));
 });
 
 test('a failed read of the card is not a revoked member', async () => {
@@ -460,8 +465,9 @@ test('a failed read of the card is not a revoked member', async () => {
       organizations: { members: failedRead('AuthUnavailable', 503) },
     }),
   );
-  assert.match(page, /Повторить загрузку/);
-  assert.ok(!page.includes('Участник больше не состоит'));
+  assert.match(page, /Не удалось загрузить данные участника/);
+  assert.match(page, /Попробовать ещё раз/);
+  assert.ok(!page.includes('Участника больше нет'));
 });
 
 test('a membership action without a known outcome locks the whole card', async () => {
@@ -490,12 +496,12 @@ test('RV01 names the member, the organization and the assignments', async () => 
   assert.match(dialog, /Отозвать доступ участника\?/);
   assert.match(
     dialog,
-    /Ирина Ковалёва потеряет доступ к организации «Восток Фуд» и ко всем назначениям:/,
+    /Ирина Ковалёва потеряет доступ к организации «Восток Фуд» и все роли:/,
   );
   assert.match(dialog, /На Береговой — Склад, Официант/);
   assert.match(
     dialog,
-    /Учётная запись сохранится\. Незавершённые действия участника в организации будут прерваны\./,
+    /Аккаунт участника останется, а его неотправленные данные пропадут\./,
   );
   assert.ok(dialog.indexOf('Отмена') < dialog.indexOf('Отозвать доступ', 30));
 });
@@ -515,7 +521,10 @@ test('the matrix is controlled by value and marks changed rows', () => {
   const html = matrix({ changed: new Set([R]) });
   assert.equal(checkedBoxes(html), 1);
   assert.equal(text(html).match(/Изменено/g)?.length, 1);
-  assert.match(text(html), /Готовится — доступ откроется после подготовки/);
+  assert.match(
+    text(html),
+    /Настраивается — доступ откроется, когда ресторан будет готов/,
+  );
   assert.ok(!/<input[^>]*type="checkbox"[^>]*disabled/.test(html));
 });
 
@@ -540,8 +549,8 @@ test('a remembered save locks the matrix and offers the check', async () => {
       },
     }),
   );
-  assert.match(text(html), /Результат сохранения неизвестен/);
-  assert.match(text(html), /Проверить сохранение/);
+  assert.match(text(html), /Не знаем, сохранились ли роли/);
+  assert.match(text(html), /Проверить результат/);
   const boxes = html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
   assert.ok(boxes.length > 0);
   for (const box of boxes) assert.match(box, /disabled/);
@@ -561,6 +570,6 @@ test('a remembered revoke keeps «Отозвать доступ» open for the c
     }),
   );
   const dialog = text(revokeDialog(html));
-  assert.match(dialog, /Результат отзыва неизвестен/);
+  assert.match(dialog, /Не знаем, отозван ли доступ/);
   assert.match(dialog, /Проверить результат/);
 });

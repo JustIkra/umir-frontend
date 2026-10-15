@@ -40,7 +40,7 @@ function NoOtherMembers({ invitePath }: { invitePath: string }) {
     <Card as="section">
       <chakra.h2 textStyle="heading.h3">Других участников нет</chakra.h2>
       <Text textStyle="body.default" color="text.secondary">
-        Пригласите сотрудников по почте и назначьте им рестораны и роли.
+        Пригласите сотрудников по почте и выберите им рестораны и роли.
       </Text>
       <ButtonLink
         alignSelf={{ base: 'stretch', sm: 'flex-start' }}
@@ -91,7 +91,7 @@ function MembersLoaded({
       </Flex>
       {found.length === 0 ? (
         <Text role="status" textStyle="body.default" color="text.secondary">
-          Ничего не найдено. Проверьте имя или почту.
+          Ничего не нашли. Проверьте имя или почту.
         </Text>
       ) : (
         <MemberList
@@ -126,12 +126,12 @@ function MembersBody({ organization }: { organization: OrganizationAccess }) {
         </>
       ) : snapshot.failed ? (
         <ServiceUnavailableAlert
-          title="Список участников не получен"
+          title="Не удалось загрузить список участников"
           onRetry={() => {
             model.refresh();
           }}
         >
-          Сервис авторизации не отвечает. Это не означает, что участников нет.
+          Попробуйте ещё раз.
         </ServiceUnavailableAlert>
       ) : (
         <MemberSkeleton />

@@ -37,8 +37,9 @@ const hiddenFromSm: SystemStyleObject = {
 // every restaurant and onChange hears the next value of one box.
 //
 // changed: the restaurants that show «Изменено» (MM02). A preparing
-// restaurant carries «Готовится — доступ откроется после подготовки»; readyOnly
-// leaves such a row unavailable (the invitation is refused for it).
+// restaurant carries «Настраивается — доступ откроется, когда ресторан будет
+// готов»; readyOnly leaves such a row unavailable (the invitation is refused
+// for it).
 export function AssignmentMatrix({
   id,
   restaurants,
@@ -103,7 +104,7 @@ export function AssignmentMatrix({
                 </Text>
                 {preparing && (
                   <Text textStyle="caption.default" color="text.secondary">
-                    Готовится — доступ откроется после подготовки
+                    Настраивается — доступ откроется, когда ресторан будет готов
                   </Text>
                 )}
                 {marked && (
@@ -145,7 +146,7 @@ export function AssignmentMatrix({
         })}
       </Stack>
       <Text textStyle="caption.default" color="text.secondary">
-        «Склад» — приём поставок, справочники, остатки и подтверждение списания.
+        «Склад» — приём поставок, справочники, остатки и подтверждение списаний.
         <br />
         «Официант» — заказы, меню и рекомендации.
       </Text>

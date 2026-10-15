@@ -139,7 +139,7 @@ export function CancelInvitationDialog({
       ) : (
         <>
           <Text textStyle="body.default">
-            {`Приглашение для ${email} будет отменено. Ссылка из письма перестанет действовать. Учётные записи и назначения участников не меняются.`}
+            {`Приглашение для ${email} будет отменено. Ссылка из письма перестанет действовать.`}
           </Text>
           {cancelling && (
             <Text role="status" textStyle="body.default">

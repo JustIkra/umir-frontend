@@ -163,7 +163,7 @@ function AssignmentsCard({
       }}
     >
       <chakra.h2 id="member-roles-title" textStyle="heading.h3">
-        Назначения в ресторанах
+        Роли в ресторанах
       </chakra.h2>
       <AssignmentMatrix
         id="member-roles"
@@ -192,7 +192,7 @@ function AssignmentsCard({
                 void check();
               }}
             >
-              Проверить сохранение
+              Проверить результат
             </Button>
           }
         >
@@ -225,7 +225,7 @@ function AssignmentsCard({
           disabled={!canSave}
           aria-busy={saving ? true : undefined}
         >
-          Сохранить назначения
+          Сохранить роли
         </Button>
         {differs && !saving && pending === undefined && (
           <Button variant="secondary" onClick={cancel}>
@@ -276,8 +276,8 @@ function MemberCards({
       <Card as="section">
         <chakra.h2 textStyle="heading.h3">Доступ к организации</chakra.h2>
         <Text textStyle="body.default" color="text.secondary">
-          Отзыв закрывает все назначения участника в организации. Учётная запись
-          сохранится.
+          Участник потеряет доступ ко всем ресторанам организации. Его аккаунт
+          останется.
         </Text>
         <Button
           variant="secondary"
@@ -299,14 +299,15 @@ function MemberGone({ orgID }: { orgID: string }) {
   return (
     <StateCard
       icon={userIcon}
-      title="Участник больше не состоит в организации"
+      title="Участника больше нет в организации"
       actions={
         <ButtonLink to={`${organizationPath(orgID)}/members`}>
           Вернуться к участникам
         </ButtonLink>
       }
     >
-      Доступ этого участника к организации отозван. Назначения изменить нельзя.
+      Доступ этого участника к организации отозвали, поэтому роли изменить
+      нельзя.
     </StateCard>
   );
 }
@@ -361,13 +362,12 @@ function MemberBody({
       >
         {snapshot.failed ? (
           <ServiceUnavailableAlert
-            title="Данные участника не получены"
+            title="Не удалось загрузить данные участника"
             onRetry={() => {
               model.refresh();
             }}
           >
-            Сервис авторизации не отвечает. Это не означает, что участник больше
-            не состоит в организации.
+            Попробуйте ещё раз.
           </ServiceUnavailableAlert>
         ) : (
           <Stack aria-hidden="true" gap={{ base: '4', sm: '6' }}>

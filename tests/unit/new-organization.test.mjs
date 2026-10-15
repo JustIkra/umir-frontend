@@ -85,33 +85,31 @@ test('name errors read as the frames say', () => {
   assert.equal(restaurantNameMessage('required'), 'Укажите название ресторана');
   for (const message of [organizationNameMessage, restaurantNameMessage]) {
     assert.equal(message('long'), 'Не длиннее 100 символов');
-    assert.equal(
-      message('control'),
-      'Название не может содержать перевод строки',
-    );
+    assert.equal(message('control'), 'Название — в одну строку');
   }
 });
 
 test('NE02 asks to fill the marked fields', () => {
   assert.deepEqual(creationMessage({ kind: 'invalid' }, ''), {
-    title: 'Предприятие не создано',
-    text: 'Заполните поля, отмеченные ниже.',
+    title: 'Организация не создана',
+    text: 'Проверьте отмеченные поля.',
   });
   assert.equal(creationTone({ kind: 'invalid' }), 'error');
 });
 
 test('NE02 from the service has no marked fields to point at', () => {
   const message = creationMessage({ kind: 'invalid', rejected: true }, '');
-  assert.equal(message?.title, 'Предприятие не создано');
-  assert.ok(!message?.text.includes('отмеченные ниже'));
+  assert.equal(message?.title, 'Организация не создана');
+  assert.equal(message?.text, 'Проверьте названия и отправьте ещё раз.');
+  assert.ok(!message?.text.includes('отмеченные'));
 });
 
 test('a creation that can no longer be followed never opens the form again', () => {
   const message = creationMessage({ kind: 'untracked' }, 'Северная кухня');
-  assert.equal(message?.title, 'Состояние подготовки неизвестно');
+  assert.equal(message?.title, 'Не знаем, готов ли ресторан');
   assert.equal(
     message?.text,
-    'Организация создана, но получить состояние подготовки не удалось. Откройте список организаций, чтобы проверить ресторан.',
+    'Организация создана. Откройте список организаций, чтобы проверить.',
   );
   assert.equal(creationTone({ kind: 'untracked' }), 'unknown');
   assert.ok(!message?.text.includes('не отвечает'));
@@ -124,7 +122,7 @@ test('NE05 tells the preparation takes up to a minute', () => {
   );
   assert.equal(
     message?.text,
-    'Подготовка ресторана обычно занимает до минуты. Страницу можно не обновлять.',
+    'Обычно это занимает до минуты. Страницу обновлять не нужно.',
   );
   assert.equal(
     creationTone({ kind: 'preparing', operationID: OPERATION }),
@@ -136,7 +134,7 @@ test('NE06 names the new enterprise', () => {
   assert.equal(
     creationMessage({ kind: 'ready', restaurantID: R }, 'Северная кухня')
       ?.title,
-    'Предприятие «Северная кухня» готово к работе',
+    'Организация «Северная кухня» готова к работе',
   );
   assert.equal(creationTone({ kind: 'ready', restaurantID: R }), 'success');
 });
@@ -146,46 +144,49 @@ test('NE09 offers the preparation again without creating the organization again'
     { kind: 'stalled', operationID: OPERATION },
     'Северная кухня',
   );
-  assert.equal(message?.title, 'Подготовка ресторана не завершена');
+  assert.equal(message?.title, 'Ресторан не настроился');
   assert.equal(
     message?.text,
-    'Организация создана, рабочее пространство ресторана не подготовлено. Повторите подготовку — организация повторно не создаётся.',
+    'Организация создана. Нажмите «Попробовать снова» — организация не задвоится.',
   );
 });
 
 test('NE07 never promises either outcome', () => {
   const message = creationMessage({ kind: 'unknown' }, '');
-  assert.equal(message?.title, 'Результат создания неизвестен');
+  assert.equal(message?.title, 'Не знаем, создана ли организация');
   assert.equal(
     message?.text,
-    'Ответ сервиса не получен. Предприятие могло быть создано. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+    'Связь прервалась. Нажмите «Проверить результат» — организация не задвоится.',
   );
   assert.equal(creationTone({ kind: 'unknown' }), 'unknown');
 });
 
 test('NE08 and NE10 are two reasons the enterprise was not created', () => {
   const unavailable = creationMessage({ kind: 'not-created' }, '');
-  assert.equal(unavailable?.title, 'Предприятие не создано');
+  assert.equal(unavailable?.title, 'Организация не создана');
   assert.equal(
     unavailable?.text,
-    'Сервис авторизации не отвечает. Данные сохранены в форме, повторите отправку через несколько минут.',
+    'Не получилось. Попробуйте через пару минут. Данные остались в форме.',
   );
   const checked = creationMessage({ kind: 'not-created', checked: true }, '');
-  assert.equal(checked?.title, 'Предприятие не создано');
+  assert.equal(checked?.title, 'Организация не создана');
   assert.equal(
     checked?.text,
-    'Проверка показала, что попытка не завершена. Введённые данные сохранены, форму можно отправить повторно.',
+    'Не получилось. Данные остались в форме — отправьте ещё раз.',
   );
   const limited = creationMessage({ kind: 'not-created', seconds: 45 }, '');
-  assert.match(limited?.text ?? '', /45 с/);
+  assert.equal(
+    limited?.text,
+    'Слишком много попыток. Попробуйте через 45 секунд. Данные остались в форме.',
+  );
 });
 
 test('NE11 says the account may not create organizations', () => {
   const message = creationMessage({ kind: 'forbidden' }, '');
-  assert.equal(message?.title, 'Создание предприятия недоступно');
+  assert.equal(message?.title, 'Создать организацию нельзя');
   assert.equal(
     message?.text,
-    'Политика сервиса не разрешает этой учётной записи создавать организации. Доступ к существующей организации предоставляет её администратор.',
+    'Вам пока нельзя создавать организации. Попросите администратора прислать приглашение.',
   );
 });
 
@@ -235,15 +236,15 @@ test('the refusals of Auth become the screen states', () => {
   });
 });
 
-test('TZ09 names the zone Auth does not know', () => {
+test('TZ09 says the zone is not available, without its identifier', () => {
   assert.equal(
-    zoneUnsupported('Etc/GMT-3'),
-    'Зона «Etc/GMT-3» не поддерживается сервисом. Выберите зону из списка.',
+    zoneUnsupported,
+    'Этот часовой пояс недоступен. Выберите из списка.',
   );
-  assert.equal(
-    creationMessage({ kind: 'zone' }, '')?.text,
-    'Зона не поддерживается сервисом. Выберите зону из списка.',
-  );
+  assert.deepEqual(creationMessage({ kind: 'zone' }, ''), {
+    title: 'Организация не создана',
+    text: 'Этот часовой пояс недоступен. Выберите из списка.',
+  });
 });
 
 test('the followed operation decides the preparation states', () => {
@@ -270,27 +271,32 @@ test('the followed operation decides the preparation states', () => {
 
 test('NE01 is an empty form with the zone of Moscow', async () => {
   const html = await renderRoute('/app/organizations/new');
-  assert.equal(h1(html), 'Создать предприятие');
+  assert.equal(h1(html), 'Создать организацию');
   for (const label of [
     'Название организации',
     'Название первого ресторана',
     'Часовой пояс организации',
   ])
     assert.ok(labels(html).includes(label), label);
-  assert.match(text(html), /Москва — Europe\/Moscow · UTC\+3/);
-  assert.match(text(html), /Отображается в меню и письмах-приглашениях/);
-  assert.ok(!buttonTag(html, 'Создать предприятие')?.includes('disabled'));
-  assert.ok(!text(html).includes('Результат создания неизвестен'));
+  assert.match(text(html), /Москва \(UTC\+3\)/);
+  assert.ok(!text(html).includes('Europe/Moscow'));
+  assert.match(text(html), /Его увидят в меню и в письмах с приглашением/);
+  assert.match(
+    text(html),
+    /По нему показываем даты и сроки во всех ресторанах организации\./,
+  );
+  assert.ok(!buttonTag(html, 'Создать организацию')?.includes('disabled'));
+  assert.ok(!text(html).includes('Не знаем, создана ли организация'));
 });
 
 test('a creation without a known outcome locks the form and offers the check', async () => {
   const html = await renderRoute('/app/organizations/new', {
     organizations: { pending: new Set(['org.create']) },
   });
-  assert.ok(buttonTag(html, 'Создать предприятие')?.includes('disabled'));
+  assert.ok(buttonTag(html, 'Создать организацию')?.includes('disabled'));
   assert.ok(inputTag(html, 'organizationName')?.includes('disabled'));
   assert.ok(inputTag(html, 'restaurantName')?.includes('disabled'));
-  assert.match(text(html), /Результат создания неизвестен/);
+  assert.match(text(html), /Не знаем, создана ли организация/);
   assert.ok(buttonTag(html, 'Проверить результат'));
 });
 
@@ -314,10 +320,10 @@ test('RS01 is an empty dialog that repeats the zone of the organization', async 
   assert.ok(labels(html).includes('Название ресторана'));
   assert.match(
     text(html),
-    /Часовой пояс — как у организации: Москва — Europe\/Moscow, UTC\+3\./,
+    /Часовой пояс — как у организации: Москва \(UTC\+3\)\./,
   );
   assert.ok(buttonTag(html, 'Добавить')?.includes('type="submit"'));
-  assert.ok(!text(html).includes('Результат добавления неизвестен'));
+  assert.ok(!text(html).includes('Не знаем, добавлен ли ресторан'));
 });
 
 test('RS06 locks the dialog while the answer is unknown', async () => {
@@ -325,7 +331,7 @@ test('RS06 locks the dialog while the answer is unknown', async () => {
     access: adminAccess,
     organizations: { pending: new Set([`org.restaurant.add.${ORG}`]) },
   });
-  assert.match(text(html), /Результат добавления неизвестен/);
+  assert.match(text(html), /Не знаем, добавлен ли ресторан/);
   assert.ok(inputTag(html, 'restaurantName')?.includes('disabled'));
   assert.ok(buttonTag(html, 'Проверить результат'));
 });
@@ -333,20 +339,28 @@ test('RS06 locks the dialog while the answer is unknown', async () => {
 test('the dialog messages follow the frames', () => {
   const name = 'На Ленина';
   assert.deepEqual(addRestaurantMessage({ kind: 'unknown' }, name), {
-    title: 'Результат добавления неизвестен',
-    text: 'Ответ сервиса не получен. Ресторан мог быть добавлен. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+    title: 'Не знаем, добавлен ли ресторан',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
+  });
+  assert.deepEqual(addRestaurantMessage({ kind: 'rejected' }, ` ${name} `), {
+    title: 'Ресторан не добавлен',
+    text: 'Проверьте название «На Ленина» и отправьте ещё раз.',
   });
   assert.equal(
     addRestaurantMessage({ kind: 'forbidden' }, name)?.title,
-    'Добавление недоступно',
+    'Добавить ресторан нельзя',
+  );
+  assert.deepEqual(addRestaurantMessage({ kind: 'not-added' }, name), {
+    title: 'Ресторан не добавлен',
+    text: 'Не получилось. Попробуйте через пару минут. Название осталось в поле.',
+  });
+  assert.equal(
+    addRestaurantMessage({ kind: 'not-added', checked: true }, name)?.text,
+    'Не получилось. Название осталось в поле — отправьте ещё раз.',
   );
   assert.equal(
-    addRestaurantMessage({ kind: 'not-added' }, name)?.title,
-    'Ресторан не добавлен',
-  );
-  assert.match(
-    addRestaurantMessage({ kind: 'not-added', seconds: 30 }, name)?.text ?? '',
-    /30 с/,
+    addRestaurantMessage({ kind: 'not-added', seconds: 30 }, name)?.text,
+    'Слишком много попыток. Попробуйте через 30 секунд. Название осталось в поле.',
   );
   assert.equal(addRestaurantMessage({ kind: 'editing' }, name), undefined);
   assert.equal(addRestaurantMessage({ kind: 'sending' }, name), undefined);
@@ -387,18 +401,18 @@ test('the dialog states come from the outcomes', () => {
 test('NE05 marks the second step as current and NE06 completes all three', () => {
   const steps = [
     'Организация создана',
-    'Ресторан подготавливается',
+    'Ресторан настраивается',
     'Готово к работе',
   ];
   const preparing = renderElement(h(ReadinessSteps, { stage: 'preparing' }));
   for (const step of steps) assert.ok(text(preparing).includes(step), step);
   assert.equal(preparing.match(/aria-current="step"/g)?.length, 1);
-  assert.match(text(preparing), /Ресторан подготавливается — выполняется/);
+  assert.match(text(preparing), /Ресторан настраивается — выполняется/);
   const ready = renderElement(h(ReadinessSteps, { stage: 'ready' }));
   assert.ok(!ready.includes('aria-current'));
   assert.match(text(ready), /Готово к работе — выполнено/);
   const stalled = renderElement(h(ReadinessSteps, { stage: 'stalled' }));
-  assert.match(text(stalled), /Ресторан подготавливается — не завершено/);
+  assert.match(text(stalled), /Ресторан настраивается — не получилось/);
 });
 
 test('the pending creation shows the values it was sent with', async () => {
@@ -416,7 +430,7 @@ test('the pending creation shows the values it was sent with', async () => {
     inputTag(html, 'organizationName')?.includes('value="Северная кухня"'),
   );
   assert.ok(inputTag(html, 'restaurantName')?.includes('value="На Невском"'));
-  assert.match(text(html), /Екатеринбург — Asia\/Yekaterinburg · UTC\+5/);
+  assert.match(text(html), /Екатеринбург \(UTC\+5\)/);
 });
 
 test('the pending restaurant shows the name it was sent with', async () => {
@@ -437,6 +451,6 @@ test('NE06 names the enterprise as the followed operation does', () => {
   );
   assert.equal(
     creationMessage(state, 'Северная кухня')?.title,
-    'Предприятие «Северная кухня» готово к работе',
+    'Организация «Северная кухня» готова к работе',
   );
 });

@@ -9,8 +9,9 @@ import type {
   RoleGrant,
 } from '@/application/organizations';
 import { roleTitle } from '@/presentation/app-shell/shell-context';
+import { plural } from '@/presentation/ui/plural';
 import { formatInstant } from '@/presentation/ui/time';
-import { zoneLabel } from '@/presentation/ui/zones';
+import { zoneCity } from '@/presentation/ui/zones';
 
 export type InvitationTone = 'neutral' | 'success' | 'error';
 
@@ -25,8 +26,8 @@ export interface InvitationStatus {
 export const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
 // The status of a row: the state of the invitation, and for a pending one
-// the latest delivery of its link. «Принято к отправке» is as far as Auth
-// says: the letter is never «доставлено».
+// the latest delivery of its link. «Отправлено» is as far as Auth says: the
+// letter is never «доставлено».
 export function invitationStatus(row: InvitationRow): InvitationStatus {
   const { invitation, linkDelivery, resendAllowed } = row;
   switch (invitation.state) {
@@ -51,23 +52,23 @@ export function invitationStatus(row: InvitationRow): InvitationStatus {
   switch (linkDelivery?.state) {
     case 'pending':
     case 'retry':
-      return { label: 'Принято к отправке', tone: 'neutral', actions };
     case 'sending':
-      return { label: 'Ожидает доставки', tone: 'neutral', actions };
+      return { label: 'Отправляется', tone: 'neutral', actions };
     case 'sent':
-      return { label: 'Ожидает принятия', tone: 'neutral', actions };
+      return { label: 'Отправлено', tone: 'neutral', actions };
     case 'unknown':
-      return { label: 'Доставка не подтверждена', tone: 'neutral', actions };
+      return { label: 'Письмо могло не дойти', tone: 'neutral', actions };
     case 'failed':
-      return { label: 'Ошибка отправки', tone: 'error', actions };
+      return { label: 'Не получилось отправить', tone: 'error', actions };
     case 'suppressed':
     case undefined:
-      return { label: 'Ссылка не отправлена', tone: 'neutral', actions };
+      return { label: 'Не отправлено', tone: 'neutral', actions };
   }
 }
 
+// «21.10.2026, 10:00».
 const moment = (epochMs: number, timeZone: string) =>
-  `${formatInstant(epochMs, timeZone, 'date')} ${formatInstant(epochMs, timeZone, 'time')}`;
+  `${formatInstant(epochMs, timeZone, 'date')}, ${formatInstant(epochMs, timeZone, 'time')}`;
 
 // When the invitation was made: the term it was given ends at expiresAt.
 export const createdAt = (invitation: Invitation) =>
@@ -208,10 +209,10 @@ export function validateInvite(
     : { kind: 'member', membershipID: member.membership.membershipID };
 }
 
-// «Приглашение действует 7 дней: до 21.10.2026 10:00 (Москва, UTC+3).»
+// «Приглашение действует 7 дней: до 21.10.2026, 10:00 (Москва).»
 export function inviteTerm(nowMs: number, timeZone: string): string {
   const until = nowMs + invitationLifetimeMs;
-  return `Приглашение действует 7 дней: до ${moment(until, timeZone)} (${zoneLabel(timeZone, until)}).`;
+  return `Приглашение действует 7 дней: до ${moment(until, timeZone)} (${zoneCity(timeZone)}).`;
 }
 
 const emailMessages = {
@@ -221,7 +222,7 @@ const emailMessages = {
 export const rolesRequired =
   'Выберите хотя бы одну роль хотя бы в одном ресторане';
 export const memberMessage =
-  'Пользователь с этой почтой уже состоит в организации. Назначения меняются на вкладке «Участники».';
+  'Этот человек уже в организации. Роли можно поменять во вкладке «Участники».';
 
 // The texts under the fields of a form that was not filled right (IV02).
 export function inviteFieldErrors(state: InviteState): {
@@ -236,6 +237,15 @@ export function inviteFieldErrors(state: InviteState): {
 }
 
 const notSent = 'Приглашение не отправлено';
+const tryLater = 'Не получилось. Попробуйте через пару минут.';
+const checkResult =
+  'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.';
+const deliveryOff =
+  'Сейчас не получается отправлять письма. Напишите в поддержку.';
+const notAllowed =
+  'Ресторан ещё настраивается, или у вас больше нет роли администратора.';
+const seconds = (count: number) =>
+  `${String(count)} ${plural(count, 'секунду', 'секунды', 'секунд')}`;
 
 // What the form says (IV02 to IV09 and the refusals). A message without a
 // title is the text of a field (IV03, IV04, under the address) or a status
@@ -253,44 +263,40 @@ export function inviteMessage(
       return {
         text:
           state.expiresAt === undefined
-            ? 'На эту почту уже отправлено приглашение. Отмените его, чтобы отправить новое.'
-            : `На эту почту уже отправлено приглашение, оно действует до ${moment(state.expiresAt, timeZone)} (${zoneLabel(timeZone, state.expiresAt)}). Отмените его, чтобы отправить новое.`,
+            ? 'На эту почту уже отправили приглашение. Отмените его, чтобы отправить новое.'
+            : `На эту почту уже отправили приглашение, оно действует до ${moment(state.expiresAt, timeZone)} (${zoneCity(timeZone)}). Отмените его, чтобы отправить новое.`,
       };
     case 'invalid':
       return {
         title: notSent,
         text:
           state.email === undefined && state.roles === undefined
-            ? 'Проверьте почту и назначения и повторите отправку.'
-            : 'Заполните поля, отмеченные ниже.',
+            ? 'Проверьте почту и роли и отправьте ещё раз.'
+            : 'Проверьте отмеченные поля.',
       };
     case 'sending':
       return { text: 'Отправляем…' };
     case 'unavailable':
       return {
         title: notSent,
-        text: 'Сервис авторизации не отвечает. Данные сохранены в форме, повторите отправку через несколько минут.',
+        text: `${tryLater} Данные остались в форме.`,
       };
     case 'unknown':
       return {
-        title: 'Результат отправки неизвестен',
-        text: 'Ответ сервиса не получен. Приглашение могло быть создано. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+        title: 'Не знаем, отправлено ли приглашение',
+        text: checkResult,
       };
-    case 'limited':
+    case 'limited': {
+      const minutes = Math.ceil(state.seconds / 60);
       return {
         title: notSent,
-        text: `Превышен лимит приглашений на эту почту. Повторите через ${String(Math.ceil(state.seconds / 60))} мин.`,
+        text: `На этот адрес уже отправили много приглашений. Попробуйте через ${String(minutes)} ${plural(minutes, 'минуту', 'минуты', 'минут')}.`,
       };
+    }
     case 'delivery':
-      return {
-        title: notSent,
-        text: 'Отправка писем не настроена. Обратитесь к администратору сервиса.',
-      };
+      return { title: notSent, text: deliveryOff };
     case 'forbidden':
-      return {
-        title: notSent,
-        text: 'Выбранный ресторан ещё не готов или роль администратора снята.',
-      };
+      return { title: notSent, text: notAllowed };
   }
 }
 
@@ -332,7 +338,7 @@ export function reinviteNotice(
 ): { title: string; text: string } {
   return {
     title: 'Повторное приглашение',
-    text: `Почта, рестораны и роли взяты из приглашения от ${formatInstant(createdAt(row.invitation), timeZone, 'date')}. Проверьте их перед отправкой.`,
+    text: `Мы подставили почту, рестораны и роли из приглашения от ${formatInstant(createdAt(row.invitation), timeZone, 'date')}. Проверьте их перед отправкой.`,
   };
 }
 
@@ -353,8 +359,8 @@ export interface InvitationNotice {
 }
 
 export const invitedNotice = (email: string): InvitationNotice => ({
-  title: `Приглашение для ${email} принято к отправке`,
-  text: 'Статус доставки обновится в списке.',
+  title: `Приглашение для ${email} отправлено`,
+  text: 'В списке будет видно, дошло ли письмо.',
 });
 
 // IN05.
@@ -364,8 +370,8 @@ export const cancelledNotice = (email: string): InvitationNotice => ({
 });
 
 export const resentNotice = (email: string): InvitationNotice => ({
-  title: `Ссылка для ${email} принята к отправке`,
-  text: 'Статус доставки обновится в списке.',
+  title: `Ссылка для ${email} отправлена ещё раз`,
+  text: 'В списке будет видно, дошло ли письмо.',
 });
 
 const notResent = 'Ссылка не отправлена';
@@ -388,7 +394,7 @@ export function resendResult(
         tone: 'error',
         notice: {
           title: notResent,
-          text: `Повторная отправка будет доступна через ${String(outcome.seconds)} с.`,
+          text: `Отправить ещё раз можно будет через ${seconds(outcome.seconds)}.`,
         },
       };
     case 'closed':
@@ -402,18 +408,12 @@ export function resendResult(
     case 'delivery':
       return {
         tone: 'error',
-        notice: {
-          title: notResent,
-          text: 'Отправка писем не настроена. Обратитесь к администратору сервиса.',
-        },
+        notice: { title: notResent, text: deliveryOff },
       };
     case 'forbidden':
       return {
         tone: 'error',
-        notice: {
-          title: notResent,
-          text: 'Выбранный ресторан ещё не готов или роль администратора снята.',
-        },
+        notice: { title: notResent, text: notAllowed },
       };
     case 'unknown':
     case 'ended':
@@ -426,10 +426,7 @@ export function resendResult(
     case 'unavailable':
       return {
         tone: 'error',
-        notice: {
-          title: notResent,
-          text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
-        },
+        notice: { title: notResent, text: tryLater },
       };
   }
 }
@@ -465,7 +462,7 @@ export function cancelMessage(
     case 'accepted':
       return {
         title: 'Приглашение уже принято',
-        text: `Пользователь с почтой ${email} уже стал участником организации. Чтобы закрыть доступ, отзовите его на вкладке «Участники».`,
+        text: `Человек с почтой ${email} уже в организации. Закрыть ему доступ можно во вкладке «Участники».`,
       };
     case 'closed':
       return {
@@ -475,22 +472,22 @@ export function cancelMessage(
     case 'unavailable':
       return {
         title: notCancelled,
-        text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+        text: tryLater,
       };
     case 'unknown':
       return {
-        title: 'Результат отмены неизвестен',
-        text: 'Ответ сервиса не получен. Приглашение могло быть отменено. Проверка продолжит ту же попытку.',
+        title: 'Не знаем, отменено ли приглашение',
+        text: checkResult,
       };
     case 'forbidden':
       return {
         title: notCancelled,
-        text: 'Отменять приглашения может администратор организации.',
+        text: 'Отменять приглашения может только администратор организации.',
       };
     case 'limited':
       return {
         title: notCancelled,
-        text: `Повторите через ${String(state.seconds)} с.`,
+        text: `Слишком много попыток. Попробуйте через ${seconds(state.seconds)}.`,
       };
   }
 }

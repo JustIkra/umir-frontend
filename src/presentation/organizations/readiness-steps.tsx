@@ -6,18 +6,18 @@ export type ReadinessStage = 'preparing' | 'stalled' | 'ready';
 
 const steps = [
   'Организация создана',
-  'Ресторан подготавливается',
+  'Ресторан настраивается',
   'Готово к работе',
 ] as const;
 
-// Figma NE05: the three steps of a new enterprise. The organization is created
-// at once, the restaurant is prepared after the answer, and the last step is
-// reached when the preparation is finished. A stalled preparation keeps the
-// second step current.
+// Figma NE05: the three steps of a new organization. The organization is
+// created at once, the restaurant is prepared after the answer, and the last
+// step is reached when the preparation is finished. A stalled preparation
+// keeps the second step current.
 export function ReadinessSteps({ stage }: { stage: ReadinessStage }) {
   const done = stage === 'ready' ? 3 : 1;
   return (
-    <Stack as="ol" gap="3" listStyleType="none" aria-label="Шкала готовности">
+    <Stack as="ol" gap="3" listStyleType="none" aria-label="Этапы создания">
       {steps.map((title, index) => {
         const finished = index < done;
         const current = index === done;
@@ -64,7 +64,7 @@ export function ReadinessSteps({ stage }: { stage: ReadinessStage }) {
                   ? ' — выполнено'
                   : current
                     ? stage === 'stalled'
-                      ? ' — не завершено'
+                      ? ' — не получилось'
                       : ' — выполняется'
                     : ''}
               </chakra.span>

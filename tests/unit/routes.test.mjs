@@ -166,7 +166,7 @@ const pages = [
   [`/app/r/${R}/catalog/dishes/new`, 'Новое блюдо', ['Название', 'Код блюда']],
   [
     '/app/settings',
-    'Учётная запись',
+    'Аккаунт',
     ['Текущий пароль', 'Новый пароль', 'Повторите новый пароль'],
   ],
   ['/app/organizations', 'Организации и рестораны', [], administered],
@@ -199,7 +199,7 @@ const pages = [
   ],
   [
     '/app/organizations/new',
-    'Создать предприятие',
+    'Создать организацию',
     [
       'Название организации',
       'Название первого ресторана',
@@ -290,7 +290,7 @@ test('sign-in has no code step and explains an ended session', async () => {
     `/login?return=${encodeURIComponent(`/app/r/${R}`)}&expired=1`,
     { session: { status: 'anonymous', expired: true } },
   );
-  assert.match(text(html), /Сессия завершена/);
+  assert.match(text(html), /Вы вышли из аккаунта/);
   assert.match(
     text(html),
     /Войдите снова — после входа откроется та же страница\./,
@@ -436,7 +436,7 @@ const twoOrganizations = {
 
 // The account menu dialog, and the first «Разделы» navigation (the sidebar).
 const accountMenu = (html) =>
-  /<dialog[^>]*aria-label="Учётная запись"[^>]*>([\s\S]*?)<\/dialog>/.exec(
+  /<dialog[^>]*aria-label="Аккаунт"[^>]*>([\s\S]*?)<\/dialog>/.exec(
     html,
   )?.[1] ?? '';
 const sectionLinks = (html) =>
@@ -542,8 +542,12 @@ test('the order flow goes from the menu to the placed order', async () => {
     }),
   });
   assert.ok(text(draft).includes('2 позиции · 9 порций'));
-  assert.ok(text(draft).includes('Подготовить заказ'));
-  assert.ok(text(draft).includes('Повтор блюда из поз. 1 — отдельная позиция'));
+  assert.ok(text(draft).includes('Проверить заказ'));
+  assert.ok(text(draft).includes('Это блюдо уже есть в позиции 1'));
+  // The stepper names the unit in full, agreeing with its value.
+  assert.match(draft, /value="4"[^]*?>порции</);
+  assert.match(draft, /value="5"[^]*?>порций</);
+  assert.doesNotMatch(text(draft), /порц\./);
   assert.ok(text(draft).includes('Заказ · 2 позиции'));
   assert.ok(text(draft).includes('9 порций · не проверен'));
   const proposed = await renderRoute(route, {
@@ -590,7 +594,8 @@ test('the order flow goes from the menu to the placed order', async () => {
       },
     }),
   });
-  assert.ok(placed.includes('ord-20261010-0042'));
+  assert.ok(text(placed).includes('Оформлен 14 октября, 10:01'));
+  assert.ok(!placed.includes('ord-20261010-0042'));
   assert.ok(hrefs(placed).includes(`/app/r/${R}/warehouse/history`));
 });
 
@@ -654,7 +659,7 @@ const unverified = {
 
 test('/app without verified access shows W17', async () => {
   const html = await renderRoute('/app', { access: unverified });
-  assert.equal(h1(html), 'Доступ не проверен');
+  assert.equal(h1(html), 'Не удалось загрузить рестораны');
   assert.equal(
     await redirectOf('/app', { access: unverified, remembered: R }),
     `/app/r/${R}`,
@@ -672,7 +677,7 @@ test('a section without the right shows W14', async () => {
   const waiter = readyAccess([sampleRestaurant({ roles: ['Waiter'] })]);
   assert.equal(
     h1(await renderRoute(`/app/r/${R}/warehouse`, { access: waiter })),
-    'Раздел «Склад» недоступен',
+    'Нет доступа к разделу «Склад»',
   );
   assert.equal(
     h1(await renderRoute(`/app/r/${R}/orders`, { access: waiter })),
@@ -691,7 +696,7 @@ test('a restaurant outside access shows W15; a preparing one shows W16', async (
   ]);
   assert.equal(
     h1(await renderRoute(`/app/r/${R}`, { access: preparing })),
-    'Ресторан подготавливается',
+    'Ресторан ещё настраивается',
   );
 });
 
@@ -714,12 +719,12 @@ test('restaurant links carry the restaurant id', async () => {
   );
 });
 
-test('a session without an answer shows «Сессия не проверена» instead of the page', async () => {
+test('a session without an answer shows «Не удалось проверить вход» instead of the page', async () => {
   const session = { status: 'unavailable', failure: unverified.failure };
   for (const path of ['/app', '/app/settings', `/app/r/${R}/orders`]) {
     assert.equal(
       h1(await renderRoute(path, { session })),
-      'Сессия не проверена',
+      'Не удалось проверить вход',
       path,
     );
   }
@@ -772,7 +777,7 @@ test('the shell follows another user and the roles of the restaurant', async () 
   assert.match(text(html), /Ирина Ковалёва/);
   assert.match(text(accountMenu(html)), /i\.kovaleva/);
   assert.match(text(html), /На Тургеневской · Официант/);
-  assert.ok(html.includes('aria-label="Учётная запись: Ирина Ковалёва"'));
+  assert.ok(html.includes('aria-label="Аккаунт: Ирина Ковалёва"'));
   assert.deepEqual(sectionLinks(html), [`/app/r/${R}`, `/app/r/${R}/orders`]);
 });
 
@@ -794,8 +799,8 @@ test('access states leave the shell without sections', async () => {
       'Нет доступных ресторанов',
     ],
     [`/app/r/${OTHER}`, {}, 'Доступ к ресторану отозван'],
-    [`/app/r/${R}`, { access: preparing }, 'На Пушкинской · подготавливается'],
-    ['/app', { access: unverified }, 'Доступ не проверен'],
+    [`/app/r/${R}`, { access: preparing }, 'На Пушкинской · настраивается'],
+    ['/app', { access: unverified }, 'Не удалось загрузить рестораны'],
   ]) {
     const html = await renderRoute(path, options);
     assert.deepEqual(sectionLinks(html), [], path);
@@ -803,20 +808,20 @@ test('access states leave the shell without sections', async () => {
   }
 });
 
-test('«Данные обновились» shows in the restaurant it belongs to', async () => {
+test('«Данные обновлены» shows in the restaurant it belongs to', async () => {
   const shown = await renderRoute(`/app/r/${R}`, {
     notice: { restaurantID: R },
   });
-  assert.match(text(shown), /Данные обновились/);
+  assert.match(text(shown), /Данные обновлены/);
   const elsewhere = await renderRoute(`/app/r/${R}`, {
     notice: { restaurantID: OTHER },
   });
-  assert.doesNotMatch(text(elsewhere), /Данные обновились/);
+  assert.doesNotMatch(text(elsewhere), /Данные обновлены/);
   // W15: the restaurant is out of access, its data is not shown.
   const revoked = await renderRoute(`/app/r/${OTHER}`, {
     notice: { restaurantID: OTHER },
   });
-  assert.doesNotMatch(text(revoked), /Данные обновились/);
+  assert.doesNotMatch(text(revoked), /Данные обновлены/);
 });
 
 test('W12: the overview names the missing section between the header and the tiles', () => {
@@ -851,12 +856,12 @@ test('W12: the overview names the missing section between the header and the til
   );
   const page = text(html);
   const notice = page.indexOf(
-    'Раздел «Склад» недоступен в ресторане «На Пушкинской»',
+    'В ресторане «На Пушкинской» у вас нет доступа к разделу «Склад»',
   );
   // «Собрать заказ» is the header action; the warehouse tile follows.
   assert.ok(notice > page.indexOf('Обзор'), 'the notice follows the header');
   assert.ok(
-    html.indexOf('недоступен в ресторане') <
+    html.indexOf('у вас нет доступа к разделу') <
       html.indexOf(`href="/app/r/${R}/warehouse"`),
     'the notice precedes the tiles',
   );

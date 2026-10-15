@@ -96,20 +96,20 @@ function RestaurantRow({
           )}
           {stalled && (
             <Text textStyle="caption.default" color="text.secondary">
-              Рабочее пространство ресторана не подготовлено.
+              Ресторан не настроился.
             </Text>
           )}
         </Stack>
         {stalled ? (
           <>
-            <Badge tone="error">Подготовка не завершена</Badge>
+            <Badge tone="error">Не настроен</Badge>
             <Button
               variant="secondary"
               onClick={() => {
                 lifecycles.retry(stalled.operationID);
               }}
             >
-              Повторить подготовку
+              Попробовать снова
             </Button>
           </>
         ) : restaurant.lifecycle === 'ready' ? (
@@ -124,7 +124,7 @@ function RestaurantRow({
             </ButtonLink>
           </>
         ) : (
-          <Badge>Подготавливается</Badge>
+          <Badge>Настраивается</Badge>
         )}
         {admin &&
           (deleted || deleteState.kind === 'done' ? (

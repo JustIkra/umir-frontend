@@ -101,8 +101,8 @@ export function DeleteOrganizationDialog({
       ) : (
         <>
           <Text textStyle="body.default">
-            Все участники потеряют доступ ко всем ресторанам организации.
-            Учётные записи сохранятся. Отменить удаление нельзя.
+            Все участники потеряют доступ ко всем ресторанам организации. Их
+            аккаунты останутся. Отменить удаление нельзя.
           </Text>
           <FieldGroup>
             <FieldLabel htmlFor="delete-organization-name">

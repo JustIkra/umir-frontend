@@ -147,7 +147,10 @@ export interface AssignmentsMessage {
   readonly tone: 'success' | 'error' | 'info';
 }
 
-const notSaved = 'Назначения не сохранены';
+const notSaved = 'Роли не сохранены';
+const tryLater = 'Не получилось. Попробуйте через пару минут.';
+const checkResult =
+  'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.';
 
 // What the frames MM02 to MM08 say. The view state has no message.
 export function assignmentsMessage(
@@ -162,32 +165,32 @@ export function assignmentsMessage(
       return { text: 'Сохраняем…', tone: 'info' };
     case 'saved':
       return {
-        title: 'Назначения сохранены',
-        text: 'Изменения вступят в силу при следующем обновлении прав участника.',
+        title: 'Роли сохранены',
+        text: 'Участник увидит изменения после обновления страницы.',
         tone: 'success',
       };
     case 'no-roles':
       return {
         title: notSaved,
-        text: 'Не выбрано ни одной роли. Выберите хотя бы одну роль или используйте «Отозвать доступ», чтобы закрыть доступ полностью.',
+        text: 'Не выбрано ни одной роли. Отметьте хотя бы одну или нажмите «Отозвать доступ», чтобы закрыть доступ полностью.',
         tone: 'error',
       };
     case 'conflict':
       return {
         title: notSaved,
-        text: 'После открытия формы назначения участника изменились — например, в другой вкладке. Обновите форму и внесите изменения повторно.',
+        text: 'Пока форма была открыта, роли участника изменились — например, в другой вкладке. Обновите форму и внесите изменения заново.',
         tone: 'error',
       };
     case 'unavailable':
       return {
         title: notSaved,
-        text: 'Сервис авторизации не отвечает. Выбор сохранён в форме, повторите сохранение через несколько минут.',
+        text: `${tryLater} Данные остались в форме.`,
         tone: 'error',
       };
     case 'unknown':
       return {
-        title: 'Результат сохранения неизвестен',
-        text: 'Ответ сервиса не получен. Назначения могли измениться. Проверка продолжит ту же попытку.',
+        title: 'Не знаем, сохранились ли роли',
+        text: checkResult,
         tone: 'info',
       };
     case 'last-admin':
@@ -199,13 +202,13 @@ export function assignmentsMessage(
     case 'forbidden':
       return {
         title: notSaved,
-        text: 'Изменять назначения может администратор организации.',
+        text: 'Менять роли может только администратор организации.',
         tone: 'error',
       };
   }
 }
 
-// The frame after the answer of Auth to «Сохранить назначения». A refusal
+// The frame after the answer of Auth to «Сохранить роли». A refusal
 // without a frame of its own means the roles were not saved and Auth did not
 // answer in time (MM07).
 export function assignmentsOutcomeState(
@@ -266,12 +269,12 @@ export function adminMessage(
       return state.admin
         ? {
             title: 'Роль администратора назначена',
-            text: 'Участник управляет участниками, приглашениями, ресторанами и настройками организации.',
+            text: 'Теперь участник управляет участниками, приглашениями, ресторанами и настройками организации.',
             tone: 'success',
           }
         : {
             title: 'Роль администратора снята',
-            text: 'Участник больше не управляет организацией. Его назначения в ресторанах сохранены.',
+            text: 'Участник больше не управляет организацией. Его роли в ресторанах остались.',
             tone: 'success',
           };
     case 'last-admin':
@@ -283,25 +286,25 @@ export function adminMessage(
     case 'conflict':
       return {
         title: adminNotChanged,
-        text: 'После открытия страницы данные участника изменились — например, в другой вкладке. Обновите страницу и повторите.',
+        text: 'Пока страница была открыта, данные участника изменились — например, в другой вкладке. Обновите страницу и попробуйте ещё раз.',
         tone: 'error',
       };
     case 'unavailable':
       return {
         title: adminNotChanged,
-        text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+        text: tryLater,
         tone: 'error',
       };
     case 'unknown':
       return {
-        title: 'Результат изменения роли неизвестен',
-        text: 'Ответ сервиса не получен. Роль могла измениться. Проверка продолжит ту же попытку.',
+        title: 'Не знаем, изменилась ли роль',
+        text: checkResult,
         tone: 'info',
       };
     case 'forbidden':
       return {
         title: adminNotChanged,
-        text: 'Изменять роль администратора может администратор организации.',
+        text: 'Менять роль администратора может только администратор организации.',
         tone: 'error',
       };
   }
@@ -369,22 +372,22 @@ export function revokeMessage(
     case 'unavailable':
       return {
         title: notRevoked,
-        text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+        text: tryLater,
       };
     case 'unknown':
       return {
-        title: 'Результат отзыва неизвестен',
-        text: 'Ответ сервиса не получен. Доступ мог быть отозван. Проверка продолжит ту же попытку.',
+        title: 'Не знаем, отозван ли доступ',
+        text: checkResult,
       };
     case 'already':
       return {
         title: 'Доступ уже отозван',
-        text: `Доступ участника ${name} к организации был отозван ранее — например, в другой вкладке.`,
+        text: `Доступ участника ${name} к организации уже отозвали — например, в другой вкладке.`,
       };
     case 'changed':
       return {
         title: notRevoked,
-        text: 'Данные участника изменились. Закройте окно и повторите.',
+        text: 'Данные участника изменились. Закройте окно и попробуйте ещё раз.',
       };
     case 'last-admin':
       return {
@@ -394,7 +397,7 @@ export function revokeMessage(
     case 'forbidden':
       return {
         title: notRevoked,
-        text: 'Отзывать доступ может администратор организации.',
+        text: 'Отзывать доступ может только администратор организации.',
       };
   }
 }
@@ -414,7 +417,7 @@ export function revokedName(state: unknown): string | undefined {
 export function revokedNotice(name: string): RevokeMessage {
   return {
     title: `Доступ участника ${name} отозван`,
-    text: 'Назначения участника в организации закрыты. Учётная запись сохранена.',
+    text: 'Участник больше не видит рестораны организации. Его аккаунт остался.',
   };
 }
 

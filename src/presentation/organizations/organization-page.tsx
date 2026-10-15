@@ -53,7 +53,7 @@ function AdminRestaurants({
       {added !== undefined && (
         <FormMessage
           tone="success"
-          title={`Ресторан «${added}» добавлен. Подготовка обычно занимает до минуты.`}
+          title={`Ресторан «${added}» добавлен. Настройка обычно занимает до минуты.`}
         />
       )}
       {deleted !== undefined && (
@@ -102,7 +102,7 @@ function StaffOrganization({
         <ReadOnlyValue
           label="Часовой пояс организации"
           value={zoneLabel(timeZone, now())}
-          note={`Часовой пояс организации: ${zoneLabel(timeZone, now())}. Изменить его может администратор организации.`}
+          note="Изменить его может только администратор организации."
         />
       </Card>
       <ButtonLink
@@ -110,7 +110,7 @@ function StaffOrganization({
         to="/app/organizations/new"
         alignSelf="flex-start"
       >
-        Создать предприятие
+        Создать организацию
       </ButtonLink>
     </OrganizationLayout>
   );

@@ -216,7 +216,7 @@ function InviteForm({ organization }: { organization: OrganizationAccess }) {
           <FieldMessage
             id="invite-email-hint"
             error={emailError}
-            hint="На этот адрес придёт письмо со ссылкой. Существующий пользователь войдёт своей учётной записью."
+            hint="На этот адрес придёт письмо со ссылкой. Если аккаунт уже есть, человек просто войдёт в него."
           />
           {state.kind === 'member' && !own && (
             <ButtonLink

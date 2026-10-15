@@ -11,7 +11,7 @@ import { ButtonLink } from '@/presentation/ui/actions';
 import { Card } from '@/presentation/ui/card';
 import { InfoNotice } from '@/presentation/ui/states';
 import { organizationDeletionNotice } from './deletion';
-import { zoneLabel } from '@/presentation/ui/zones';
+import { zoneCity } from '@/presentation/ui/zones';
 import { organizationPath, restaurantCount } from './format';
 import {
   CardSkeletons,
@@ -40,7 +40,6 @@ function OrganizationCard({
 }: {
   organization: OrganizationAccess;
 }) {
-  const { now } = useServices();
   return (
     <CardLink to={organizationPath(organization.orgID)}>
       <chakra.h2 textStyle="heading.h3">{organization.name}</chakra.h2>
@@ -52,7 +51,7 @@ function OrganizationCard({
       </Text>
       {organization.admin && (
         <Text textStyle="caption.default" color="text.secondary">
-          {zoneLabel(organization.settings.timeZone, now())}
+          {`Часовой пояс: ${zoneCity(organization.settings.timeZone)}`}
         </Text>
       )}
     </CardLink>
@@ -65,12 +64,11 @@ function NoOrganizations() {
     <Card as="section">
       <chakra.h2 textStyle="heading.h3">Нет организаций</chakra.h2>
       <Text textStyle="body.default" color="text.secondary">
-        Учётная запись пока не входит ни в одну организацию. Доступ
-        предоставляет администратор организации по приглашению на почту. Также
-        можно создать собственное предприятие.
+        Вы пока не состоите ни в одной организации. Попросите администратора
+        прислать приглашение — или создайте свою.
       </Text>
       <ButtonLink to="/app/organizations/new" alignSelf="flex-start">
-        Создать предприятие
+        Создать организацию
       </ButtonLink>
     </Card>
   );
@@ -109,7 +107,7 @@ export function OrganizationsPage() {
           to="/app/organizations/new"
           alignSelf="flex-start"
         >
-          Создать предприятие
+          Создать организацию
         </ButtonLink>
         <Stack as="ul" gap={{ base: '4', sm: '6' }} listStyleType="none">
           {organizations.map((organization) => (
@@ -126,7 +124,7 @@ export function OrganizationsPage() {
       header={
         <PageHeader
           title="Организации и рестораны"
-          caption="Организации, в которых у вас есть доступ, и ваши роли"
+          caption="Организации, к которым у вас есть доступ, и ваши роли"
         />
       }
     >

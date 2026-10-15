@@ -92,8 +92,8 @@ export function DeleteRestaurantDialog({
       ) : (
         <>
           <Text textStyle="body.default">
-            Ресторан станет недоступен всем участникам, его назначения будут
-            закрыты. Восстановить ресторан нельзя.
+            Ресторан станет недоступен всем участникам, все роли в нём снимутся.
+            Восстановить ресторан нельзя.
           </Text>
           {deleting && (
             <Text role="status" textStyle="body.default">

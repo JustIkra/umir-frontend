@@ -153,10 +153,11 @@ export function AdminRoleCard({
         ) : (
           <>
             <Text textStyle="body.default">
-              {`${name} перестанет быть администратором организации «${organization.name}». Назначения в ресторанах сохранятся.`}
+              {`${name} перестанет быть администратором организации «${organization.name}». Роли в ресторанах останутся.`}
             </Text>
             <Text textStyle="caption.default" color="text.secondary">
-              Если назначений нет, участник не увидит ни одного ресторана.
+              Если ролей в ресторанах нет, участник не увидит ни одного
+              ресторана.
             </Text>
           </>
         )}

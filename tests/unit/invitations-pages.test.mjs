@@ -85,42 +85,38 @@ const status = (state, delivery, resendAllowed = true) => {
 test('invitationStatus names the delivery of a pending invitation', () => {
   const both = ['cancel', 'resend'];
   assert.deepEqual(status('pending', 'pending'), [
-    'Принято к отправке',
+    'Отправляется',
     'neutral',
     both,
   ]);
   assert.deepEqual(status('pending', 'retry'), [
-    'Принято к отправке',
+    'Отправляется',
     'neutral',
     both,
   ]);
   assert.deepEqual(status('pending', 'sending'), [
-    'Ожидает доставки',
+    'Отправляется',
     'neutral',
     both,
   ]);
-  assert.deepEqual(status('pending', 'sent'), [
-    'Ожидает принятия',
-    'neutral',
-    both,
-  ]);
+  assert.deepEqual(status('pending', 'sent'), ['Отправлено', 'neutral', both]);
   assert.deepEqual(status('pending', 'unknown'), [
-    'Доставка не подтверждена',
+    'Письмо могло не дойти',
     'neutral',
     both,
   ]);
   assert.deepEqual(status('pending', 'failed'), [
-    'Ошибка отправки',
+    'Не получилось отправить',
     'error',
     both,
   ]);
   assert.deepEqual(status('pending', 'suppressed'), [
-    'Ссылка не отправлена',
+    'Не отправлено',
     'neutral',
     both,
   ]);
   assert.deepEqual(status('pending', undefined), [
-    'Ссылка не отправлена',
+    'Не отправлено',
     'neutral',
     both,
   ]);
@@ -160,12 +156,12 @@ test('invitationDates count the creation from the end of the term', () => {
   assert.equal(invitationLifetimeMs, 7 * 24 * 3600 * 1000);
   assert.equal(
     invitationDates(pending, 'Europe/Moscow'),
-    'Создано 13.10.2026 14:30 · действует до 20.10.2026 14:30',
+    'Создано 13.10.2026, 14:30 · действует до 20.10.2026, 14:30',
   );
   // In another zone the same moments read differently.
   assert.equal(
     invitationDates(pending, 'Asia/Yekaterinburg'),
-    'Создано 13.10.2026 16:30 · действует до 20.10.2026 16:30',
+    'Создано 13.10.2026, 16:30 · действует до 20.10.2026, 16:30',
   );
   assert.equal(
     invitationDates(
@@ -174,7 +170,7 @@ test('invitationDates count the creation from the end of the term', () => {
       }),
       'Europe/Moscow',
     ),
-    'Истекло 05.10.2026 10:00',
+    'Истекло 05.10.2026, 10:00',
   );
   for (const state of ['accepted', 'revoked', 'suppressed']) {
     assert.equal(
@@ -184,7 +180,7 @@ test('invitationDates count the creation from the end of the term', () => {
         }),
         'Europe/Moscow',
       ),
-      'Создано 10.10.2026 09:12',
+      'Создано 10.10.2026, 09:12',
     );
   }
   assert.equal(
@@ -345,14 +341,14 @@ test('inviteMessage says what the frames IV02 to IV09 say', () => {
   assert.equal(message({ kind: 'editing' }), undefined);
   assert.deepEqual(message({ kind: 'invalid', email: 'required' }), {
     title: 'Приглашение не отправлено',
-    text: 'Заполните поля, отмеченные ниже.',
+    text: 'Проверьте отмеченные поля.',
   });
   assert.deepEqual(message({ kind: 'invalid' }), {
     title: 'Приглашение не отправлено',
-    text: 'Проверьте почту и назначения и повторите отправку.',
+    text: 'Проверьте почту и роли и отправьте ещё раз.',
   });
   assert.deepEqual(message({ kind: 'member', membershipID: 'm' }), {
-    text: 'Пользователь с этой почтой уже состоит в организации. Назначения меняются на вкладке «Участники».',
+    text: 'Этот человек уже в организации. Роли можно поменять во вкладке «Участники».',
   });
   assert.deepEqual(
     message({
@@ -360,36 +356,40 @@ test('inviteMessage says what the frames IV02 to IV09 say', () => {
       expiresAt: Date.parse('2026-10-17T09:12:00+03:00'),
     }),
     {
-      text: 'На эту почту уже отправлено приглашение, оно действует до 17.10.2026 09:12 (Москва, UTC+3). Отмените его, чтобы отправить новое.',
+      text: 'На эту почту уже отправили приглашение, оно действует до 17.10.2026, 09:12 (Москва). Отмените его, чтобы отправить новое.',
     },
   );
   assert.deepEqual(message({ kind: 'invited', expiresAt: undefined }), {
-    text: 'На эту почту уже отправлено приглашение. Отмените его, чтобы отправить новое.',
+    text: 'На эту почту уже отправили приглашение. Отмените его, чтобы отправить новое.',
   });
   assert.deepEqual(message({ kind: 'sending' }), { text: 'Отправляем…' });
   assert.deepEqual(message({ kind: 'unavailable' }), {
     title: 'Приглашение не отправлено',
-    text: 'Сервис авторизации не отвечает. Данные сохранены в форме, повторите отправку через несколько минут.',
+    text: 'Не получилось. Попробуйте через пару минут. Данные остались в форме.',
   });
   assert.deepEqual(message({ kind: 'unknown' }), {
-    title: 'Результат отправки неизвестен',
-    text: 'Ответ сервиса не получен. Приглашение могло быть создано. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+    title: 'Не знаем, отправлено ли приглашение',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
   });
   assert.deepEqual(message({ kind: 'limited', seconds: 600 }), {
     title: 'Приглашение не отправлено',
-    text: 'Превышен лимит приглашений на эту почту. Повторите через 10 мин.',
+    text: 'На этот адрес уже отправили много приглашений. Попробуйте через 10 минут.',
   });
   assert.equal(
     message({ kind: 'limited', seconds: 61 }).text,
-    'Превышен лимит приглашений на эту почту. Повторите через 2 мин.',
+    'На этот адрес уже отправили много приглашений. Попробуйте через 2 минуты.',
+  );
+  assert.equal(
+    message({ kind: 'limited', seconds: 60 }).text,
+    'На этот адрес уже отправили много приглашений. Попробуйте через 1 минуту.',
   );
   assert.deepEqual(message({ kind: 'delivery' }), {
     title: 'Приглашение не отправлено',
-    text: 'Отправка писем не настроена. Обратитесь к администратору сервиса.',
+    text: 'Сейчас не получается отправлять письма. Напишите в поддержку.',
   });
   assert.deepEqual(message({ kind: 'forbidden' }), {
     title: 'Приглашение не отправлено',
-    text: 'Выбранный ресторан ещё не готов или роль администратора снята.',
+    text: 'Ресторан ещё настраивается, или у вас больше нет роли администратора.',
   });
 });
 
@@ -440,8 +440,8 @@ test('pendingExpiry finds the pending invitation of the address', () => {
 
 test('the notices of the invitations name the address', () => {
   assert.deepEqual(invitedNotice('e.titova@restoran.example'), {
-    title: 'Приглашение для e.titova@restoran.example принято к отправке',
-    text: 'Статус доставки обновится в списке.',
+    title: 'Приглашение для e.titova@restoran.example отправлено',
+    text: 'В списке будет видно, дошло ли письмо.',
   });
   assert.deepEqual(cancelledNotice('o.lebedeva@restoran.example'), {
     title: 'Приглашение для o.lebedeva@restoran.example отменено',
@@ -456,7 +456,7 @@ test('the notices of the invitations name the address', () => {
     ),
     {
       title: 'Повторное приглашение',
-      text: 'Почта, рестораны и роли взяты из приглашения от 28.09.2026. Проверьте их перед отправкой.',
+      text: 'Мы подставили почту, рестораны и роли из приглашения от 28.09.2026. Проверьте их перед отправкой.',
     },
   );
 });
@@ -473,13 +473,13 @@ test('resendResult says what the link did', () => {
   assert.deepEqual(result({ kind: 'done', value: {} }), {
     tone: 'success',
     notice: {
-      title: 'Ссылка для a@x.ru принята к отправке',
-      text: 'Статус доставки обновится в списке.',
+      title: 'Ссылка для a@x.ru отправлена ещё раз',
+      text: 'В списке будет видно, дошло ли письмо.',
     },
   });
   assert.equal(
     result({ kind: 'limited', seconds: 42 }).notice.text,
-    'Повторная отправка будет доступна через 42 с.',
+    'Отправить ещё раз можно будет через 42 секунды.',
   );
   assert.equal(
     result({ kind: 'closed' }).notice.title,
@@ -487,7 +487,17 @@ test('resendResult says what the link did', () => {
   );
   assert.equal(result({ kind: 'unknown', code: 'X' }), undefined);
   assert.equal(result({ kind: 'ended' }), undefined);
-  assert.equal(result({ kind: 'unavailable', code: 'X' }).tone, 'error');
+  assert.deepEqual(result({ kind: 'unavailable', code: 'X' }), {
+    tone: 'error',
+    notice: {
+      title: 'Ссылка не отправлена',
+      text: 'Не получилось. Попробуйте через пару минут.',
+    },
+  });
+  assert.equal(
+    result({ kind: 'delivery' }).notice.text,
+    'Сейчас не получается отправлять письма. Напишите в поддержку.',
+  );
 });
 
 test('cancelMessage says what the frames CX03 to CX05 say', () => {
@@ -496,7 +506,7 @@ test('cancelMessage says what the frames CX03 to CX05 say', () => {
   assert.equal(cancelMessage({ kind: 'cancelling' }, email), undefined);
   assert.deepEqual(cancelMessage({ kind: 'accepted' }, email), {
     title: 'Приглашение уже принято',
-    text: 'Пользователь с почтой o.lebedeva@restoran.example уже стал участником организации. Чтобы закрыть доступ, отзовите его на вкладке «Участники».',
+    text: 'Человек с почтой o.lebedeva@restoran.example уже в организации. Закрыть ему доступ можно во вкладке «Участники».',
   });
   assert.deepEqual(cancelMessage({ kind: 'closed' }, email), {
     title: 'Приглашение уже недействительно',
@@ -504,11 +514,15 @@ test('cancelMessage says what the frames CX03 to CX05 say', () => {
   });
   assert.deepEqual(cancelMessage({ kind: 'unavailable' }, email), {
     title: 'Приглашение не отменено',
-    text: 'Сервис авторизации не отвечает. Повторите через несколько минут.',
+    text: 'Не получилось. Попробуйте через пару минут.',
   });
   assert.deepEqual(cancelMessage({ kind: 'unknown' }, email), {
-    title: 'Результат отмены неизвестен',
-    text: 'Ответ сервиса не получен. Приглашение могло быть отменено. Проверка продолжит ту же попытку.',
+    title: 'Не знаем, отменено ли приглашение',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
+  });
+  assert.deepEqual(cancelMessage({ kind: 'limited', seconds: 21 }, email), {
+    title: 'Приглашение не отменено',
+    text: 'Слишком много попыток. Попробуйте через 21 секунду.',
   });
 });
 
@@ -569,15 +583,16 @@ test('IN01 lists the invitations of Auth, the newest first', async () => {
       page.indexOf('s.fedorov@restoran.example'),
   );
   assert.match(page, /Склад и Официант: На Садовой/);
-  assert.match(page, /Ожидает принятия/);
+  assert.match(page, /Отправлено/);
   assert.match(
     page,
-    /Создано 10\.10\.2026 09:12 · действует до 17\.10\.2026 09:12/,
+    /Создано 10\.10\.2026, 09:12 · действует до 17\.10\.2026, 09:12/,
   );
-  assert.match(page, /Истекло 05\.10\.2026 10:00/);
+  assert.match(page, /Истекло 05\.10\.2026, 10:00/);
   // Of the two roles of the old invitation, the preparing restaurant is named.
   assert.match(page, /Официант: На Садовой; На Чехова/);
-  assert.match(page, /Время — Москва, UTC\+3\./);
+  assert.match(page, /Время указано по часовому поясу организации: Москва\./);
+  assert.ok(!page.includes('UTC'));
   assert.ok(hrefs(html).includes(newPath));
   assert.ok(!page.includes('Ирина'));
 });
@@ -636,7 +651,7 @@ test('IN03 shows no rows while the list is read', async () => {
     }),
   );
   assert.ok(!page.includes('Приглашений нет'));
-  assert.ok(!page.includes('Список приглашений не получен'));
+  assert.ok(!page.includes('Не удалось загрузить приглашения'));
 });
 
 test('IN04 says the list was not received, not that it is empty', async () => {
@@ -646,12 +661,9 @@ test('IN04 says the list was not received, not that it is empty', async () => {
       organizations: { invitations: failedRead('AuthUnavailable', 503) },
     }),
   );
-  assert.match(page, /Список приглашений не получен/);
-  assert.match(
-    page,
-    /Сервис авторизации не отвечает\. Это не означает, что приглашений нет\./,
-  );
-  assert.match(page, /Повторить загрузку/);
+  assert.match(page, /Не удалось загрузить приглашения/);
+  assert.match(page, /Попробуйте ещё раз\./);
+  assert.match(page, /Попробовать ещё раз/);
   assert.ok(!page.includes('Приглашений нет'));
 });
 
@@ -664,8 +676,11 @@ test('a resend without a known outcome is checked from the list', async () => {
       }),
     ),
   );
-  assert.match(page, /Результат повторной отправки неизвестен/);
-  assert.match(page, /o\.lebedeva@restoran\.example/);
+  assert.match(
+    page,
+    /Не знаем, отправлена ли ссылка для o\.lebedeva@restoran\.example/,
+  );
+  assert.match(page, /Связь прервалась\./);
   assert.match(page, /Проверить результат/);
 });
 
@@ -677,7 +692,7 @@ test('a resend that is merely in flight does not show the unknown outcome', asyn
     }),
   );
   const page = text(html);
-  assert.ok(!page.includes('Результат повторной отправки неизвестен'));
+  assert.ok(!page.includes('Не знаем, отправлена ли ссылка'));
   assert.ok(!html.includes('role="alert"'));
   // The row stays locked while the request is on its way.
   assert.match(
@@ -696,7 +711,7 @@ test('a cancellation that is merely in flight does not show the unknown outcome'
       }),
     ),
   );
-  assert.ok(!page.includes('Результат отмены неизвестен'));
+  assert.ok(!page.includes('Не знаем, отменено ли приглашение'));
 });
 
 test('a cancellation without a known outcome is checked from the list', async () => {
@@ -708,7 +723,10 @@ test('a cancellation without a known outcome is checked from the list', async ()
       }),
     ),
   );
-  assert.match(page, /Результат отмены неизвестен/);
+  assert.match(
+    page,
+    /Не знаем, отменено ли приглашение для o\.lebedeva@restoran\.example/,
+  );
   assert.match(page, /Проверить результат/);
 });
 
@@ -732,15 +750,19 @@ test('IV01 is an empty form with the term of seven days', async () => {
   assert.equal(checkedBoxes(html), 0);
   assert.match(
     page,
-    /Приглашение действует 7 дней: до 21\.10\.2026 10:00 \(Москва, UTC\+3\)\./,
+    /Приглашение действует 7 дней: до 21\.10\.2026, 10:00 \(Москва\)\./,
   );
+  assert.match(page, /Если аккаунт уже есть, человек просто войдёт в него\./);
   assert.match(page, /Отправить приглашение/);
   assert.ok(hrefs(html).includes(listPath));
 });
 
 test('the matrix of the invitation leaves out the restaurants that are not ready', async () => {
   const html = await renderRoute(newPath, withInvitations([]));
-  assert.match(text(html), /Готовится — доступ откроется после подготовки/);
+  assert.match(
+    text(html),
+    /Настраивается — доступ откроется, когда ресторан будет готов/,
+  );
   const boxes = html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
   assert.equal(boxes.length, 6);
   // The two boxes of «На Чехова» are not available.
@@ -759,7 +781,7 @@ test('IV10 fills the form from the old invitation, ready restaurants only', asyn
   assert.match(page, /Повторное приглашение/);
   assert.match(
     page,
-    /Почта, рестораны и роли взяты из приглашения от 28\.09\.2026\. Проверьте их перед отправкой\./,
+    /Мы подставили почту, рестораны и роли из приглашения от 28\.09\.2026\. Проверьте их перед отправкой\./,
   );
 });
 
@@ -785,10 +807,10 @@ test('IV09 shows the invitation that has no known outcome as it was sent', async
     }),
   );
   const page = text(html);
-  assert.match(page, /Результат отправки неизвестен/);
+  assert.match(page, /Не знаем, отправлено ли приглашение/);
   assert.match(
     page,
-    /Повторная отправка не требуется: проверка продолжит ту же попытку\./,
+    /Связь прервалась\. Нажмите «Проверить результат» — повторно ничего не отправится\./,
   );
   assert.match(page, /Проверить результат/);
   const email = field(html, 'email');

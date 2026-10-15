@@ -18,11 +18,11 @@ import {
 
 // TZ04: nothing in the list matches the search.
 export const noZonesMessage =
-  'Ничего не найдено. Введите город или идентификатор зоны, например Asia/Yekaterinburg.';
+  'Ничего не нашли. Попробуйте ввести город, например «Екатеринбург».';
 
 // TZ09 at the zone field.
-export const zoneUnsupported = (timeZone: string) =>
-  `Зона «${timeZone}» не поддерживается сервисом. Выберите зону из списка.`;
+export const zoneUnsupported =
+  'Этот часовой пояс недоступен. Выберите из списка.';
 
 // TZ03: the zones whose city, identifier or offset (as of nowMs) holds the
 // query, in the order of the list.
@@ -36,7 +36,8 @@ export function filterZones(query: string, nowMs: number): readonly string[] {
 // place under the hint (a non-modal dialog, Esc handled here); on 390 it is a
 // modal bottom sheet. The field is controlled: value is an IANA identifier and
 // onChange hears the chosen one; the offsets are those of the current moment.
-// The search filters the list by city and identifier (TZ03, TZ04).
+// The list names the city and the offset, never the identifier; the search
+// still finds a zone by its identifier (TZ03, TZ04).
 export function TimezoneField({
   id,
   hint,
@@ -177,7 +178,7 @@ export function TimezoneField({
             </chakra.button>
           </Flex>
           <SearchInput
-            label="Найти город или зону"
+            label="Найти город"
             value={query}
             onChange={(event) => {
               setQuery(event.currentTarget.value);
@@ -227,13 +228,6 @@ export function TimezoneField({
                       textStyle={selected ? 'body.strong' : 'body.default'}
                     >
                       {zoneCity(option)}
-                    </Text>
-                    <Text
-                      as="span"
-                      textStyle="numeric.default"
-                      color="text.secondary"
-                    >
-                      {option}
                     </Text>
                     <Text
                       as="span"

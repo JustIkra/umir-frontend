@@ -96,8 +96,10 @@ test('OG01 lists the organizations of access with the role and the count', async
   assert.match(page, /Сотрудник/);
   assert.equal(page.match(/2 ресторана/g)?.length, 1);
   assert.match(page, /1 ресторан(?!а)/);
-  assert.match(page, /Екатеринбург — Asia\/Yekaterinburg, UTC\+5/);
-  assert.ok(!page.includes('Москва — Europe/Moscow'));
+  assert.match(page, /Часовой пояс: Екатеринбург/);
+  assert.ok(!page.includes('Asia/Yekaterinburg'));
+  assert.ok(!page.includes('UTC'));
+  assert.ok(!page.includes('Часовой пояс: Москва'));
   const links = hrefs(html);
   assert.ok(links.includes(`/app/organizations/${ASIA}`));
   assert.ok(links.includes(`/app/organizations/${ORG}`));
@@ -109,7 +111,11 @@ test('OG04 explains that the account is in no organization', async () => {
     access: readyAccess([]),
   });
   assert.match(text(html), /Нет организаций/);
-  assert.match(text(html), /Также можно создать собственное предприятие/);
+  assert.match(
+    text(html),
+    /Вы пока не состоите ни в одной организации\. Попросите администратора прислать приглашение — или создайте свою\./,
+  );
+  assert.match(text(html), /Создать организацию/);
   assert.ok(hrefs(html).includes('/app/organizations/new'));
 });
 
@@ -117,9 +123,9 @@ test('OG06 says the list was not received when access is unverified', async () =
   const page = text(
     await renderRoute('/app/organizations', { access: unverified() }),
   );
-  assert.match(page, /Список организаций не получен/);
-  assert.match(page, /Это не означает, что организаций нет/);
-  assert.match(page, /Повторить загрузку/);
+  assert.match(page, /Не удалось загрузить список организаций/);
+  assert.match(page, /Попробуйте ещё раз\./);
+  assert.match(page, /Попробовать ещё раз/);
   assert.ok(!page.includes('Нет организаций'));
 });
 
@@ -134,7 +140,7 @@ test('OG05 shows skeletons while access is read', async () => {
   assert.equal(h1(loading), 'Организации и рестораны');
   assert.equal(ariaHidden(loading), ariaHidden(lost) + 1);
   assert.ok(!text(loading).includes('Нет организаций'));
-  assert.ok(!text(loading).includes('Список организаций не получен'));
+  assert.ok(!text(loading).includes('Не удалось загрузить список организаций'));
 });
 
 test('an earlier answer stays shown when the check failed', async () => {
@@ -144,7 +150,7 @@ test('an earlier answer stays shown when the check failed', async () => {
     }),
   );
   assert.match(page, /Азия Групп/);
-  assert.ok(!page.includes('Список организаций не получен'));
+  assert.ok(!page.includes('Не удалось загрузить список организаций'));
 });
 
 test('OG02 shows the administrator tabs and the restaurants', async () => {
@@ -153,10 +159,7 @@ test('OG02 shows the administrator tabs and the restaurants', async () => {
   });
   const page = text(main(html));
   assert.equal(h1(html), 'Восток Фуд');
-  assert.match(
-    page,
-    /Администратор · 2 ресторана · Москва — Europe\/Moscow, UTC\+3/,
-  );
+  assert.match(page, /Администратор · 2 ресторана · Москва/);
   for (const tab of [
     'Рестораны',
     'Участники',
@@ -170,7 +173,7 @@ test('OG02 shows the administrator tabs and the restaurants', async () => {
   assert.match(page, /Добавить ресторан/);
   assert.match(page, /Готов к работе/);
   assert.ok(links.includes(`/app/r/${R}`));
-  assert.match(page, /Подготавливается/);
+  assert.match(page, /Настраивается/);
   assert.ok(!links.includes(`/app/r/${PREPARING}`));
   assert.match(page, /Ваша роль: Администратор/);
 });
@@ -181,11 +184,11 @@ test('RS07 marks a stalled preparation and offers to watch it again', async () =
     organizations: { operations: [stalledPreparation] },
   });
   const page = text(html);
-  assert.match(page, /Подготовка не завершена/);
-  assert.match(page, /Рабочее пространство ресторана не подготовлено\./);
-  assert.match(page, /Повторить подготовку/);
+  assert.match(page, /Не настроен/);
+  assert.match(page, /Ресторан не настроился\./);
+  assert.match(page, /Попробовать снова/);
   assert.ok(!hrefs(html).includes(`/app/r/${PREPARING}`));
-  assert.ok(!text(main(html)).includes('Подготавливается'));
+  assert.ok(!text(main(html)).includes('Настраивается'));
 });
 
 test('a preparation still followed shows no retry', async () => {
@@ -199,8 +202,8 @@ test('a preparation still followed shows no retry', async () => {
       }),
     ),
   );
-  assert.match(page, /Подготавливается/);
-  assert.ok(!page.includes('Повторить подготовку'));
+  assert.match(page, /Настраивается/);
+  assert.ok(!page.includes('Попробовать снова'));
 });
 
 test('OG03 shows a staff member own restaurants and the read-only zone', async () => {
@@ -208,7 +211,8 @@ test('OG03 shows a staff member own restaurants and the read-only zone', async (
   const page = text(main(html));
   assert.match(page, /Ваши рестораны и роли/);
   assert.match(page, /Ваши роли: Склад, Официант/);
-  assert.match(page, /Изменить его может администратор организации/);
+  assert.match(page, /Москва \(UTC\+3\)/);
+  assert.match(page, /Изменить его может только администратор организации/);
   assert.match(page, /Сотрудник · 1 ресторан/);
   assert.ok(!hrefs(html).includes(`/app/organizations/${ORG}/members`));
   assert.ok(!page.includes('Участники'));
@@ -219,8 +223,8 @@ test('the organization page without an answer shows OG06, not a 404', async () =
   const page = text(
     await renderRoute(`/app/organizations/${ORG}`, { access: unverified() }),
   );
-  assert.match(page, /Список организаций не получен/);
-  assert.match(page, /Повторить загрузку/);
+  assert.match(page, /Не удалось загрузить список организаций/);
+  assert.match(page, /Попробовать ещё раз/);
 });
 
 test('unknown and malformed organizations show the 404 page', async () => {

@@ -26,7 +26,7 @@ function codePoints(value: string): number {
 
 const common: Readonly<Record<Exclude<NameError, 'required'>, string>> = {
   long: 'Не длиннее 100 символов',
-  control: 'Название не может содержать перевод строки',
+  control: 'Название — в одну строку',
 };
 
 export function organizationNameMessage(error: NameError): string {

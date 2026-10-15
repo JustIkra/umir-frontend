@@ -14,6 +14,7 @@ import {
   TextInput,
 } from '@/presentation/ui/form';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { plural } from '@/presentation/ui/plural';
 import { UnknownOutcomeAlert } from '@/presentation/ui/states';
 import {
   nameError,
@@ -48,6 +49,8 @@ export type CreationState =
 
 export type CreationTone = 'error' | 'unknown' | 'info' | 'success';
 
+const notCreated = 'Организация не создана';
+
 export function creationTone(state: CreationState): CreationTone {
   switch (state.kind) {
     case 'unknown':
@@ -78,63 +81,60 @@ export function creationMessage(
   switch (state.kind) {
     case 'invalid':
       return {
-        title: 'Предприятие не создано',
+        title: notCreated,
         text: state.rejected
-          ? 'Сервис не принял введённые данные. Проверьте названия и повторите отправку.'
-          : 'Заполните поля, отмеченные ниже.',
+          ? 'Проверьте названия и отправьте ещё раз.'
+          : 'Проверьте отмеченные поля.',
       };
     case 'preparing':
       return {
-        title: 'Ресторан подготавливается',
-        text: 'Подготовка ресторана обычно занимает до минуты. Страницу можно не обновлять.',
+        title: 'Настраиваем ресторан',
+        text: 'Обычно это занимает до минуты. Страницу обновлять не нужно.',
       };
     case 'ready':
       return {
-        title: `Предприятие «${name}» готово к работе`,
-        text: 'Организация создана, ресторан подготовлен.',
+        title: `Организация «${name}» готова к работе`,
+        text: 'Организация создана, ресторан настроен.',
       };
     case 'stalled':
       return {
-        title: 'Подготовка ресторана не завершена',
-        text: 'Организация создана, рабочее пространство ресторана не подготовлено. Повторите подготовку — организация повторно не создаётся.',
+        title: 'Ресторан не настроился',
+        text: 'Организация создана. Нажмите «Попробовать снова» — организация не задвоится.',
       };
     case 'unknown':
       return {
-        title: 'Результат создания неизвестен',
-        text: 'Ответ сервиса не получен. Предприятие могло быть создано. Повторная отправка не требуется: проверка продолжит ту же попытку.',
+        title: 'Не знаем, создана ли организация',
+        text: 'Связь прервалась. Нажмите «Проверить результат» — организация не задвоится.',
       };
     case 'not-created':
       return {
-        title: 'Предприятие не создано',
+        title: notCreated,
         text:
           state.seconds !== undefined
-            ? `Слишком много попыток. Данные сохранены в форме, повторите отправку через ${String(state.seconds)} с.`
+            ? `Слишком много попыток. Попробуйте через ${String(state.seconds)} ${plural(state.seconds, 'секунду', 'секунды', 'секунд')}. Данные остались в форме.`
             : state.checked
-              ? 'Проверка показала, что попытка не завершена. Введённые данные сохранены, форму можно отправить повторно.'
-              : 'Сервис авторизации не отвечает. Данные сохранены в форме, повторите отправку через несколько минут.',
+              ? 'Не получилось. Данные остались в форме — отправьте ещё раз.'
+              : 'Не получилось. Попробуйте через пару минут. Данные остались в форме.',
       };
     case 'forbidden':
       return {
-        title: 'Создание предприятия недоступно',
-        text: 'Политика сервиса не разрешает этой учётной записи создавать организации. Доступ к существующей организации предоставляет её администратор.',
+        title: 'Создать организацию нельзя',
+        text: 'Вам пока нельзя создавать организации. Попросите администратора прислать приглашение.',
       };
     case 'untracked':
       return {
-        title: 'Состояние подготовки неизвестно',
-        text: 'Организация создана, но получить состояние подготовки не удалось. Откройте список организаций, чтобы проверить ресторан.',
+        title: 'Не знаем, готов ли ресторан',
+        text: 'Организация создана. Откройте список организаций, чтобы проверить.',
       };
     case 'zone':
-      return {
-        title: 'Предприятие не создано',
-        text: 'Зона не поддерживается сервисом. Выберите зону из списка.',
-      };
+      return { title: notCreated, text: zoneUnsupported };
     case 'editing':
     case 'sending':
       return undefined;
   }
 }
 
-// The state after the answer to «Создать предприятие» (checked: the answer to
+// The state after the answer to «Создать организацию» (checked: the answer to
 // the same attempt sent again). A refusal Auth gives without a screen of its
 // own means the same as no answer: nothing was created, the form stays.
 export function refusalState(
@@ -197,7 +197,7 @@ export function followedCreation(
 
 const defaultZone = 'Europe/Moscow';
 
-// Figma NE01–NE12. «Создать предприятие» sends one command; the preparation
+// Figma NE01–NE12. «Создать организацию» sends one command; the preparation
 // of the first restaurant is followed by the tracker that the command started.
 export function NewOrganizationPage() {
   const { organizations } = useServices();
@@ -256,8 +256,8 @@ export function NewOrganizationPage() {
   const tone = creationTone(state);
   const header = (
     <PageHeader
-      title="Создать предприятие"
-      caption="Организация объединяет рестораны. Первый ресторан создаётся вместе с ней."
+      title="Создать организацию"
+      caption="Организация объединяет ваши рестораны. Первый ресторан создадим вместе с ней."
     />
   );
 
@@ -306,7 +306,7 @@ export function NewOrganizationPage() {
                       lifecycles.retry(state.operationID);
                     }}
                   >
-                    Повторить подготовку
+                    Попробовать снова
                   </Button>
                 ) : undefined
               }
@@ -358,7 +358,7 @@ export function NewOrganizationPage() {
                         void submit();
                       }}
                     >
-                      Отправить повторно
+                      Отправить ещё раз
                     </Button>
                   ) : undefined
                 }
@@ -390,7 +390,7 @@ export function NewOrganizationPage() {
             error={
               organizationError && organizationNameMessage(organizationError)
             }
-            hint="Отображается в меню и письмах-приглашениях."
+            hint="Его увидят в меню и в письмах с приглашением."
           />
         </FieldGroup>
         <FieldGroup>
@@ -416,10 +416,10 @@ export function NewOrganizationPage() {
         </FieldGroup>
         <TimezoneField
           id="new-organization-zone"
-          hint="Действует для всех ресторанов организации: даты, сроки и границы периодов отображаются в этой зоне."
+          hint="По нему показываем даты и сроки во всех ресторанах организации."
           value={timeZone}
           disabled={locked}
-          error={state.kind === 'zone' ? zoneUnsupported(timeZone) : undefined}
+          error={state.kind === 'zone' ? zoneUnsupported : undefined}
           onChange={(next) => {
             setTimeZone(next);
             if (stored.kind === 'zone') setStored({ kind: 'editing' });
@@ -431,7 +431,7 @@ export function NewOrganizationPage() {
             disabled={locked}
             aria-busy={state.kind === 'sending' ? true : undefined}
           >
-            {state.kind === 'sending' ? 'Создаём…' : 'Создать предприятие'}
+            {state.kind === 'sending' ? 'Создаём…' : 'Создать организацию'}
           </Button>
           <ButtonLink variant="secondary" to="/app/organizations">
             Отмена

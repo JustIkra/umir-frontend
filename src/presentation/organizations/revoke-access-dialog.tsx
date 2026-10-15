@@ -140,7 +140,7 @@ export function RevokeAccessDialog({
       ) : (
         <>
           <Text textStyle="body.default">
-            {`${name} потеряет доступ к организации «${organizationName}» и ко всем назначениям:`}
+            {`${name} потеряет доступ к организации «${organizationName}» и все роли:`}
           </Text>
           {/* A real list for screen readers; Figma draws inline bullets. */}
           <chakra.ul listStyleType="none" textStyle="body.default">
@@ -151,8 +151,7 @@ export function RevokeAccessDialog({
             ))}
           </chakra.ul>
           <Text textStyle="caption.default" color="text.secondary">
-            Учётная запись сохранится. Незавершённые действия участника в
-            организации будут прерваны.
+            Аккаунт участника останется, а его неотправленные данные пропадут.
           </Text>
           {revoking && (
             <Text role="status" textStyle="body.default">

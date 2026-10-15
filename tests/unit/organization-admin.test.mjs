@@ -79,13 +79,14 @@ test('adminMessage says what the role card says', () => {
   assert.equal(adminMessage({ kind: 'saving' })?.text, 'Сохраняем…');
   assert.deepEqual(adminMessage({ kind: 'done', admin: true }), {
     title: 'Роль администратора назначена',
-    text: 'Участник управляет участниками, приглашениями, ресторанами и настройками организации.',
+    text: 'Теперь участник управляет участниками, приглашениями, ресторанами и настройками организации.',
     tone: 'success',
   });
-  assert.equal(
-    adminMessage({ kind: 'done', admin: false })?.title,
-    'Роль администратора снята',
-  );
+  assert.deepEqual(adminMessage({ kind: 'done', admin: false }), {
+    title: 'Роль администратора снята',
+    text: 'Участник больше не управляет организацией. Его роли в ресторанах остались.',
+    tone: 'success',
+  });
   assert.deepEqual(adminMessage({ kind: 'last-admin' }), {
     title: 'Роль не снята',
     text: 'В организации должен остаться хотя бы один администратор.',
@@ -93,13 +94,13 @@ test('adminMessage says what the role card says', () => {
   });
   assert.equal(adminMessage({ kind: 'conflict' })?.tone, 'error');
   assert.match(adminMessage({ kind: 'conflict' })?.text ?? '', /изменились/);
-  assert.match(
-    adminMessage({ kind: 'unavailable' })?.text ?? '',
-    /Сервис авторизации не отвечает/,
+  assert.equal(
+    adminMessage({ kind: 'unavailable' })?.text,
+    'Не получилось. Попробуйте через пару минут.',
   );
   assert.equal(
     adminMessage({ kind: 'unknown' })?.title,
-    'Результат изменения роли неизвестен',
+    'Не знаем, изменилась ли роль',
   );
   assert.equal(adminMessage({ kind: 'forbidden' })?.tone, 'error');
 });
@@ -162,7 +163,7 @@ test('an unsettled role change offers «Проверить результат»'
     pending: new Set([orgKeys.updateMembership(MEMBERSHIP)]),
   });
   const page = text(html);
-  assert.match(page, /Результат изменения роли неизвестен/);
+  assert.match(page, /Не знаем, изменилась ли роль/);
   assert.match(page, /Проверить результат/);
   const button = /<button[^>]*>\s*Назначить администратором\s*<\/button>/.exec(
     html,
@@ -232,9 +233,17 @@ test('deletionMessage names the restaurant or the organization', () => {
     deletionMessage('restaurant', { kind: 'confirm' }, 'X'),
     undefined,
   );
+  assert.deepEqual(deletionMessage('restaurant', { kind: 'unknown' }, 'X'), {
+    title: 'Не знаем, удалён ли ресторан',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
+  });
   assert.equal(
-    deletionMessage('restaurant', { kind: 'unknown' }, 'X')?.title,
-    'Результат удаления неизвестен',
+    deletionMessage('organization', { kind: 'unknown' }, 'X')?.title,
+    'Не знаем, удалена ли организация',
+  );
+  assert.equal(
+    deletionMessage('restaurant', { kind: 'gone' }, 'На Береговой')?.text,
+    'Ресторан «На Береговой» уже удалили — например, в другой вкладке.',
   );
   assert.equal(
     deletionMessage('restaurant', { kind: 'forbidden' }, 'X')?.title,
@@ -253,7 +262,7 @@ test('the administrator deletes a restaurant from its row, staff cannot', async 
   assert.match(page, /Удалить ресторан «На Береговой»\?/);
   assert.match(
     page,
-    /Ресторан станет недоступен всем участникам, его назначения будут закрыты\. Восстановить ресторан нельзя\./,
+    /Ресторан станет недоступен всем участникам, все роли в нём снимутся\. Восстановить ресторан нельзя\./,
   );
   assert.match(page, /Удалить ресторан(?!\s*«)/);
   assert.match(page, /Отмена/);
@@ -267,8 +276,11 @@ test('a deletion of a restaurant without a known outcome is shown in its row', a
     organizations: { pending: new Set([orgKeys.deleteRestaurant(BEREGOVAYA)]) },
   });
   const page = text(html);
-  assert.equal(page.match(/Результат удаления неизвестен/g)?.length, 1);
-  assert.equal(page.match(/Проверить результат/g)?.length, 1);
+  assert.equal(page.match(/Не знаем, удалён ли ресторан/g)?.length, 1);
+  assert.equal(
+    html.match(/<button[^>]*>\s*Проверить результат\s*<\/button>/g)?.length,
+    1,
+  );
 });
 
 test('a deletion of a restaurant that is merely in flight is not an unknown outcome', async () => {
@@ -280,7 +292,7 @@ test('a deletion of a restaurant that is merely in flight is not an unknown outc
       },
     }),
   );
-  assert.ok(!page.includes('Результат удаления неизвестен'));
+  assert.ok(!page.includes('Не знаем, удалён ли ресторан'));
   assert.ok(!page.includes('Проверить результат'));
 });
 
@@ -293,7 +305,7 @@ test('the profile has a section to delete the organization', async () => {
   assert.match(page, /Удаление организации/);
   assert.match(
     page,
-    /Удаление закрывает доступ всем участникам ко всем ресторанам организации\. Учётные записи сохранятся\. Отменить удаление нельзя\./,
+    /Все участники потеряют доступ ко всем ресторанам организации\. Их аккаунты останутся\. Отменить удаление нельзя\./,
   );
   assert.match(page, /Удалить организацию «Северная сеть»\?/);
   assert.match(page, /Введите название организации, чтобы подтвердить/);
@@ -316,7 +328,7 @@ test('a deletion of the organization without a known outcome is shown in the pro
       },
     }),
   );
-  assert.match(page, /Результат удаления неизвестен/);
+  assert.match(page, /Не знаем, удалена ли организация/);
   assert.match(page, /Проверить результат/);
 });
 
@@ -330,7 +342,7 @@ test('a deletion of the organization that is merely in flight is not an unknown 
       },
     }),
   );
-  assert.ok(!page.includes('Результат удаления неизвестен'));
+  assert.ok(!page.includes('Не знаем, удалена ли организация'));
 });
 
 const deletion = (status, name = 'Северная сеть') => ({
@@ -355,11 +367,11 @@ const deletion = (status, name = 'Северная сеть') => ({
 test('organizationDeletionNotice follows the status of the operation', () => {
   assert.equal(
     organizationDeletionNotice(deletion('following'))?.title,
-    'Организация «Северная сеть» удаляется',
+    'Удаляем организацию «Северная сеть»',
   );
   assert.equal(
     organizationDeletionNotice(deletion('stalled'))?.title,
-    'Организация «Северная сеть» удаляется',
+    'Удаляем организацию «Северная сеть»',
   );
   assert.equal(
     organizationDeletionNotice(deletion('finished'))?.title,
@@ -370,13 +382,13 @@ test('organizationDeletionNotice follows the status of the operation', () => {
     'Организация «Северная сеть» удалена',
   );
   // A lost operation does not say the data is cleaned: that is not known.
-  assert.match(
-    organizationDeletionNotice(deletion('finished'))?.text ?? '',
-    /данные очищены/,
+  assert.equal(
+    organizationDeletionNotice(deletion('finished'))?.text,
+    'Все её данные удалены. Аккаунты участников остались.',
   );
   const lost = organizationDeletionNotice(deletion('lost'))?.text ?? '';
-  assert.ok(!lost.includes('данные очищены'));
-  assert.match(lost, /Состояние очистки данных получить не удалось/);
+  assert.ok(!lost.includes('данные удалены'));
+  assert.equal(lost, 'Доступ к ней закрыт. Аккаунты участников остались.');
   assert.equal(
     organizationDeletionNotice({
       ...deletion('following'),
@@ -392,7 +404,7 @@ test('the list of organizations says an organization is being deleted', async ()
     organizations: { operations: [deletion('following')] },
   });
   const page = text(html);
-  assert.match(page, /Организация «Северная сеть» удаляется/);
+  assert.match(page, /Удаляем организацию «Северная сеть»/);
   // The deleted organization was the last one: the list says so as well.
   assert.match(page, /Нет организаций/);
   const done = text(

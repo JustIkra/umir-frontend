@@ -47,10 +47,10 @@ export function BackLink({ to, children }: { to: string; children: string }) {
 export function OrganizationsUnavailable({ onRetry }: { onRetry: () => void }) {
   return (
     <ServiceUnavailableAlert
-      title="Список организаций не получен"
+      title="Не удалось загрузить список организаций"
       onRetry={onRetry}
     >
-      Сервис авторизации не отвечает. Это не означает, что организаций нет.
+      Попробуйте ещё раз.
     </ServiceUnavailableAlert>
   );
 }

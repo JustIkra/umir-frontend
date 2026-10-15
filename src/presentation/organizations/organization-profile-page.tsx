@@ -58,7 +58,7 @@ export function zoneMessage(
       return undefined;
     case 'changed':
       return {
-        text: 'Изменится отображение дат и границы новых календарных периодов. Уже сохранённые сроки партий не изменятся.',
+        text: 'Даты будут показываться по новому часовому поясу. Сроки уже принятых продуктов не изменятся.',
         tone: 'info',
       };
     case 'saving':
@@ -66,37 +66,37 @@ export function zoneMessage(
     case 'saved':
       return {
         title: 'Часовой пояс сохранён',
-        text: `Даты во всех ресторанах организации отображаются в зоне ${zoneLabel(state.timeZone, nowMs)}.`,
+        text: `Даты во всех ресторанах показываются по часовому поясу ${zoneLabel(state.timeZone, nowMs)}.`,
         tone: 'success',
       };
     case 'unsupported':
-      return { text: zoneUnsupported(state.timeZone), tone: 'error' };
+      return { text: zoneUnsupported, tone: 'error' };
     case 'forbidden':
       return {
         title: notSaved,
-        text: 'Роль администратора организации снята. Изменять часовой пояс может администратор организации.',
+        text: 'У вас больше нет роли администратора. Менять часовой пояс может только администратор организации.',
         tone: 'error',
       };
     case 'unavailable':
       return {
         title: notSaved,
-        text: 'Сервис авторизации не отвечает. Выбор сохранён в поле, повторите сохранение через несколько минут.',
+        text: 'Не получилось. Попробуйте через пару минут. Выбранный часовой пояс остался в поле.',
         tone: 'error',
       };
     case 'conflict':
       return {
         title: 'Часовой пояс уже изменён',
-        text: `Другой администратор сохранил ${
+        text: `Другой администратор уже ${
           state.timeZone === undefined
-            ? 'новую зону'
-            : `зону «${zoneLabel(state.timeZone, nowMs)}»`
-        }. Проверьте выбор и сохраните повторно, если нужно.`,
+            ? 'сменил часовой пояс'
+            : `выбрал часовой пояс ${zoneLabel(state.timeZone, nowMs)}`
+        }. Проверьте и, если нужно, сохраните свой ещё раз.`,
         tone: 'error',
       };
     case 'unknown':
       return {
-        title: 'Результат сохранения неизвестен',
-        text: 'Ответ сервиса не получен. Часовой пояс мог измениться. Проверка продолжит ту же попытку.',
+        title: 'Не знаем, сохранился ли часовой пояс',
+        text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
         tone: 'info',
       };
   }
@@ -162,8 +162,8 @@ function DeletionSection({ profile }: { profile: OrganizationProfile }) {
         Удаление организации
       </chakra.h2>
       <Text textStyle="body.default" color="text.secondary">
-        Удаление закрывает доступ всем участникам ко всем ресторанам
-        организации. Учётные записи сохранятся. Отменить удаление нельзя.
+        Все участники потеряют доступ ко всем ресторанам организации. Их
+        аккаунты останутся. Отменить удаление нельзя.
       </Text>
       <DeletionNotice
         subject="organization"
@@ -259,7 +259,7 @@ function ProfileSections({ profile }: { profile: OrganizationProfile }) {
         <ReadOnlyValue
           label="Название организации"
           value={profile.name}
-          note="Название задаётся при создании организации."
+          note="Название нельзя изменить."
         />
       </Card>
       <CardForm
@@ -275,7 +275,7 @@ function ProfileSections({ profile }: { profile: OrganizationProfile }) {
         </chakra.h2>
         <TimezoneField
           id="organization-zone"
-          hint="Действует для всех ресторанов организации."
+          hint="Один для всех ресторанов организации."
           value={zone}
           disabled={locked}
           error={
@@ -297,7 +297,7 @@ function ProfileSections({ profile }: { profile: OrganizationProfile }) {
                   void save();
                 }}
               >
-                Проверить сохранение
+                Проверить результат
               </Button>
             }
           >
@@ -355,12 +355,12 @@ function ProfileBody({ orgID }: { orgID: string }) {
   if (snapshot.failed) {
     return (
       <ServiceUnavailableAlert
-        title="Профиль организации не получен"
+        title="Не удалось загрузить профиль организации"
         onRetry={() => {
           model.refresh();
         }}
       >
-        Сервис авторизации не отвечает.
+        Попробуйте ещё раз.
       </ServiceUnavailableAlert>
     );
   }

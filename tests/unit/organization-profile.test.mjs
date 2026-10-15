@@ -37,14 +37,15 @@ test('the zone search finds a city or an identifier, ignoring case', () => {
   assert.deepEqual(filterZones('moscow', NOW), ['Europe/Moscow']);
   assert.deepEqual(filterZones('сидоров', NOW), []);
   assert.ok(filterZones('', NOW).includes('Europe/Moscow'));
-  assert.ok(noZonesMessage.startsWith('Ничего не найдено.'));
+  assert.ok(noZonesMessage.startsWith('Ничего не нашли.'));
+  assert.ok(!noZonesMessage.includes('/'));
 });
 
 test('zoneMessage says what the frames TZ06 to TZ13 say', () => {
   const at = (state) => zoneMessage(state, NOW);
   assert.equal(at({ kind: 'idle' }), undefined);
   assert.deepEqual(at({ kind: 'changed' }), {
-    text: 'Изменится отображение дат и границы новых календарных периодов. Уже сохранённые сроки партий не изменятся.',
+    text: 'Даты будут показываться по новому часовому поясу. Сроки уже принятых продуктов не изменятся.',
     tone: 'info',
   });
   assert.deepEqual(at({ kind: 'saving' }), {
@@ -53,36 +54,36 @@ test('zoneMessage says what the frames TZ06 to TZ13 say', () => {
   });
   assert.deepEqual(at({ kind: 'saved', timeZone: 'Asia/Yekaterinburg' }), {
     title: 'Часовой пояс сохранён',
-    text: 'Даты во всех ресторанах организации отображаются в зоне Екатеринбург — Asia/Yekaterinburg, UTC+5.',
+    text: 'Даты во всех ресторанах показываются по часовому поясу Екатеринбург (UTC+5).',
     tone: 'success',
   });
   assert.deepEqual(at({ kind: 'unsupported', timeZone: 'Etc/GMT-3' }), {
-    text: 'Зона «Etc/GMT-3» не поддерживается сервисом. Выберите зону из списка.',
+    text: 'Этот часовой пояс недоступен. Выберите из списка.',
     tone: 'error',
   });
   assert.deepEqual(at({ kind: 'forbidden' }), {
     title: 'Часовой пояс не сохранён',
-    text: 'Роль администратора организации снята. Изменять часовой пояс может администратор организации.',
+    text: 'У вас больше нет роли администратора. Менять часовой пояс может только администратор организации.',
     tone: 'error',
   });
   assert.deepEqual(at({ kind: 'unavailable' }), {
     title: 'Часовой пояс не сохранён',
-    text: 'Сервис авторизации не отвечает. Выбор сохранён в поле, повторите сохранение через несколько минут.',
+    text: 'Не получилось. Попробуйте через пару минут. Выбранный часовой пояс остался в поле.',
     tone: 'error',
   });
   assert.deepEqual(at({ kind: 'conflict', timeZone: 'Europe/Samara' }), {
     title: 'Часовой пояс уже изменён',
-    text: 'Другой администратор сохранил зону «Самара — Europe/Samara, UTC+4». Проверьте выбор и сохраните повторно, если нужно.',
+    text: 'Другой администратор уже выбрал часовой пояс Самара (UTC+4). Проверьте и, если нужно, сохраните свой ещё раз.',
     tone: 'error',
   });
   assert.deepEqual(at({ kind: 'conflict', timeZone: undefined }), {
     title: 'Часовой пояс уже изменён',
-    text: 'Другой администратор сохранил новую зону. Проверьте выбор и сохраните повторно, если нужно.',
+    text: 'Другой администратор уже сменил часовой пояс. Проверьте и, если нужно, сохраните свой ещё раз.',
     tone: 'error',
   });
   assert.deepEqual(at({ kind: 'unknown' }), {
-    title: 'Результат сохранения неизвестен',
-    text: 'Ответ сервиса не получен. Часовой пояс мог измениться. Проверка продолжит ту же попытку.',
+    title: 'Не знаем, сохранился ли часовой пояс',
+    text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.',
     tone: 'info',
   });
 });
@@ -126,7 +127,8 @@ test('the profile shows the name and the zone of Auth', async () => {
   const plain = text(html);
   assert.ok(plain.includes('Профиль организации'));
   assert.ok(plain.includes('Северная сеть'));
-  assert.ok(plain.includes('Москва — Europe/Moscow · UTC+3'));
+  assert.ok(plain.includes('Москва (UTC+3)'));
+  assert.ok(!plain.includes('Europe/Moscow'));
   assert.ok(!plain.includes('Сохранить часовой пояс'));
   assert.ok(!tagOf(html, 'organization-zone').includes('disabled'));
 });
@@ -137,7 +139,7 @@ test('the zone of the profile, not the one of access, is shown', async () => {
       settings: { timeZone: 'Asia/Omsk', settingsVersion: '5' },
     }),
   });
-  assert.ok(text(html).includes('Омск — Asia/Omsk · UTC+6'));
+  assert.ok(text(html).includes('Омск (UTC+6)'));
 });
 
 test('the profile loads under a skeleton', async () => {
@@ -150,16 +152,16 @@ test('a lost profile read is not the absence of a profile', async () => {
   const plain = text(
     await page({ profile: failedRead('AuthUnavailable', 503) }),
   );
-  assert.ok(plain.includes('Профиль организации не получен'));
-  assert.ok(plain.includes('Сервис авторизации не отвечает.'));
-  assert.ok(plain.includes('Повторить загрузку'));
+  assert.ok(plain.includes('Не удалось загрузить профиль организации'));
+  assert.ok(plain.includes('Попробуйте ещё раз.'));
+  assert.ok(plain.includes('Попробовать ещё раз'));
 });
 
 test('a removed administrator role leaves the profile', async () => {
   const html = await page({
     profile: failedRead('Forbidden', 403, 'rejected'),
   });
-  assert.ok(!text(html).includes('Профиль организации не получен'));
+  assert.ok(!text(html).includes('Не удалось загрузить профиль организации'));
   assert.ok(!text(html).includes('Часовой пояс организации'));
 });
 
@@ -170,6 +172,6 @@ test('a zone without a known outcome locks the field', async () => {
   });
   assert.ok(tagOf(html, 'organization-zone').includes('disabled'));
   const plain = text(html);
-  assert.ok(plain.includes('Результат сохранения неизвестен'));
-  assert.ok(plain.includes('Проверить сохранение'));
+  assert.ok(plain.includes('Не знаем, сохранился ли часовой пояс'));
+  assert.ok(plain.includes('Проверить результат'));
 });

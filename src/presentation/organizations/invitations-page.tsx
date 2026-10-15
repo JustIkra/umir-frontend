@@ -17,7 +17,7 @@ import {
   UnknownOutcomeAlert,
 } from '@/presentation/ui/states';
 import { rem } from '@/presentation/ui/units';
-import { zoneLabel } from '@/presentation/ui/zones';
+import { zoneCity } from '@/presentation/ui/zones';
 import { CancelInvitationDialog } from './cancel-invitation-dialog';
 import { organizationPath } from './format';
 import { InvitationList } from './invitation-list';
@@ -43,6 +43,9 @@ import { RefreshButton, useRefreshOnOpen } from './refresh';
 interface Notice extends InvitationNotice {
   readonly tone: 'success' | 'error';
 }
+
+const checkResult =
+  'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не отправится.';
 
 // IN03.
 function InvitationSkeleton() {
@@ -85,7 +88,7 @@ function InvitationsLoaded({
   list: InvitationListModel;
   arrived: Notice | undefined;
 }) {
-  const { now, organizations } = useServices();
+  const { organizations } = useServices();
   const { commands } = organizations;
   const { orgID } = organization;
   const { timeZone } = organization.settings;
@@ -154,12 +157,12 @@ function InvitationsLoaded({
         .map((row) => (
           <UnknownOutcomeAlert
             key={`resend-${row.invitation.invitationID}`}
-            title="Результат повторной отправки неизвестен"
+            title={`Не знаем, отправлена ли ссылка для ${row.invitation.email}`}
             onCheck={() => {
               void resend(row);
             }}
           >
-            {`Ответ сервиса не получен. Ссылка для ${row.invitation.email} могла быть отправлена. Проверка продолжит ту же попытку.`}
+            {checkResult}
           </UnknownOutcomeAlert>
         ))}
       {rows
@@ -167,12 +170,12 @@ function InvitationsLoaded({
         .map((row) => (
           <UnknownOutcomeAlert
             key={`cancel-${row.invitation.invitationID}`}
-            title="Результат отмены неизвестен"
+            title={`Не знаем, отменено ли приглашение для ${row.invitation.email}`}
             onCheck={() => {
               void checkCancel(row);
             }}
           >
-            {`Ответ сервиса не получен. Приглашение для ${row.invitation.email} могло быть отменено. Проверка продолжит ту же попытку.`}
+            {checkResult}
           </UnknownOutcomeAlert>
         ))}
       {rows.length === 0 ? (
@@ -204,7 +207,7 @@ function InvitationsLoaded({
             }}
           />
           <Text textStyle="caption.default" color="text.secondary">
-            {`Время — ${zoneLabel(timeZone, now())}.`}
+            {`Время указано по часовому поясу организации: ${zoneCity(timeZone)}.`}
           </Text>
         </>
       )}
@@ -257,12 +260,12 @@ function InvitationsBody({
       )}
       {snapshot.failed ? (
         <ServiceUnavailableAlert
-          title="Список приглашений не получен"
+          title="Не удалось загрузить приглашения"
           onRetry={() => {
             model.refresh();
           }}
         >
-          Сервис авторизации не отвечает. Это не означает, что приглашений нет.
+          Попробуйте ещё раз.
         </ServiceUnavailableAlert>
       ) : (
         <InvitationSkeleton />
