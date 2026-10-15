@@ -9,14 +9,31 @@ import { FieldLabel, FieldMessage, SearchInput } from '@/presentation/ui/form';
 import { Icon } from '@/presentation/ui/icon';
 import { formatOffset } from '@/presentation/ui/time';
 import { rem } from '@/presentation/ui/units';
+import { matchesQuery } from '@/presentation/ui/search';
 import { organizationZones, zoneCity } from '@/presentation/ui/zones';
 import { zoneValue } from './format';
+
+// TZ04: nothing in the list matches the search.
+export const noZonesMessage =
+  'Ничего не найдено. Введите город или идентификатор зоны, например Asia/Yekaterinburg.';
+
+// TZ09 at the zone field.
+export const zoneUnsupported = (timeZone: string) =>
+  `Зона «${timeZone}» не поддерживается сервисом. Выберите зону из списка.`;
+
+// TZ03: the zones whose city, identifier or offset (as of nowMs) holds the
+// query, in the order of the list.
+export function filterZones(query: string, nowMs: number): readonly string[] {
+  return organizationZones.filter((zone) =>
+    matchesQuery(query, zoneCity(zone), zone, formatOffset(nowMs, zone)),
+  );
+}
 
 // Figma Timezone field and list (TZ01, TZ02). From 1024 the list opens in
 // place under the hint (a non-modal dialog, Esc handled here); on 390 it is a
 // modal bottom sheet. The field is controlled: value is an IANA identifier and
 // onChange hears the chosen one; the offsets are those of the current moment.
-// Search is for show until the zone list is filtered.
+// The search filters the list by city and identifier (TZ03, TZ04).
 export function TimezoneField({
   id,
   hint,
@@ -34,6 +51,8 @@ export function TimezoneField({
 }) {
   const { now } = useServices();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const zones = filterZones(query, now());
   const list = useRef<HTMLDialogElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const listId = useId();
@@ -100,6 +119,7 @@ export function TimezoneField({
         maxW="100vw"
         onClose={() => {
           setOpen(false);
+          setQuery('');
           button.current?.focus();
         }}
         onKeyDown={(event) => {
@@ -153,7 +173,18 @@ export function TimezoneField({
               <Icon src={closeIcon} size={24} />
             </chakra.button>
           </Flex>
-          <SearchInput label="Найти город или зону" />
+          <SearchInput
+            label="Найти город или зону"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.currentTarget.value);
+            }}
+          />
+          {zones.length === 0 && (
+            <Text role="status" px="3" py="2" textStyle="body.default">
+              {noZonesMessage}
+            </Text>
+          )}
           <Stack
             as="ul"
             gap="1"
@@ -162,7 +193,7 @@ export function TimezoneField({
             listStyleType="none"
             aria-label="Часовые пояса"
           >
-            {organizationZones.map((option) => {
+            {zones.map((option) => {
               const selected = option === value;
               return (
                 <li key={option}>

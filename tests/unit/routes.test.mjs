@@ -21,6 +21,7 @@ import {
   labels,
   loaded,
   orderSnapshot,
+  organizationProfile,
   readyAccess,
   redirectOf,
   renderRoute,
@@ -326,7 +327,7 @@ const pages = [
     `/app/organizations/${ORG}/profile`,
     'Восток Фуд',
     ['Часовой пояс организации'],
-    administered,
+    { ...administered, organizations: { profile: organizationProfile() } },
   ],
   [
     '/app/organizations/new',

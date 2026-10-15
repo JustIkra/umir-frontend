@@ -15,9 +15,9 @@ import {
   creationTone,
   followedCreation,
   refusalState,
-  zoneUnsupported,
 } from '../../src/presentation/organizations/new-organization-page.tsx';
 import { ReadinessSteps } from '../../src/presentation/organizations/readiness-steps.tsx';
+import { zoneUnsupported } from '../../src/presentation/organizations/timezone-field.tsx';
 import {
   ORG,
   R,

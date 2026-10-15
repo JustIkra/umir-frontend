@@ -22,7 +22,7 @@ import {
 } from './names';
 import { OrganizationLayout } from './organization-layout';
 import { ReadinessSteps } from './readiness-steps';
-import { TimezoneField } from './timezone-field';
+import { TimezoneField, zoneUnsupported } from './timezone-field';
 
 export type CreationState =
   | { readonly kind: 'editing' }
@@ -133,10 +133,6 @@ export function creationMessage(
       return undefined;
   }
 }
-
-// TZ09 at the zone field.
-export const zoneUnsupported = (timeZone: string) =>
-  `Зона «${timeZone}» не поддерживается сервисом. Выберите зону из списка.`;
 
 // The state after the answer to «Создать предприятие» (checked: the answer to
 // the same attempt sent again). A refusal Auth gives without a screen of its
