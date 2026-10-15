@@ -254,3 +254,23 @@ test('the product attempt is not blocked by a damaged dish record', async () => 
   assert.equal(run.catalog.dishAttempt.damaged(), true);
   assert.equal((await run.catalog.registerProduct(product)).kind, 'created');
 });
+
+test('a second product command is not sent over a readable record of another command', async () => {
+  const run = setup();
+  let release;
+  const slow = new Promise((resolve) => {
+    release = resolve;
+  });
+  run.answers.push(slow);
+  const first = run.catalog.registerProduct(product);
+  run.commands.clear();
+  assert.deepEqual(await run.catalog.registerProduct(product), {
+    kind: 'refused',
+    code: 'AttemptUnresolved',
+  });
+  assert.equal(run.calls.length, 1);
+  assert.equal(run.store.load(refOf('product')).record.commandID, 'cmd-1');
+  release({ context: {}, result: product });
+  await first;
+  assert.equal(run.store.load(refOf('product')).status, 'absent');
+});

@@ -12,6 +12,11 @@ import { settlesAttempt } from './commands';
 // operation cannot be read: nothing was sent and no new command was made.
 export const attemptDamagedCode = 'AttemptDamaged';
 
+// The code of the refusal when the saved attempt of the operation is another
+// command that has not been settled yet: nothing was sent either, and the
+// saved record stays as it is until its own answer (or a reload) settles it.
+export const attemptUnresolvedCode = 'AttemptUnresolved';
+
 // What a screen reads about one operation: whether the attempt could not be
 // saved (it lives in this tab only), whether the saved one is damaged, and
 // the owner's way to discard a damaged one.
@@ -97,9 +102,14 @@ export function createDurableAttempts({
       mark(damaged, key, true);
       throw new ApiError(localFailure(attemptDamagedCode, 'not_committed'));
     }
-    if (loaded.status === 'ok' && loaded.record.commandID === commandID) {
-      mark(notSaved, key, false);
-      return;
+    if (loaded.status === 'ok') {
+      if (loaded.record.commandID === commandID) {
+        mark(notSaved, key, false);
+        return;
+      }
+      // A readable record is dropped only by the answer to its own command;
+      // writing over it would lose the trace of a command that may be done.
+      throw new ApiError(localFailure(attemptUnresolvedCode, 'not_committed'));
     }
     const known = begun.get(key);
     const startedAt = known?.commandID === commandID ? known.startedAt : now();

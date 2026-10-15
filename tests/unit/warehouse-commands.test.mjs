@@ -515,3 +515,118 @@ test('records of another restaurant are not restored here', async () => {
   const { value } = setup({}, { store });
   assert.equal(value.pendingWriteoff('B'), false);
 });
+
+const writeoffRef = {
+  kind: 'writeoff',
+  userID: U,
+  restaurantID: R,
+  batchID: 'B',
+};
+
+test('a second command is not sent over a readable record of another command', async () => {
+  const store = createMemoryAttemptStore();
+  let release;
+  const slow = new Promise((resolve) => {
+    release = resolve;
+  });
+  const calls = [];
+  const { value, commands } = setup(
+    {
+      confirmWriteoff: async (...args) => {
+        calls.push(args);
+        return slow;
+      },
+    },
+    { store },
+  );
+  const first = value.confirmWriteoff('B', E);
+  // The runner lost the attempt (as after clear()), but its command may still
+  // be on its way and its record is the only trace.
+  commands.clear();
+  assert.deepEqual(await value.confirmWriteoff('B', E), {
+    kind: 'refused',
+    code: 'AttemptUnresolved',
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(store.load(writeoffRef).record.commandID, 'command-1');
+  assert.equal(commands.getSnapshot().length, 0);
+  // The first command ends: its record goes and the operation is free again.
+  release({ context: {}, result: {} });
+  await first;
+  assert.equal(store.load(writeoffRef).status, 'absent');
+  assert.equal((await value.confirmWriteoff('B', E)).kind, 'created');
+  assert.equal(calls.length, 2);
+});
+
+test('a reload keeps the record readable for the retry of the same command', async () => {
+  const store = createMemoryAttemptStore();
+  const api = lostThenAnswer();
+  const first = setup(api, { store });
+  assert.equal((await first.value.confirmWriteoff('B', E)).kind, 'unknown');
+  // After the reload nothing else is called: only the button of W11 retries.
+  const second = setup(api, { store });
+  const [attempt] = second.commands.getSnapshot();
+  assert.equal(attempt.commandID, 'command-1');
+  const result = await second.commands.retry(attempt.key);
+  assert.equal(result.kind, 'committed');
+  assert.deepEqual(api.calls[1], api.calls[0]);
+  assert.equal(second.commands.getSnapshot().length, 0);
+  assert.equal(store.load(writeoffRef).status, 'absent');
+});
+
+test('the saved epoch is used even when the current one is different', async () => {
+  const store = createMemoryAttemptStore();
+  store.save({
+    kind: 'writeoff',
+    userID: U,
+    restaurantID: R,
+    commandID: 'saved-command',
+    epoch: NEXT,
+    startedAt: 5,
+    payload: { batchID: 'B' },
+  });
+  const calls = [];
+  const { value, commands } = setup(
+    {
+      confirmWriteoff: async (...args) => {
+        calls.push(args);
+        return { context: {}, result: {} };
+      },
+    },
+    { store },
+  );
+  // The screen sees the current epoch E; the saved command was sent under NEXT.
+  assert.equal(commands.getSnapshot()[0].commandID, 'saved-command');
+  assert.equal((await value.confirmWriteoff('B', E)).kind, 'created');
+  assert.deepEqual(calls, [[R, 'B', 'saved-command', NEXT]]);
+});
+
+test('a record that cannot be removed does not turn a committed answer into a failure', async () => {
+  const store = createMemoryAttemptStore();
+  store.remove = () => 'unavailable';
+  const { value, invalidations } = setup(
+    { confirmWriteoff: async () => ({ context: {}, result: {} }) },
+    { store },
+  );
+  assert.equal((await value.confirmWriteoff('B', E)).kind, 'created');
+  assert.equal(invalidations.length, 1);
+  assert.equal(store.load(writeoffRef).status, 'ok');
+  assert.equal(value.pendingWriteoff('B'), false);
+});
+
+test('sign-out of A, B in, A back: the attempt of A is restored, B never sees it', async () => {
+  const store = createMemoryAttemptStore();
+  const api = lostThenAnswer();
+  const a1 = setup(api, { store });
+  await a1.value.confirmWriteoff('B', E);
+  // Sign-out clears the runner and the factories, not the records.
+  a1.commands.clear();
+  const b = setup(api, { store, userID: OTHER });
+  assert.equal(b.value.pendingWriteoff('B'), false);
+  assert.equal(b.commands.getSnapshot().length, 0);
+  b.commands.clear();
+  const a2 = setup(api, { store });
+  assert.equal(a2.value.pendingWriteoff('B'), true);
+  assert.equal(a2.commands.getSnapshot()[0].commandID, 'command-1');
+  assert.equal(store.list(OTHER).entries.length, 0);
+});
