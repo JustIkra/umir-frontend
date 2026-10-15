@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import { createElement as h } from 'react';
+import { DateField } from '../../src/presentation/ui/date-field.tsx';
 import { selectedTime, visibleTimes } from '../../src/presentation/ui/masks.ts';
 import { SearchSelect } from '../../src/presentation/ui/search-select.tsx';
 import { TimeField } from '../../src/presentation/ui/time-field.tsx';
@@ -123,4 +124,53 @@ test('a time between the half hours checks no item', () => {
   const html = renderElement(h(TimeField, { id: 't', defaultValue: '14:27' }));
   assert.doesNotMatch(html, /data-state="checked"/);
   assert.equal(html.match(/role="option"/g)?.length, 48);
+});
+
+test('the date field has segments, a calendar button and a hidden value', () => {
+  const html = renderElement(
+    h(DateField, {
+      id: 'd1',
+      labelId: 'd1-label',
+      name: 'made-date-1',
+      defaultValue: '2026-10-15',
+      today: '2026-10-15',
+      timeZone: 'Europe/Moscow',
+    }),
+  );
+  assert.match(html, /role="spinbutton"/);
+  assert.match(html, /aria-label="Открыть календарь"/);
+  assert.match(
+    html,
+    /<input type="hidden" name="made-date-1" value="15.10.2026"/,
+  );
+  assert.doesNotMatch(html, /type="date"/);
+});
+
+test('an empty date field gives an empty hidden value', () => {
+  const html = renderElement(
+    h(DateField, {
+      id: 'd',
+      name: 'd',
+      today: '2026-10-15',
+      timeZone: 'Asia/Yekaterinburg',
+    }),
+  );
+  assert.match(html, /<input type="hidden" name="d" value=""/);
+});
+
+// Ark renders the attributes of the button in its own order, so the check
+// looks for each one apart from the others.
+test('a disabled date field disables the calendar button', () => {
+  const html = renderElement(
+    h(DateField, {
+      id: 'd',
+      today: '2026-10-15',
+      timeZone: 'Europe/Moscow',
+      disabled: true,
+    }),
+  );
+  assert.match(
+    html,
+    /<button(?=[^>]*aria-label="Открыть календарь")(?=[^>]*disabled="")[^>]*>/,
+  );
 });
