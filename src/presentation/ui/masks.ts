@@ -87,3 +87,17 @@ export function ruDateToIso(ru: string): string {
   const parts = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(ru);
   return parts ? `${parts[3] ?? ''}-${parts[2] ?? ''}-${parts[1] ?? ''}` : '';
 }
+
+// The half hours the list shows: all of them for a held value, and only those
+// starting with what the person typed since the list opened (all again when
+// nothing matches).
+export function visibleTimes(text: string, typed: boolean): readonly string[] {
+  if (!typed || text === '') return timeOptions;
+  const matching = timeOptions.filter((option) => option.startsWith(text));
+  return matching.length > 0 ? matching : timeOptions;
+}
+
+// The checked item of the list: the held value when it is one of the half hours.
+export function selectedTime(text: string): readonly string[] {
+  return timeOptions.includes(text) ? [text] : [];
+}

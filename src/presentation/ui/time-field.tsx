@@ -1,9 +1,15 @@
 import { Combobox, Portal, createListCollection } from '@chakra-ui/react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import chevronIcon from '@/presentation/assets/icons/chevron-down-24.svg';
 import { Icon } from './icon';
-import { maskTime, nearestSlot, normalizeTime, timeOptions } from './masks';
+import {
+  maskTime,
+  nearestSlot,
+  normalizeTime,
+  selectedTime,
+  visibleTimes,
+} from './masks';
 
 // Time of the day (spec 3.2): digits only with the colon put in, a list of half
 // hours that opens at the nearest one, an exact time can be typed. On blur
@@ -38,19 +44,29 @@ export function TimeField({
     onValueChange?.(next);
   };
   const [highlighted, setHighlighted] = useState<string | null>(null);
-  const items = useMemo(() => {
-    const matching = timeOptions.filter((option) => option.startsWith(text));
-    return createListCollection({
-      items: matching.length > 0 ? [...matching] : [...timeOptions],
-    });
-  }, [text]);
+  // True while the text comes from typing in this opening of the list: only
+  // then the list is filtered. A held value shows every half hour.
+  const [typed, setTyped] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const items = useMemo(
+    () => createListCollection({ items: [...visibleTimes(text, typed)] }),
+    [text, typed],
+  );
   const wrong = normalizeTime(text) === undefined;
   return (
     <Combobox.Root
       collection={items}
+      value={[...selectedTime(text)]}
       inputValue={text}
       onInputValueChange={(details) => {
-        set(maskTime(details.inputValue));
+        const masked = maskTime(details.inputValue);
+        // The input is uncontrolled in the DOM and is re-synced only when the
+        // text changes; a refused character («a», a third minute digit) leaves
+        // the text as it was, so the masked text is written back by hand.
+        if (masked !== details.inputValue && input.current !== null)
+          input.current.value = masked;
+        setTyped(details.reason === 'input-change');
+        set(masked);
       }}
       onValueChange={(details) => {
         set(details.value[0] ?? text);
@@ -60,6 +76,8 @@ export function TimeField({
         setHighlighted(details.highlightedValue);
       }}
       onOpenChange={(details) => {
+        if (details.reason === 'input-change') return;
+        setTyped(false);
         if (details.open)
           setHighlighted(nearestSlot(text) || nearestSlot(now) || null);
       }}
@@ -72,6 +90,7 @@ export function TimeField({
     >
       <Combobox.Control>
         <Combobox.Input
+          ref={input}
           inputMode="numeric"
           placeholder="чч:мм"
           maxLength={5}
@@ -88,7 +107,9 @@ export function TimeField({
           </Combobox.Trigger>
         </Combobox.IndicatorGroup>
       </Combobox.Control>
-      {name !== undefined && <input type="hidden" name={name} value={text} />}
+      {name !== undefined && (
+        <input type="hidden" name={name} value={normalizeTime(text) ?? text} />
+      )}
       <Portal>
         <Combobox.Positioner>
           <Combobox.Content minW="7rem">
