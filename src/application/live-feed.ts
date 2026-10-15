@@ -36,4 +36,7 @@ export interface LiveFeed {
     onEvent: (event: LiveEvent) => void,
     onStatus: (status: LiveStatus) => void,
   ): () => void;
+  // Drops what the feed remembers between subscriptions (resume cursors), so
+  // the next user or sign-in never resumes another user's stream.
+  forget(): void;
 }

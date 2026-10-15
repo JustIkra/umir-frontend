@@ -204,3 +204,32 @@ test('the next subscription resumes from the last event id; a refused resume dro
   );
   assert.equal(opened[2].url, `/api/v2/r/${R}/live`);
 });
+
+test('forget drops every saved cursor so the next user starts without one', () => {
+  const { open, opened } = fakeSources();
+  const feed = createEventSourceFeed(open);
+  const stop = feed.subscribe(
+    R,
+    () => {},
+    () => {},
+  );
+  opened[0].fire('open');
+  opened[0].fire('change', {
+    data: data({
+      type: 'change',
+      tenantID: R,
+      epoch: EPOCH,
+      sequence: '7',
+      topics: ['stock'],
+    }),
+    lastEventId: 'cur-7',
+  });
+  stop();
+  feed.forget();
+  feed.subscribe(
+    R,
+    () => {},
+    () => {},
+  );
+  assert.equal(opened[1].url, `/api/v2/r/${R}/live`);
+});

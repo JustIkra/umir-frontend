@@ -34,6 +34,9 @@ export function createEventSourceFeed(
 ): LiveFeed {
   const cursors = new Map<string, string>();
   return {
+    forget() {
+      cursors.clear();
+    },
     subscribe(restaurantID, onEvent, onStatus) {
       const cursor = cursors.get(restaurantID);
       const source = open(livePath(restaurantID, cursor));

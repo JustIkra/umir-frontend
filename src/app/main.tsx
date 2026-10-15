@@ -138,8 +138,9 @@ const lifecycles = createLifecycleTracker({
     void access.refresh();
   },
 });
+const liveFeed = createEventSourceFeed((url) => new EventSource(url));
 const live = createLiveSync({
-  feed: createEventSourceFeed((url) => new EventSource(url)),
+  feed: liveFeed,
   scheduler,
   visibility,
   sessionCheck: { check: () => session.check() },
@@ -215,6 +216,7 @@ const session = createSessionStore({
   },
   onSignedOut: () => {
     live.stop();
+    liveFeed.forget();
     models.clear();
     commands.clear();
     epochs.clear();
@@ -239,6 +241,7 @@ const session = createSessionStore({
   // Another user signed in, here or in another tab. The shown restaurant
   // reads that user's access again.
   onUserChanged: () => {
+    liveFeed.forget();
     models.clear();
     commands.clear();
     epochs.clear();
