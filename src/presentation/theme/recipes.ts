@@ -221,8 +221,14 @@ export const dateInputRecipe = defineSlotRecipe({
       borderRadius: 'sm',
       outline: 'none',
       caretColor: 'transparent',
-      _focus: { bg: 'bg.action', color: 'text.onAction' },
       _placeholderShown: { color: 'text.secondary' },
+      // After the placeholder rule: an empty segment in focus is still ink on
+      // the action colour.
+      _focus: {
+        bg: 'bg.action',
+        color: 'text.onAction',
+        _placeholderShown: { color: 'text.onAction' },
+      },
       '&[data-type=literal]': { px: '0', color: 'text.secondary' },
     },
   },
@@ -271,7 +277,7 @@ export const datePickerRecipe = defineSlotRecipe({
     },
     prevTrigger: monthButton,
     nextTrigger: monthButton,
-    rangeText: { textStyle: 'body.strong', textTransform: 'capitalize' },
+    rangeText: { textStyle: 'body.strong' },
     table: { borderCollapse: 'separate', borderSpacing: '0.5' },
     tableHeader: {
       textStyle: 'caption.default',

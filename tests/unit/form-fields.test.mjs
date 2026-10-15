@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'bun:test';
 import { createElement as h } from 'react';
 import { DateField } from '../../src/presentation/ui/date-field.tsx';
-import { selectedTime, visibleTimes } from '../../src/presentation/ui/masks.ts';
+import {
+  monthTitle,
+  selectedTime,
+  visibleTimes,
+} from '../../src/presentation/ui/masks.ts';
 import { SearchSelect } from '../../src/presentation/ui/search-select.tsx';
 import { TimeField } from '../../src/presentation/ui/time-field.tsx';
 import { renderElement } from './support/render-route.mjs';
@@ -173,4 +177,11 @@ test('a disabled date field disables the calendar button', () => {
     html,
     /<button(?=[^>]*aria-label="Открыть календарь")(?=[^>]*disabled="")[^>]*>/,
   );
+});
+
+test('the calendar header is the month and the year, capitalised once', () => {
+  assert.equal(monthTitle('октябрь 2026 г.'), 'Октябрь 2026');
+  assert.equal(monthTitle('март 2027 г.'), 'Март 2027');
+  assert.equal(monthTitle('Май 2026'), 'Май 2026');
+  assert.equal(monthTitle(''), '');
 });

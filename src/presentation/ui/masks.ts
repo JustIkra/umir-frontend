@@ -88,6 +88,12 @@ export function ruDateToIso(ru: string): string {
   return parts ? `${parts[3] ?? ''}-${parts[2] ?? ''}-${parts[1] ?? ''}` : '';
 }
 
+// «октябрь 2026 г.» from the calendar becomes the header «Октябрь 2026».
+export function monthTitle(text: string): string {
+  const plain = text.replace(/\s*г\.$/, '').trim();
+  return `${plain.charAt(0).toUpperCase()}${plain.slice(1)}`;
+}
+
 // The half hours the list shows: all of them for a held value, and only those
 // starting with what the person typed since the list opened (all again when
 // nothing matches).
