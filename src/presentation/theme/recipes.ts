@@ -126,8 +126,11 @@ export const fieldControl = {
   _disabled: { opacity: '0.5', cursor: 'not-allowed' },
 } as const;
 
-// The floating layer of a list or a calendar.
+// The floating layer of a list or a calendar. The z-index sits on the content:
+// the positioner copies it into its own `--z-index`, and a value set on the
+// positioner itself is overridden, which left the layer under the page.
 export const floatingContent = {
+  zIndex: 'popover',
   bg: 'bg.surface',
   borderWidth: '1px',
   borderColor: 'border.default',
@@ -175,7 +178,6 @@ export const comboboxRecipe = defineSlotRecipe({
       '& img': { transitionProperty: 'transform', transitionDuration: 'fast' },
       _open: { '& img': { transform: 'rotate(180deg)' } },
     },
-    positioner: { zIndex: 'popover' },
     content: {
       ...floatingContent,
       py: '1',
@@ -261,7 +263,6 @@ export const datePickerRecipe = defineSlotRecipe({
       _hover: { bg: 'bg.subtle' },
       _disabled: { cursor: 'not-allowed', bg: 'transparent' },
     },
-    positioner: { zIndex: 'popover' },
     content: {
       ...floatingContent,
       p: '3',

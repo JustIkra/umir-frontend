@@ -78,7 +78,7 @@ export function SearchSelect({
       disabled={disabled}
       invalid={invalid}
       ids={{ input: id }}
-      positioning={{ sameWidth: true, gutter: 4 }}
+      positioning={{ sameWidth: false, gutter: 4, placement: 'bottom-start' }}
     >
       <Combobox.Control>
         <Combobox.Input
@@ -101,7 +101,9 @@ export function SearchSelect({
       )}
       <Portal>
         <Combobox.Positioner>
-          <Combobox.Content>
+          {/* At least as wide as the field, and wide enough for a name with its
+              code in a narrow table column. */}
+          <Combobox.Content minW="max(var(--reference-width), 15rem)">
             <Combobox.Empty>Ничего не нашли</Combobox.Empty>
             {collection.items.map((item) => (
               <Combobox.Item key={item.value} item={item}>

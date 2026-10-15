@@ -55,7 +55,11 @@ const hiddenWide = {
   },
 } as const;
 
-const wideColumns = `${rem(28)} minmax(${rem(160)}, ${rem(200)}) ${rem(128)} ${rem(232)} ${rem(176)} ${rem(232)} ${rem(40)}`;
+// The date field is at least 148 wide, so a date with a time (100) needs 254;
+// the fixed columns and the 6 gaps of 8 sum to 1014, which fits the content of
+// a 1400 screen (1030) and leaves the product at least 112.
+const wideColumns = `${rem(24)} minmax(${rem(112)}, 1fr) ${rem(104)} ${rem(254)} ${rem(170)} ${rem(254)} ${rem(40)}`;
+const rowTimeWidth = { base: rem(112), '2xl': rem(100) } as const;
 
 function RowLabel({
   htmlFor,
@@ -334,7 +338,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                 aria-hidden="true"
                 display={{ base: 'none', '2xl': 'grid' }}
                 gridTemplateColumns={wideColumns}
-                columnGap="3"
+                columnGap="2"
                 alignItems="start"
                 pb="2"
                 borderBottomWidth="1px"
@@ -381,7 +385,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                         '2xl': wideColumns,
                       }}
                       alignItems={{ base: 'start', '2xl': 'center' }}
-                      columnGap={{ base: '4', '2xl': '3' }}
+                      columnGap={{ base: '4', '2xl': '2' }}
                       rowGap="3"
                       p={{ base: '4', '2xl': '0' }}
                       py={{ '2xl': '3' }}
@@ -496,7 +500,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                             disabled={closed}
                             onValueChange={markDirty}
                           />
-                          <Box w={rem(112)} flexShrink="0">
+                          <Box w={rowTimeWidth} flexShrink="0">
                             <TimeField
                               id={id('made-time')}
                               name={`made-time-${String(row.key)}`}
@@ -557,7 +561,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                             disabled={closed}
                             onValueChange={markDirty}
                           />
-                          <Box w={rem(112)} flexShrink="0">
+                          <Box w={rowTimeWidth} flexShrink="0">
                             <TimeField
                               id={id('received-time')}
                               name={`received-time-${String(row.key)}`}

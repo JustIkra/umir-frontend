@@ -17,7 +17,9 @@ const breakpoints = {
   md: '881px',
   lg: '1025px',
   xl: '1201px',
-  '2xl': '1367px',
+  // The delivery lines become a table here: its columns need 1030px of content
+  // (see wideColumns), a 1400 screen less the sidebar and the card paddings.
+  '2xl': '1400px',
   '3xl': '2400px',
 } as const;
 
