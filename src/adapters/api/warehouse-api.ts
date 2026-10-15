@@ -1,7 +1,9 @@
 import type { BusinessContext, Envelope } from '@/application/api';
 import { ApiError, localFailure, type Outcome } from '@/application/api';
 import type {
+  CapturePage,
   History,
+  MovementRow,
   ProductBatch,
   WarehouseApi,
   WarehouseReads,
@@ -18,11 +20,13 @@ import {
   decodeExpiring,
   decodeHistory,
   decodeInventory,
+  decodeMovementPage,
   decodePending,
   decodeReceipt,
   decodeWarehouseEnvelope,
   decodeWriteoff,
   validBatchCapture,
+  type MovementPage,
 } from './decode/warehouse';
 
 const base = (restaurantID: string) =>
@@ -50,6 +54,7 @@ const supply = decoded(
   (body) => decodePlanningEnvelope(body, decodeSupplySuggestions, 'warehouse'),
   'unavailable',
 );
+const movements = decoded(decodeMovementPage, 'unavailable');
 
 function scope<T>(
   value: Envelope<T>,
@@ -81,6 +86,37 @@ function compareBatch(a: ProductBatch, b: ProductBatch): number {
     : a.batch.batchID > b.batch.batchID
       ? 1
       : 0;
+}
+
+function samePage(a: CapturePage, b: CapturePage): boolean {
+  return (
+    a.tenantID === b.tenantID &&
+    a.epoch === b.epoch &&
+    a.stateVersion === b.stateVersion &&
+    a.prefixSequence === b.prefixSequence &&
+    a.filterFingerprint === b.filterFingerprint &&
+    a.settings.timeZone === b.settings.timeZone &&
+    a.settings.settingsVersion === b.settings.settingsVersion
+  );
+}
+function samePeriod(
+  a: Envelope<MovementPage>,
+  b: Envelope<MovementPage>,
+): boolean {
+  const x = a.result;
+  const y = b.result;
+  return (
+    instantNanos(x.from) === instantNanos(y.from) &&
+    instantNanos(x.to) === instantNanos(y.to) &&
+    x.coverage.epoch === y.coverage.epoch &&
+    x.coverage.complete === y.coverage.complete &&
+    instantNanos(x.coverage.coverageFrom) ===
+      instantNanos(y.coverage.coverageFrom) &&
+    instantNanos(x.coverage.requestedFrom) ===
+      instantNanos(y.coverage.requestedFrom) &&
+    instantNanos(x.coverage.availableFrom) ===
+      instantNanos(y.coverage.availableFrom)
+  );
 }
 
 export function createWarehouseReads(
@@ -120,6 +156,61 @@ export function createWarehouseReads(
         supply(await client.read(`${base(id)}/supply-suggestions`, options)),
         id,
       );
+    },
+    async movementReport(id, period, options) {
+      const path = `${base(id)}/analytics/movements?fromDate=${period.fromDate}&throughDate=${period.throughDate}&limit=500`;
+      let page = scope(movements(await client.read(path, options)), id);
+      const first = page;
+      if (
+        first.result.page.tenantID !== id ||
+        first.result.page.epoch !== first.context.runtimeEpoch
+      )
+        return malformed('movement capture identity differs');
+      const items: MovementRow[] = [];
+      const seen = new Set<string>();
+      const cursors = new Set<string>();
+      for (;;) {
+        if (
+          !sameScope(first.context, page.context) ||
+          first.context.stateVersion !== page.context.stateVersion ||
+          instantNanos(first.context.evaluatedAt) !==
+            instantNanos(page.context.evaluatedAt) ||
+          !samePage(first.result.page, page.result.page) ||
+          !samePeriod(first, page)
+        )
+          return malformed('movement capture changed between pages');
+        for (const item of page.result.items) {
+          if (seen.has(item.productID))
+            return malformed('duplicate movement rows');
+          seen.add(item.productID);
+          items.push(item);
+        }
+        const cursor = page.result.nextCursor;
+        if (cursor === undefined) break;
+        if (page.result.items.length === 0 || cursors.has(cursor))
+          return malformed('movement cursor did not advance');
+        if (cursors.size >= 20)
+          return malformed('movement page capacity exceeded');
+        cursors.add(cursor);
+        page = scope(
+          movements(
+            await client.read(
+              `${path}&cursor=${encodeURIComponent(cursor)}`,
+              options,
+            ),
+          ),
+          id,
+        );
+      }
+      return {
+        context: first.context,
+        result: {
+          from: first.result.from,
+          to: first.result.to,
+          coverage: first.result.coverage,
+          items,
+        },
+      };
     },
     async productBatches(id, productID, options) {
       const path = `${base(id)}/products/${encodeURIComponent(productID)}/batches?limit=500`;
