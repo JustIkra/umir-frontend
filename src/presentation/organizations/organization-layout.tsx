@@ -1,11 +1,12 @@
 import { Skeleton, Stack } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
+import { Navigate } from 'react-router';
 import {
   knownOrganizations,
+  type AccessState,
   type OrganizationAccess,
 } from '@/application/access';
 import { PageHeader } from '@/presentation/app-shell/pages';
-import { NotFound } from '@/presentation/documents/not-found-page';
 import { useServices } from '@/presentation/services';
 import { useAccess } from '@/presentation/session/hooks';
 import { ButtonLink } from '@/presentation/ui/actions';
@@ -57,26 +58,35 @@ export function OrganizationsUnavailable({ onRetry }: { onRetry: () => void }) {
 export type OrganizationLookup =
   | { readonly kind: 'loading' }
   | { readonly kind: 'failed'; readonly retry: () => void }
+  | { readonly kind: 'missing' }
   | { readonly kind: 'ready'; readonly organization: OrganizationAccess };
 
 // The organization of the address from access. Access known without it (the
-// right was revoked meanwhile) is a 404, like in the loaders.
-export function useOrganization(orgID: string): OrganizationLookup {
-  const { access } = useServices();
-  const state = useAccess();
+// right was revoked, the organization deleted here or in another tab) is
+// `missing`: render must not throw, the page still mounted has to leave for
+// the list. The loaders keep the 404 for an unknown address on first load.
+export function lookupOrganization(
+  state: AccessState,
+  orgID: string,
+  retry: () => void,
+): OrganizationLookup {
   const known = knownOrganizations(state);
   if (known !== undefined) {
     const organization = known.find((item) => item.orgID === orgID);
-    if (organization === undefined) throw new NotFound();
-    return { kind: 'ready', organization };
+    return organization === undefined
+      ? { kind: 'missing' }
+      : { kind: 'ready', organization };
   }
   if (state.status === 'loading') return { kind: 'loading' };
-  return {
-    kind: 'failed',
-    retry: () => {
-      void access.refresh();
-    },
-  };
+  return { kind: 'failed', retry };
+}
+
+export function useOrganization(orgID: string): OrganizationLookup {
+  const { access } = useServices();
+  const state = useAccess();
+  return lookupOrganization(state, orgID, () => {
+    void access.refresh();
+  });
 }
 
 // «Все организации», the name and «Роль · рестораны · зона». The document
@@ -140,6 +150,9 @@ export function OrganizationState({
 }) {
   const lookup = useOrganization(orgID);
   if (lookup.kind === 'ready') return children(lookup.organization);
+  if (lookup.kind === 'missing') {
+    return <Navigate to="/app/organizations" replace />;
+  }
   return (
     <OrganizationLayout
       header={
