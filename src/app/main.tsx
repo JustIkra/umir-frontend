@@ -25,6 +25,7 @@ import { createOrganizationsApi } from '@/adapters/api/organizations-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
+import { createAttemptStore } from '@/adapters/browser-storage/attempt-store';
 import { createOrderStore } from '@/adapters/browser-storage/order-store';
 import { createInvitationStore } from '@/adapters/browser-storage/invitation-store';
 import { createRegistrationStore } from '@/adapters/browser-storage/registration-store';
@@ -157,6 +158,12 @@ const warehouseApi = createWarehouseApi(client);
 const warehouseCommands = new Map<string, WarehouseCommands>();
 const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
+const attemptStore = createAttemptStore(browserSessionStorage());
+// Until the wiring of the next step: the user of the active session.
+const activeUserID = (): string => {
+  const state = session.getSnapshot();
+  return state.status === 'active' ? state.user.userID : '';
+};
 const restaurantData = new Map<string, RestaurantData>();
 const catalogCommands = new Map<string, CatalogCommands>();
 const restaurantFeedback = new Map<string, FeedbackSubmitter>();
@@ -341,6 +348,9 @@ const services: PresentationServices = {
         api: catalogApi,
         commands,
         restaurantID,
+        userID: activeUserID(),
+        attempts: attemptStore,
+        now,
         markStale: (topics) => {
           models.markStale(restaurantID, topics);
         },
@@ -359,6 +369,9 @@ const services: PresentationServices = {
         api: warehouseApi,
         commands,
         restaurantID,
+        userID: activeUserID(),
+        attempts: attemptStore,
+        now,
         newID: () => crypto.randomUUID(),
         markStale: (topics) => {
           models.markStale(restaurantID, topics);

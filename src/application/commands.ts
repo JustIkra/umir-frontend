@@ -82,6 +82,17 @@ interface Pending extends Attempt {
 // command means the service did not run it.
 const settledOutcomes = new Set(['committed', 'not_committed', 'unavailable']);
 
+// A service restarted, so the outcome is lost for good.
+function isReset(failure: ApiFailure): boolean {
+  return failure.code === 'RuntimeReset' || failure.outcome === 'indeterminate';
+}
+
+// True when the failure settles the attempt for good, a reset included: the
+// attempt is released and nothing may keep it. Only an unknown outcome stays.
+export function settlesAttempt(failure: ApiFailure): boolean {
+  return isReset(failure) || settledOutcomes.has(failure.outcome);
+}
+
 export function createCommandRunner({
   newId,
   now,
@@ -113,15 +124,12 @@ export function createCommandRunner({
 
   function settle(attempt: Pending, error: unknown): CommandResult<unknown> {
     const failure = failureOf(error) ?? localFailure('Malformed', 'unknown');
-    if (
-      failure.code === 'RuntimeReset' ||
-      failure.outcome === 'indeterminate'
-    ) {
+    if (isReset(failure)) {
       release(attempt);
       onReset(attempt.restaurantID);
       return { kind: 'reset', failure };
     }
-    if (settledOutcomes.has(failure.outcome)) {
+    if (settlesAttempt(failure)) {
       release(attempt);
       return { kind: 'rejected', failure };
     }
