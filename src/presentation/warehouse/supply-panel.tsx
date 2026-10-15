@@ -10,24 +10,8 @@ import {
   Td,
 } from '@/presentation/ui/table';
 import { FormMessage } from '@/presentation/ui/form-message';
-import { plural } from '@/presentation/ui/plural';
+import { days, displayDecimal } from '@/presentation/ui/decimals';
 import { WarehouseRead } from './warehouse-read';
-
-export function displayDecimal(value: string): string {
-  const [whole = '', fraction = ''] = value.split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  const tail = fraction.replace(/0+$/, '');
-  return tail === '' ? grouped : `${grouped},${tail}`;
-}
-
-// «1 день», «3 дня», «2,5 дня»: a fraction takes «дня».
-const days = (value: string): string => {
-  const [whole = '0', fraction = ''] = value.split('.');
-  const form = /[1-9]/.test(fraction)
-    ? 'дня'
-    : plural(whole, 'день', 'дня', 'дней');
-  return `${displayDecimal(value)}\u00a0${form}`;
-};
 
 function SupplyRows({ value }: { value: SupplySuggestions }) {
   return (

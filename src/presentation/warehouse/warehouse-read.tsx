@@ -19,10 +19,12 @@ export const warehouseStamp = (context: BusinessContext | undefined) =>
 export function WarehouseRead<T>({
   model,
   title,
+  section = 'Склад',
   children,
 }: {
   model: ReadModel<Envelope<T>>;
   title: string;
+  section?: string;
   children: (value: Envelope<T>) => ReactNode;
 }) {
   const { snapshot, failure } = useRestaurantRead(model);
@@ -31,7 +33,7 @@ export function WarehouseRead<T>({
       return (
         <ReadFailure
           failure={failure}
-          section="Склад"
+          section={section}
           title={title}
           onRetry={() => {
             model.refresh();
