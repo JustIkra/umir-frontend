@@ -1,4 +1,5 @@
 import type { RestaurantAccess, StaffRoleName } from '@/application/access';
+import { emailProblem } from '@/application/credentials';
 import { sortedRoles, type Outcome } from '@/application/organization-commands';
 import type {
   DurableResult,
@@ -181,8 +182,6 @@ export interface InviteInput {
   readonly grants: readonly RoleGrant[];
 }
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 // The checks before anything is sent: an empty address, its shape, no role at
 // all, an address of a member (D14: Auth would take the invitation and then
 // fail to accept it). undefined: it can be sent.
@@ -191,12 +190,7 @@ export function validateInvite(
   members: readonly Member[] | undefined,
 ): Extract<InviteState, { kind: 'invalid' } | { kind: 'member' }> | undefined {
   const email = input.email.trim();
-  const problem =
-    email === ''
-      ? ('required' as const)
-      : emailPattern.test(email)
-        ? undefined
-        : ('format' as const);
+  const problem = emailProblem(email);
   const roles = !input.grants.some((grant) => grant.roles.length > 0);
   if (problem !== undefined || roles) {
     return {

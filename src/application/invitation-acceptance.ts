@@ -3,8 +3,8 @@ import type { AccessStore } from './access';
 import type { ApiFailure } from './api';
 import type { CommandResult, CommandRunner } from './commands';
 import {
-  codePoints,
   defaultWaitSeconds,
+  nameProblem,
   normalizedCode,
   passwordProblem,
 } from './credentials';
@@ -156,9 +156,6 @@ const labels: Record<AcceptAction, string> = {
   accept: 'принятия приглашения',
 };
 
-const minName = 2;
-const maxName = 80;
-
 type Refusal = Exclude<CommandResult<unknown>, { readonly kind: 'committed' }>;
 
 // The code turns into «expired» at expiresAt without a request.
@@ -171,12 +168,6 @@ export function isAcceptCodeExpired(
     snapshot.expiresAtMs !== undefined &&
     nowMs >= snapshot.expiresAtMs
   );
-}
-
-function nameProblem(name: string): 'required' | 'length' | undefined {
-  if (name === '') return 'required';
-  const length = codePoints(name);
-  return length < minName || length > maxName ? 'length' : undefined;
 }
 
 export function createInvitationAcceptance({
