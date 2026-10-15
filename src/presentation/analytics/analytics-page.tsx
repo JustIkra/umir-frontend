@@ -5,6 +5,7 @@ import { useSectionDate } from '@/presentation/app-shell/section-date';
 import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
 import { EvaluationStamp } from '@/presentation/ui/evaluation-stamp';
 import { warehouseStamp } from '@/presentation/warehouse/warehouse-read';
+import { SupplyCard } from './supply-card';
 import { AnalyticsTiles } from './tiles';
 import { useAnalyticsWeek } from './week';
 
@@ -51,6 +52,7 @@ export function AnalyticsPage() {
         }}
       />
       <AnalyticsTiles stop={stop} pending={pending} expiring={expiring} />
+      <SupplyCard />
     </Stack>
   );
 }

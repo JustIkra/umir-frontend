@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
+import fin from '../../api/completion-v1-examples.json' with { type: 'json' };
+import {
+  decodePlanningEnvelope,
+  decodeSupplySuggestions,
+} from '../../src/adapters/api/decode/planning.ts';
 import {
   R,
   failedRead,
@@ -105,4 +110,78 @@ test('the stamp shows the oldest loaded read and waits while nothing is loaded',
   const empty = text(await renderRoute(page, { access: warehouse }));
   assert.ok(empty.includes('Получаем данные…'));
   assert.ok(!empty.includes('Обновлено'));
+});
+
+const supply = decodePlanningEnvelope(
+  fin.examples[0].value,
+  decodeSupplySuggestions,
+  'warehouse',
+);
+const supplyRead = loaded(supply.result, supply.context);
+
+test('«Скоро закончится» puts the dish blocker first and shows the cover from the supply hint', async () => {
+  const html = await renderRoute(page, {
+    access: warehouse,
+    data: { supplySuggestions: supplyRead },
+  });
+  const plain = text(html);
+  assert.ok(plain.includes('Скоро закончится'));
+  assert.ok(plain.includes('Данных пока мало'));
+  assert.ok(plain.indexOf('Milk') < plain.indexOf('Flour'));
+  assert.ok(plain.includes('Держит в стоп-листе 1 блюдо'));
+  assert.ok(plain.includes('Хватит на 2 дня'));
+  for (const label of [
+    'Запаса меньше чем на 3 дня',
+    'Держит блюда в стоп-листе',
+    'Линия — запас на 3 дня',
+  ])
+    assert.ok(plain.includes(label), label);
+  assert.ok(
+    html.includes(
+      'aria-label="Flour: 2 г — можно использовать, 1 г — расход в день, 2\u00a0дня — хватит"',
+    ),
+  );
+  assert.ok(
+    html.includes(
+      'aria-label="Milk: 0 мл — можно использовать, 0 мл — расход в день, 1 блюдо — в стоп-листе"',
+    ),
+  );
+  assert.equal(count(html, 'data-segment="cover"'), 1);
+  assert.ok(html.includes('data-threshold'));
+});
+
+test('«Скоро закончится» as a table lists every product with its numbers', async () => {
+  const plain = text(
+    await renderRoute(`${page}?supply=table`, {
+      access: warehouse,
+      data: { supplySuggestions: supplyRead },
+    }),
+  );
+  assert.ok(plain.includes('Показать графиком'));
+  assert.ok(plain.includes('Блюд в стоп-листе'));
+  assert.ok(plain.includes('Расхода нет'));
+  assert.ok(plain.includes('Flour'));
+});
+
+test('«Скоро закончится» when nothing runs out, and when the read fails', async () => {
+  const calm = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: {
+        supplySuggestions: loaded(
+          { ...supply.result, items: [] },
+          supply.context,
+        ),
+      },
+    }),
+  );
+  assert.ok(calm.includes('Сейчас ничего докупать не нужно.'));
+  const failed = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: { supplySuggestions: failedRead('UpstreamUnavailable', 503) },
+    }),
+  );
+  assert.ok(failed.includes('Не удалось загрузить подсказку о закупках'));
+  assert.ok(failed.includes('Попробовать ещё раз'));
 });
