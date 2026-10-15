@@ -344,6 +344,9 @@ export function createOrganizationCommands({
       const plan = planAssignments(membership, desired, editable);
       if (plan.kind === 'none') return { kind: 'unchanged' };
       let result: Outcome<unknown>;
+      // A revoke that committed changes the membership even when a later
+      // step fails: the list must be read again then.
+      let committed = false;
       if (plan.kind === 'replace') {
         result = outcome(
           await commands.run({
@@ -382,10 +385,11 @@ export function createOrganizationCommands({
             'membership',
           );
           if (result.kind !== 'done') break;
+          committed = true;
         }
       }
       // A refusal may come from a membership that moved on: read it again.
-      if (result.kind === 'done' || result.kind === 'conflict') {
+      if (committed || result.kind === 'done' || result.kind === 'conflict') {
         membersChanged(membership.orgID);
       }
       return result.kind === 'done' ? { kind: 'saved' } : result;

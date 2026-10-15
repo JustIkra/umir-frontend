@@ -269,6 +269,41 @@ test('revoking assignments stops at the first refusal', async () => {
   assert.equal(calls.length, 1);
 });
 
+test('a revoke that committed refreshes the members although a later one fails', async () => {
+  const cases = [
+    [
+      refusal(503, 'AuthUnavailable', 'unavailable'),
+      { kind: 'unavailable', code: 'AuthUnavailable' },
+    ],
+    [
+      refusal(504, 'UpstreamTimeout', 'unknown'),
+      { kind: 'unknown', code: 'UpstreamTimeout' },
+    ],
+    [refusal(403, 'Forbidden'), { kind: 'forbidden' }],
+  ];
+  for (const [failure, expected] of cases) {
+    const { organizations, calls, events } = setup({}, failure);
+    const result = await organizations.saveAssignments(
+      memberOf({ orgRoles: ['Admin'] }),
+      [],
+      everything,
+    );
+    assert.deepEqual(result, expected);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(events, [['members', ORG]]);
+  }
+});
+
+test('a first revoke that fails does not refresh the members unless it conflicts', async () => {
+  const { organizations, events } = setup(refusal(403, 'Forbidden'));
+  await organizations.saveAssignments(
+    memberOf({ orgRoles: ['Admin'] }),
+    [],
+    everything,
+  );
+  assert.deepEqual(events, []);
+});
+
 test('setAdmin sends the roles with the editable assignments only', async () => {
   const { organizations, calls } = setup({});
   const result = await organizations.setAdmin(memberOf(), true, new Set([R1]));
