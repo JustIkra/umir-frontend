@@ -1,44 +1,33 @@
 import { Flex, Stack, Text } from '@chakra-ui/react';
 import { useId } from 'react';
-import {
-  type Invitation,
-  type InvitationStatus,
-} from '@/presentation/placeholder-organizations';
+import type { RestaurantAccess } from '@/application/access';
+import type { InvitationRow as Row } from '@/application/organizations';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { ListCard } from '@/presentation/ui/card';
+import { grantsLine, invitationDates, invitationStatus } from './invitations';
 
-// Badge tones per 2b-1: «Принято» — success, «Ошибка отправки» — error, the
-// rest neutral (amber stays for expiry dates). Pending invitations can be
-// cancelled; expired, cancelled and failed ones can be sent again.
-const statuses: Record<
-  InvitationStatus,
-  {
-    label: string;
-    tone: 'neutral' | 'success' | 'error';
-    action?: 'cancel' | 'reinvite';
-  }
-> = {
-  queued: { label: 'Принято к отправке', tone: 'neutral', action: 'cancel' },
-  delivering: { label: 'Ожидает доставки', tone: 'neutral', action: 'cancel' },
-  pending: { label: 'Ожидает принятия', tone: 'neutral', action: 'cancel' },
-  accepted: { label: 'Принято', tone: 'success' },
-  expired: { label: 'Истекло', tone: 'neutral', action: 'reinvite' },
-  cancelled: { label: 'Отменено', tone: 'neutral', action: 'reinvite' },
-  failed: { label: 'Ошибка отправки', tone: 'error', action: 'reinvite' },
-};
-
-function InvitationRow({
-  invitation,
+function InvitationItem({
+  row,
+  restaurants,
+  timeZone,
   invitePath,
+  busy,
   onCancel,
+  onResend,
 }: {
-  invitation: Invitation;
+  row: Row;
+  restaurants: readonly RestaurantAccess[];
+  timeZone: string;
   invitePath: string;
-  onCancel: (email: string) => void;
+  // A resend or a cancellation of the row has no known outcome yet.
+  busy: boolean;
+  onCancel: (row: Row) => void;
+  onResend: (row: Row) => void;
 }) {
   const emailId = useId();
-  const status = statuses[invitation.status];
+  const { invitation } = row;
+  const status = invitationStatus(row);
   return (
     <Flex
       as="li"
@@ -53,9 +42,11 @@ function InvitationRow({
         <Text id={emailId} textStyle="body.strong" overflowWrap="anywhere">
           {invitation.email}
         </Text>
-        <Text textStyle="caption.default">{invitation.assignments}</Text>
+        <Text textStyle="caption.default">
+          {grantsLine(invitation.assignments, restaurants)}
+        </Text>
         <Text textStyle="caption.default" color="text.secondary">
-          {invitation.dates}
+          {invitationDates(row, timeZone)}
         </Text>
       </Stack>
       <Stack
@@ -63,22 +54,34 @@ function InvitationRow({
         align={{ base: 'flex-start', sm: 'flex-end' }}
       >
         <Badge tone={status.tone}>{status.label}</Badge>
-        {status.action === 'cancel' && (
+        {status.actions.includes('resend') && (
+          <Button
+            variant="secondary"
+            disabled={busy}
+            aria-describedby={emailId}
+            onClick={() => {
+              onResend(row);
+            }}
+          >
+            Отправить ссылку повторно
+          </Button>
+        )}
+        {status.actions.includes('cancel') && (
           <Button
             variant="secondary"
             aria-haspopup="dialog"
             aria-describedby={emailId}
             onClick={() => {
-              onCancel(invitation.email);
+              onCancel(row);
             }}
           >
             Отменить приглашение
           </Button>
         )}
-        {status.action === 'reinvite' && (
+        {status.actions.includes('reinvite') && (
           <ButtonLink
             variant="secondary"
-            to={invitePath}
+            to={`${invitePath}?from=${invitation.invitationID}`}
             aria-describedby={emailId}
           >
             Пригласить повторно
@@ -89,24 +92,37 @@ function InvitationRow({
   );
 }
 
-// Figma Invitation row: a line from 1024, a card on 390.
+// Figma Invitation row: a line from 1024, a card on 390. The roles are named
+// per restaurant of access; the buttons follow the status of the invitation.
 export function InvitationList({
-  invitations,
+  rows,
+  restaurants,
+  timeZone,
   invitePath,
+  busy,
   onCancel,
+  onResend,
 }: {
-  invitations: readonly Invitation[];
+  rows: readonly Row[];
+  restaurants: readonly RestaurantAccess[];
+  timeZone: string;
   invitePath: string;
-  onCancel: (email: string) => void;
+  busy: (invitationID: string) => boolean;
+  onCancel: (row: Row) => void;
+  onResend: (row: Row) => void;
 }) {
   return (
     <ListCard>
-      {invitations.map((invitation) => (
-        <InvitationRow
-          key={invitation.email + invitation.status}
-          invitation={invitation}
+      {rows.map((row) => (
+        <InvitationItem
+          key={row.invitation.invitationID}
+          row={row}
+          restaurants={restaurants}
+          timeZone={timeZone}
           invitePath={invitePath}
+          busy={busy(row.invitation.invitationID)}
           onCancel={onCancel}
+          onResend={onResend}
         />
       ))}
     </ListCard>

@@ -147,6 +147,12 @@ export type MembershipChange =
   | { readonly kind: 'admin'; readonly admin: boolean }
   | { readonly kind: 'revoke' };
 
+// What an invitation is sent with: the address and the roles per restaurant.
+export interface InviteInput {
+  readonly email: string;
+  readonly grants: readonly RoleGrant[];
+}
+
 export interface OrganizationCommands {
   createOrganization(input: NewOrganization): Promise<Outcome<Lifecycle>>;
   addRestaurant(orgID: string, name: string): Promise<Outcome<Lifecycle>>;
@@ -192,6 +198,9 @@ export interface OrganizationCommands {
     orgID: string,
     invitationID: string,
   ): Promise<Outcome<DurableResult>>;
+  // The input of the invitation that has no known outcome, per organization:
+  // «Проверить результат» resends the attempt that was sent with it.
+  pendingInvite(orgID: string): InviteInput | undefined;
   // True while a command of that key has no known outcome.
   isPending(key: string): boolean;
   // The input of the creation that has no known outcome: the attempt that is
@@ -221,6 +230,9 @@ export const orgKeys = {
 } as const;
 
 const defaultWaitSeconds = 60;
+// Auth allows three invitations to an address in ten minutes and says nothing
+// of the wait then.
+const inviteWindowSeconds = 600;
 
 // What a refusal means depends on the operation: Auth answers 404 NotFound
 // to a closed invitation and 409 CommandConflict to an address that already
@@ -236,7 +248,9 @@ export function refusalOf(failure: ApiFailure, scope: RefusalScope): Refusal {
   if (failure.status === 429 || failure.code === 'RateLimited') {
     return {
       kind: 'limited',
-      seconds: failure.retryAfterSeconds ?? defaultWaitSeconds,
+      seconds:
+        failure.retryAfterSeconds ??
+        (scope === 'invite' ? inviteWindowSeconds : defaultWaitSeconds),
     };
   }
   switch (failure.code) {
@@ -308,6 +322,10 @@ export function createOrganizationCommands({
   // A call made meanwhile resends that attempt, so it is the name of the
   // attempt, not the one of the new call, that the tracker is told.
   const unsettled = new Map<string, Unsettled>();
+
+  // What the invitations without a known outcome were sent with, per
+  // organization.
+  const invites = new Map<string, InviteInput>();
 
   // What the membership changes without a known outcome were sent with.
   const changes = new Map<string, MembershipChange>();
@@ -597,6 +615,11 @@ export function createOrganizationCommands({
       return result;
     },
     async invite(orgID, email, grants) {
+      // A call that finds the attempt pending resends it and keeps the
+      // remembered input.
+      if (!isPending(orgKeys.invite(orgID))) {
+        invites.set(orgID, { email, grants });
+      }
       const result = outcome(
         await commands.run({
           key: orgKeys.invite(orgID),
@@ -616,6 +639,7 @@ export function createOrganizationCommands({
         }),
         'invite',
       );
+      if (result.kind !== 'unknown') invites.delete(orgID);
       if (result.kind === 'done') invitationsChanged(orgID);
       return result;
     },
@@ -647,6 +671,8 @@ export function createOrganizationCommands({
       return result;
     },
     isPending,
+    pendingInvite: (orgID) =>
+      isPending(orgKeys.invite(orgID)) ? invites.get(orgID) : undefined,
     pendingOrganization: () =>
       isPending(orgKeys.createOrganization)
         ? unsettled.get(orgKeys.createOrganization)?.organization
@@ -659,6 +685,7 @@ export function createOrganizationCommands({
       unsettled.clear();
       changes.clear();
       revokePlans.clear();
+      invites.clear();
     },
   };
 }

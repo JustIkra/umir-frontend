@@ -18,6 +18,7 @@ import {
   h1,
   hrefs,
   instantOf,
+  invitationList,
   labels,
   loaded,
   memberList,
@@ -27,6 +28,7 @@ import {
   redirectOf,
   renderRoute,
   resetSnapshot,
+  sampleInvitationRow,
   sampleMember,
   sampleRestaurant,
   text,
@@ -507,13 +509,29 @@ test('the member page checks the roles of the member', async () => {
 });
 
 test('invitation actions follow the status', async () => {
-  const html = await renderRoute(
-    `/app/organizations/${ORG}/invitations`,
-    administered,
-  );
-  // Three pending rows and the submit button of the closed CX01 dialog.
-  assert.equal(html.match(/>Отменить приглашение</g)?.length, 3 + 1);
-  assert.equal(html.match(/>Пригласить повторно</g)?.length, 3);
+  const row = (id, state) =>
+    sampleInvitationRow({
+      invitation: {
+        invitationID: id,
+        email: `${id}@example.test`,
+        state,
+        expiresAt: instantOf('2026-10-20T10:00:00+03:00'),
+      },
+    });
+  const html = await renderRoute(`/app/organizations/${ORG}/invitations`, {
+    ...administered,
+    organizations: {
+      invitations: invitationList([
+        row('p1', 'pending'),
+        row('p2', 'pending'),
+        row('e1', 'expired'),
+        row('a1', 'accepted'),
+      ]),
+    },
+  });
+  // Two pending rows and the submit button of the closed CX01 dialog.
+  assert.equal(html.match(/>Отменить приглашение</g)?.length, 2 + 1);
+  assert.equal(html.match(/>Пригласить повторно</g)?.length, 1);
 });
 
 const OTHER = '55555555-5555-4555-8555-555555555555';

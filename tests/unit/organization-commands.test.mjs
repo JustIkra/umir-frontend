@@ -428,7 +428,7 @@ const table = [
   // Invite.
   ['invite', 409, 'CommandConflict', undefined, { kind: 'invited' }],
   ['invite', 403, 'Forbidden', undefined, { kind: 'forbidden' }],
-  ['invite', 429, 'RateLimited', undefined, { kind: 'limited', seconds: 60 }],
+  ['invite', 429, 'RateLimited', undefined, { kind: 'limited', seconds: 600 }],
   ['invite', 429, 'RateLimited', 17, { kind: 'limited', seconds: 17 }],
   ['invite', 503, 'DeliveryUnavailable', undefined, { kind: 'delivery' }],
   [
@@ -833,8 +833,46 @@ test('setAdmin and revokeMember remember what they were sent with', async () => 
   assert.deepEqual(organizations.pendingMembership(other), { kind: 'revoke' });
 });
 
+test('an invitation without a known outcome keeps the input it was sent with', async () => {
+  const { organizations, calls, events } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    { invitationID: INVITATION },
+  );
+  const grants = [{ restaurantID: R1, roles: ['Waiter'] }];
+  assert.equal(organizations.pendingInvite(ORG), undefined);
+  assert.equal(
+    (await organizations.invite(ORG, 'a@x.ru', grants)).kind,
+    'unknown',
+  );
+  assert.deepEqual(organizations.pendingInvite(ORG), {
+    email: 'a@x.ru',
+    grants,
+  });
+  assert.equal(organizations.pendingInvite(INVITATION), undefined);
+  // The form came back empty and checks the attempt: the input is not replaced.
+  const checked = await organizations.invite(ORG, '', []);
+  assert.equal(checked.kind, 'done');
+  assert.deepEqual(calls[1], calls[0]);
+  assert.deepEqual(events, [['invitations', ORG]]);
+  assert.equal(organizations.pendingInvite(ORG), undefined);
+});
+
+test('a refusal after the check clears the remembered invitation', async () => {
+  const { organizations } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
+    refusal(409, 'CommandConflict'),
+  );
+  const grants = [{ restaurantID: R1, roles: ['Waiter'] }];
+  await organizations.invite(ORG, 'a@x.ru', grants);
+  assert.deepEqual(await organizations.invite(ORG, 'a@x.ru', grants), {
+    kind: 'invited',
+  });
+  assert.equal(organizations.pendingInvite(ORG), undefined);
+});
+
 test('clear forgets the remembered inputs', async () => {
   const { organizations } = setup(
+    refusal(504, 'UpstreamTimeout', 'unknown'),
     refusal(504, 'UpstreamTimeout', 'unknown'),
     refusal(504, 'UpstreamTimeout', 'unknown'),
   );
@@ -845,9 +883,12 @@ test('clear forgets the remembered inputs', async () => {
   };
   await organizations.createOrganization(input);
   await organizations.saveAssignments(memberOf(), keepWaiter, everything);
+  await organizations.invite(ORG, 'a@x.ru', keepWaiter);
+  assert.notEqual(organizations.pendingInvite(ORG), undefined);
   organizations.clear();
   assert.equal(organizations.pendingMembership(MEMBERSHIP), undefined);
   assert.equal(organizations.pendingOrganization(), undefined);
+  assert.equal(organizations.pendingInvite(ORG), undefined);
 });
 
 const R4 = '44444444-4444-4444-8444-444444444444';

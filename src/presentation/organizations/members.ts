@@ -53,19 +53,36 @@ export function grantsOf(member: Member): readonly RoleGrant[] {
   });
 }
 
+const isReady = (restaurant: RestaurantAccess) =>
+  restaurant.lifecycle === 'ready';
+
 // The matrix offers restaurants that are ready or still preparing: Auth takes
 // an assignment to a preparing restaurant, and the deleted ones are gone.
+const isOffered = (restaurant: RestaurantAccess) =>
+  isReady(restaurant) || restaurant.lifecycle === 'registering';
+
 export function editableRestaurants(
   restaurants: readonly RestaurantAccess[],
 ): ReadonlySet<string> {
   return new Set(
-    restaurants
-      .filter(
-        (restaurant) =>
-          restaurant.lifecycle === 'ready' ||
-          restaurant.lifecycle === 'registering',
-      )
-      .map((restaurant) => restaurant.restaurantID),
+    restaurants.filter(isOffered).map((restaurant) => restaurant.restaurantID),
+  );
+}
+
+// The rows of the matrix, in the order of access.
+export function offeredRestaurants(
+  restaurants: readonly RestaurantAccess[],
+): readonly RestaurantAccess[] {
+  return restaurants.filter(isOffered);
+}
+
+// An invitation is refused for a restaurant that is not ready (D15): only
+// these may be sent.
+export function readyRestaurants(
+  restaurants: readonly RestaurantAccess[],
+): ReadonlySet<string> {
+  return new Set(
+    restaurants.filter(isReady).map((restaurant) => restaurant.restaurantID),
   );
 }
 

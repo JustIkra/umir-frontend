@@ -258,7 +258,7 @@ export const resetSnapshot = (overrides = {}) => ({
 // (members, invitations, profile; loading by default), operations (the
 // followed preparations and deletions), pending (command keys without a known
 // outcome; pendingOrganization and pendingRestaurantName are the inputs of
-// their attempts) and commands (replacements of command methods; pendingMembership is the remembered membership change).
+// their attempts) and commands (replacements of command methods; pendingMembership is the remembered membership change; pendingInvite the remembered invitation input).
 export function fakeServices({
   session = activeSession,
   access: givenAccess = readyAccess(),
@@ -326,6 +326,7 @@ export function fakeServices({
         invite: done,
         resendLink: done,
         cancelInvitation: done,
+        pendingInvite: () => organizations.pendingInvite,
         isPending: (key) => (organizations.pending ?? new Set()).has(key),
         pendingOrganization: () => organizations.pendingOrganization,
         pendingRestaurantName: () => organizations.pendingRestaurantName,

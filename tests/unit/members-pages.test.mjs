@@ -11,6 +11,8 @@ import {
   editableRestaurants,
   filterMembers,
   grantsOf,
+  offeredRestaurants,
+  readyRestaurants,
   revokeMessage,
   revokeOutcomeState,
   revokedNotice,
@@ -155,6 +157,18 @@ test('editableRestaurants are the ready and the preparing ones', () => {
   assert.deepEqual(
     [...editableRestaurants(restaurants)].sort(),
     [R, BEREGOVAYA, CHEKHOVA].sort(),
+  );
+});
+
+test('offeredRestaurants and readyRestaurants keep the rule in one place', () => {
+  assert.deepEqual(offeredRestaurants(restaurants), [
+    turgenev,
+    beregovaya,
+    chekhova,
+  ]);
+  assert.deepEqual(
+    [...readyRestaurants(restaurants)].sort(),
+    [R, BEREGOVAYA].sort(),
   );
 });
 

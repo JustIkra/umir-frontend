@@ -35,6 +35,7 @@ import {
   changedRestaurants,
   editableRestaurants,
   grantsOf,
+  offeredRestaurants,
   type AssignmentsState,
 } from './members';
 import {
@@ -253,9 +254,7 @@ function MemberCards({
   const { membershipID } = member.membership;
   useAttempts();
   const editable = editableRestaurants(organization.restaurants);
-  const offered = organization.restaurants.filter((restaurant) =>
-    editable.has(restaurant.restaurantID),
-  );
+  const offered = offeredRestaurants(organization.restaurants);
   const revoking = commands.pendingMembership(membershipID)?.kind === 'revoke';
   return (
     <>
