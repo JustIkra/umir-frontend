@@ -115,10 +115,16 @@ export function organizationDeletionNotice(
         text: 'Доступ к организации закрыт. Очистка данных продолжается в фоне.',
       };
     case 'finished':
-    case 'lost':
       return {
         title: `Организация «${operation.name}» удалена`,
         text: 'Доступ к организации закрыт, данные очищены. Учётные записи участников сохранены.',
+      };
+    // The operation can no longer be read: whether the data is cleaned is
+    // not known.
+    case 'lost':
+      return {
+        title: `Организация «${operation.name}» удалена`,
+        text: 'Доступ к организации закрыт. Состояние очистки данных получить не удалось. Учётные записи участников сохранены.',
       };
   }
 }

@@ -369,6 +369,14 @@ test('organizationDeletionNotice follows the status of the operation', () => {
     organizationDeletionNotice(deletion('lost'))?.title,
     'Организация «Северная сеть» удалена',
   );
+  // A lost operation does not say the data is cleaned: that is not known.
+  assert.match(
+    organizationDeletionNotice(deletion('finished'))?.text ?? '',
+    /данные очищены/,
+  );
+  const lost = organizationDeletionNotice(deletion('lost'))?.text ?? '';
+  assert.ok(!lost.includes('данные очищены'));
+  assert.match(lost, /Состояние очистки данных получить не удалось/);
   assert.equal(
     organizationDeletionNotice({
       ...deletion('following'),
