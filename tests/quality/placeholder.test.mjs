@@ -15,10 +15,7 @@ const files = (dir) =>
 const sample =
   /Марина Белова|m\.belova|Восток Фуд|На Пушкинской|Южного федерального|Ковалёва|restoran\.example|Уральская кухня|Тальятелле|Яйцо куриное|ord-20261010-0042|P-0158|Масло трюфельное|Суббота, 10 октября/;
 // The landing illustration shows its own sample screen.
-const allowed = [
-  'src/presentation/placeholder-organizations.ts',
-  'src/presentation/landing/product-preview.tsx',
-];
+const allowed = ['src/presentation/landing/product-preview.tsx'];
 
 test('placeholder data lives in marked modules', () => {
   for (const module of allowed.filter((path) => path.includes('placeholder-')))
@@ -36,11 +33,11 @@ test('placeholder data lives in marked modules', () => {
   assert.deepEqual(offenders, []);
 });
 
-test('only the organization screens keep sample modules', () => {
+test('no screen keeps a sample module', () => {
   assert.deepEqual(
     readdirSync(join(root, 'src/presentation')).filter((name) =>
       name.startsWith('placeholder-'),
     ),
-    ['placeholder-organizations.ts'],
+    [],
   );
 });
