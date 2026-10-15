@@ -35,6 +35,7 @@ import {
   PrivacyPolicyPage,
 } from './documents/pages';
 import { InviteAcceptancePage, createInviteLoader } from './invite/invite-page';
+import { RegisterPage, createRegisterLoader } from './register/register-page';
 import { LandingPage } from './landing/landing-page';
 import {
   createAdminLoader,
@@ -125,6 +126,12 @@ export function createRoutes(services: PresentationServices): RouteObject[] {
           path: '/login',
           loader: createSignInLoader(services),
           element: <SignInPage />,
+        },
+        {
+          path: '/register',
+          loader: createRegisterLoader(services),
+          element: <RegisterPage />,
+          errorElement: <NotFoundBoundary />,
         },
         { path: '/logout', element: <LogoutPage /> },
         { path: '/password-reset', element: <PasswordResetRequestPage /> },

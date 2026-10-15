@@ -5,6 +5,7 @@ import type { CatalogCommands } from '@/application/catalog-commands';
 import type { CommandRunner } from '@/application/commands';
 import type { CookieNoticeStore } from '@/application/cookie-notice';
 import type { FeedbackSubmitter } from '@/application/feedback';
+import type { Registration } from '@/application/registration';
 import type { InvitationAcceptance } from '@/application/invitation-acceptance';
 import type { LifecycleTracker } from '@/application/lifecycles';
 import type { LiveSync } from '@/application/live-sync';
@@ -36,6 +37,8 @@ export interface PresentationServices {
   passwordReset: PasswordResetFlow;
   // The invitee's page /invite/:id.
   invitationAcceptance: InvitationAcceptance;
+  // Open registration: the page /register.
+  registration: Registration;
   accountSettings: AccountSettings;
   // Organization administration of Auth: the lists and profile per
   // organization, the commands and the follow-up of preparation and deletion.

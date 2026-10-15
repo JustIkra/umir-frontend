@@ -265,6 +265,10 @@ export function SignInPage() {
           </FormMessage>
         )}
       </chakra.form>
+      <Text textStyle="body.default">
+        Нет учётной записи?{' '}
+        <TextLink to="/register">Зарегистрироваться</TextLink>
+      </Text>
     </AuthLayout>
   );
 }

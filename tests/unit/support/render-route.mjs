@@ -237,10 +237,21 @@ export const inviteSnapshot = (overrides = {}) => ({
   ...overrides,
 });
 
+export const registerSnapshot = (overrides = {}) => ({
+  step: 'form',
+  email: '',
+  displayName: '',
+  expiresAtMs: undefined,
+  resendAtMs: undefined,
+  busy: false,
+  notice: undefined,
+  ...overrides,
+});
+
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
 // «Данные обновились» notice of models; invite is the snapshot of the
-// invitation page. organizations carries the snapshots of the organization
+// invitation page; register the snapshot of the registration page. organizations carries the snapshots of the organization
 // models (members, invitations, profile; loading by default), operations (the
 // followed preparations and deletions), pending (command keys without a known
 // outcome, none on its way; inFlight is the keys whose request is on its way;
@@ -258,6 +269,7 @@ export function fakeServices({
   notice,
   reset = resetSnapshot(),
   invite = inviteSnapshot(),
+  register = registerSnapshot(),
   pending = { name: undefined, password: undefined },
   data = {},
   pendingProduct,
@@ -286,6 +298,16 @@ export function fakeServices({
       resend: () => Promise.resolve(),
       completeDetails: () => Promise.resolve(),
       acceptInvitation: () => Promise.resolve(),
+      check: () => Promise.resolve(),
+      restart: () => {},
+    },
+    registration: {
+      ...store(register),
+      submit: () => Promise.resolve(),
+      requestCode: () => Promise.resolve(),
+      verify: () => Promise.resolve(),
+      resend: () => Promise.resolve(),
+      completeDetails: () => Promise.resolve(),
       check: () => Promise.resolve(),
       restart: () => {},
     },
