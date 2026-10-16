@@ -23,10 +23,10 @@ import {
 } from './chart-card';
 
 const dishes = (count: number) =>
-  `${String(count)} ${plural(count, 'блюдо', 'блюда', 'блюд')}`;
+  `${String(count)}\u00a0${plural(count, 'блюдо', 'блюда', 'блюд')}`;
 // The supply hint's own numbers, rounded to one place for reading.
 const daily = (row: SupplyRow) =>
-  `${displayDecimal(roundTenth(row.averageDailyBaseUnits))} ${unitShort(row.baseUnit)}`;
+  `${displayDecimal(roundTenth(row.averageDailyBaseUnits))}\u00a0${unitShort(row.baseUnit)}`;
 const cover = (row: SupplyRow) =>
   row.coverageDays === null
     ? 'Расхода нет'

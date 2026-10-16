@@ -178,7 +178,7 @@ export function BarChart({
           display="grid"
           gridTemplateColumns={{
             base: 'minmax(0, 1fr) auto',
-            xl: `${rem(224)} minmax(0, 1fr) ${rem(184)}`,
+            xl: `${rem(224)} minmax(0, 1fr) ${rem(232)}`,
           }}
           gridTemplateAreas={{
             base: '"name figure" "bar bar"',

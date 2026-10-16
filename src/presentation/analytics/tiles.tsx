@@ -37,7 +37,7 @@ function Tile<T>({
         {label}
       </Text>
       {value !== undefined ? (
-        <Text textStyle="heading.h2">{`${String(n)} ${plural(n, ...forms)}`}</Text>
+        <Text textStyle="heading.h2">{`${String(n)}\u00a0${plural(n, ...forms)}`}</Text>
       ) : snapshot.failed ? (
         <Flex align="center" gap="3" wrap="wrap">
           <Text textStyle="heading.h2">—</Text>

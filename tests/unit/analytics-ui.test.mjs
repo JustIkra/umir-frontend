@@ -83,6 +83,7 @@ test('the tiles count stop-list dishes, batches to write off and batches that sp
   for (const label of ['В стоп-листе', 'Ждут списания', 'Испортится за 2 дня'])
     assert.ok(plain.includes(label), label);
   assert.ok(plain.includes('3 блюда'));
+  assert.ok(html.includes('3\u00a0блюда'));
   assert.equal(count(plain, '2 партии'), 2);
   assert.equal(count(hrefs(html).join(' '), `/app/r/${R}/warehouse/expiry`), 2);
 });
@@ -138,12 +139,12 @@ test('«Скоро закончится» puts the dish blocker first and shows 
     assert.ok(plain.includes(label), label);
   assert.ok(
     html.includes(
-      'aria-label="Flour: 2 г — можно использовать, 1 г — расход в день, 2\u00a0дня — хватит"',
+      'aria-label="Flour: 2 г — можно использовать, 1\u00a0г — расход в день, 2\u00a0дня — хватит"',
     ),
   );
   assert.ok(
     html.includes(
-      'aria-label="Milk: 0 мл — можно использовать, 0 мл — расход в день, 1 блюдо — в стоп-листе"',
+      'aria-label="Milk: 0 мл — можно использовать, 0\u00a0мл — расход в день, 1\u00a0блюдо — в стоп-листе"',
     ),
   );
   assert.equal(count(html, 'data-segment="cover"'), 1);
