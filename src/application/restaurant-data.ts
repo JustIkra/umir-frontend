@@ -13,7 +13,7 @@ import type {
   Suggestion,
 } from './restaurant';
 import type {
-  AnalyticsPeriod,
+  MovementQuery,
   ExpiringBatches,
   History,
   Inventory,
@@ -41,8 +41,8 @@ export interface RestaurantData {
   expiringBatches(): ReadModel<Envelope<ExpiringBatches>>;
   history(): ReadModel<Envelope<History>>;
   supplySuggestions(): ReadModel<Envelope<SupplySuggestions>>;
-  // One model per week: the dates are part of the resource.
-  movementReport(period: AnalyticsPeriod): ReadModel<Envelope<MovementReport>>;
+  // One model per week and settings version: both are part of the resource.
+  movementReport(query: MovementQuery): ReadModel<Envelope<MovementReport>>;
 }
 
 const catalogTopics: readonly Topic[] = ['catalog'];
@@ -163,10 +163,10 @@ export function createRestaurantData(
         ['stock', 'orders', 'catalog'],
         true,
       ),
-    movementReport: (period) =>
+    movementReport: (query) =>
       warehouse(
-        `warehouse/analytics/movements?fromDate=${period.fromDate}&throughDate=${period.throughDate}`,
-        (options) => reads.movementReport(restaurantID, period, options),
+        `warehouse/analytics/movements?fromDate=${query.fromDate}&throughDate=${query.throughDate}&expectedSettingsVersion=${query.expectedSettingsVersion}`,
+        (options) => reads.movementReport(restaurantID, query, options),
         ['stock', 'orders', 'analytics'],
         true,
       ),

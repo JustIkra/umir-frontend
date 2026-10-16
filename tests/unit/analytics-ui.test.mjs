@@ -386,7 +386,49 @@ test('«Куда ушли продукты» reads the week of the restaurant zo
   assert.deepEqual(periods.at(-1), {
     fromDate: '2026-10-07',
     throughDate: '2026-10-13',
+    expectedSettingsVersion: '1',
   });
+});
+
+test('«Куда ушли продукты» waits for access instead of asking without a settings version', async () => {
+  const queries = [];
+  const plain = text(
+    await renderRoute(page, {
+      access: {
+        status: 'unverified',
+        failure: { code: 'UpstreamUnavailable', outcome: 'unavailable' },
+        previous: undefined,
+      },
+      data: {
+        movementReport: (query) => {
+          queries.push(query);
+          return movements([]);
+        },
+      },
+    }),
+  );
+  assert.ok(plain.includes('Куда ушли продукты за 7 дней'));
+  assert.ok(plain.includes('Получаем данные…'));
+  assert.deepEqual(queries, []);
+});
+
+test('«Куда ушли продукты» asks with the settings version of the organization', async () => {
+  const queries = [];
+  const ready = access(['Warehouse']);
+  ready.organizations[0].settings = {
+    timeZone: 'Europe/Moscow',
+    settingsVersion: '5',
+  };
+  await renderRoute(page, {
+    access: ready,
+    data: {
+      movementReport: (query) => {
+        queries.push(query);
+        return movements([]);
+      },
+    },
+  });
+  assert.equal(queries.at(-1).expectedSettingsVersion, '5');
 });
 
 test('«Куда ушли продукты» as a table shows what arrived too', async () => {

@@ -7,8 +7,12 @@ const sample = examples.schemaCases.find(
   (item) => item.name === 'incomplete movement coverage',
 ).value;
 const R = sample.context.tenantID;
-const week = { fromDate: '2026-10-07', throughDate: '2026-10-13' };
-const path = `/api/v2/r/${R}/warehouse/analytics/movements?fromDate=2026-10-07&throughDate=2026-10-13&limit=500`;
+const week = {
+  fromDate: '2026-10-07',
+  throughDate: '2026-10-13',
+  expectedSettingsVersion: '1',
+};
+const path = `/api/v2/r/${R}/warehouse/analytics/movements?fromDate=2026-10-07&throughDate=2026-10-13&expectedSettingsVersion=1&limit=500`;
 
 const client = (...answers) => {
   const calls = [];
@@ -100,4 +104,18 @@ test('the movement report refuses repeated products and cursors, empty pages wit
   const extra = page([row('a')]);
   extra.items[0].supplier = 'unexpected';
   await refused(extra);
+});
+
+test('the movement report sends the settings version it expects', async () => {
+  const transport = client(structuredClone(sample));
+  await createWarehouseReads(transport).movementReport(
+    R,
+    { ...week, expectedSettingsVersion: '7' },
+    { background: false },
+  );
+  assert.ok(
+    transport.calls[0][0].includes(
+      'throughDate=2026-10-13&expectedSettingsVersion=7&limit=500',
+    ),
+  );
 });

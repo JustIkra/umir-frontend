@@ -125,11 +125,23 @@ test('menu, stop list and recommendations re-read on a tick', async () => {
 
 test('the movement report is one model per week and follows stock, orders, analytics and the tick', async () => {
   const { data, models, calls } = setup();
-  const week = { fromDate: '2026-10-08', throughDate: '2026-10-14' };
+  const week = {
+    fromDate: '2026-10-08',
+    throughDate: '2026-10-14',
+    expectedSettingsVersion: '1',
+  };
   assert.equal(data.movementReport(week), data.movementReport({ ...week }));
   assert.notEqual(
     data.movementReport(week),
-    data.movementReport({ fromDate: '2026-10-09', throughDate: '2026-10-15' }),
+    data.movementReport({ ...week, expectedSettingsVersion: '2' }),
+  );
+  assert.notEqual(
+    data.movementReport(week),
+    data.movementReport({
+      fromDate: '2026-10-09',
+      throughDate: '2026-10-15',
+      expectedSettingsVersion: '1',
+    }),
   );
   data.movementReport(week).subscribe(() => undefined);
   await settled();

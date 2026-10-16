@@ -76,6 +76,11 @@ export interface AnalyticsPeriod {
   readonly fromDate: string;
   readonly throughDate: string;
 }
+// The week plus the organization settings version the warehouse checks
+// the report against (409 SettingsChanged when Auth has a newer one).
+export interface MovementQuery extends AnalyticsPeriod {
+  readonly expectedSettingsVersion: string;
+}
 export interface PendingBatch {
   readonly batch: Batch;
   readonly status: 'pending_writeoff';
@@ -174,7 +179,7 @@ export interface WarehouseReads {
   ): Promise<Envelope<SupplySuggestions>>;
   movementReport(
     restaurantID: string,
-    period: AnalyticsPeriod,
+    query: MovementQuery,
     options: LoadOptions,
   ): Promise<Envelope<MovementReport>>;
 }

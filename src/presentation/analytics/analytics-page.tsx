@@ -1,5 +1,5 @@
 import { Stack } from '@chakra-ui/react';
-import type { BusinessContext } from '@/application/api';
+import type { BusinessContext, Envelope } from '@/application/api';
 import { PageHeader } from '@/presentation/app-shell/pages';
 import { useSectionDate } from '@/presentation/app-shell/section-date';
 import { useReadModel, useRestaurantData } from '@/presentation/session/hooks';
@@ -9,7 +9,7 @@ import { FlowCard } from './flow-card';
 import { RiskCard } from './risk-card';
 import { SupplyCard } from './supply-card';
 import { AnalyticsTiles } from './tiles';
-import { useAnalyticsWeek } from './week';
+import { useMovementQuery } from './week';
 
 // The stamp names the oldest data on the page.
 const oldest = (contexts: readonly (BusinessContext | undefined)[]) =>
@@ -26,13 +26,13 @@ const oldest = (contexts: readonly (BusinessContext | undefined)[]) =>
 export function AnalyticsPage() {
   const data = useRestaurantData();
   const caption = useSectionDate();
-  const week = useAnalyticsWeek();
+  const query = useMovementQuery();
   const stop = data.stopList();
   const pending = data.pendingWriteoffs();
   const expiring = data.expiringBatches();
   const supply = data.supplySuggestions();
   const stock = data.inventory();
-  const flow = data.movementReport(week);
+  const flow = query === undefined ? undefined : data.movementReport(query);
   const stamp = warehouseStamp(
     oldest([
       useReadModel(stop).value?.context,
@@ -40,7 +40,7 @@ export function AnalyticsPage() {
       useReadModel(expiring).value?.context,
       useReadModel(supply).value?.context,
       useReadModel(stock).value?.context,
-      useReadModel(flow).value?.context,
+      useReadModel<Envelope<unknown>>(flow ?? stock).value?.context,
     ]),
   );
   return (
@@ -49,8 +49,9 @@ export function AnalyticsPage() {
       <EvaluationStamp
         text={stamp}
         onRefresh={() => {
-          for (const model of [stop, pending, expiring, supply, stock, flow])
+          for (const model of [stop, pending, expiring, supply, stock])
             model.refresh();
+          flow?.refresh();
         }}
       />
       <AnalyticsTiles stop={stop} pending={pending} expiring={expiring} />

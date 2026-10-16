@@ -157,8 +157,8 @@ export function createWarehouseReads(
         id,
       );
     },
-    async movementReport(id, period, options) {
-      const path = `${base(id)}/analytics/movements?fromDate=${period.fromDate}&throughDate=${period.throughDate}&limit=500`;
+    async movementReport(id, query, options) {
+      const path = `${base(id)}/analytics/movements?fromDate=${query.fromDate}&throughDate=${query.throughDate}&expectedSettingsVersion=${encodeURIComponent(query.expectedSettingsVersion)}&limit=500`;
       let page = scope(movements(await client.read(path, options)), id);
       const first = page;
       if (

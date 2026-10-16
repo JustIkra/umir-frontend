@@ -27,7 +27,7 @@ import {
   visibleRows,
   type CardView,
 } from './chart-card';
-import { useAnalyticsWeek } from './week';
+import { useMovementQuery } from './week';
 
 const quantity = (value: string, row: FlowRow<MovementRow>) =>
   formatQuantity(value, row.item.baseUnit);
@@ -151,7 +151,7 @@ function FlowBody({
 
 export function FlowCard() {
   const data = useRestaurantData();
-  const week = useAnalyticsWeek();
+  const query = useMovementQuery();
   const [view, setView] = useCardView('flow');
   return (
     <ChartCard
@@ -159,20 +159,26 @@ export function FlowCard() {
       title="Куда ушли продукты за 7 дней"
       description="Сколько продуктов ушло в блюда, а сколько пришлось списать."
     >
-      <WarehouseRead
-        model={data.movementReport(week)}
-        section="Аналитика"
-        title="Не удалось загрузить движение продуктов"
-      >
-        {(value) => (
-          <FlowBody
-            report={value.result}
-            timeZone={value.context.settings.timeZone}
-            view={view}
-            onView={setView}
-          />
-        )}
-      </WarehouseRead>
+      {query === undefined ? (
+        <Text role="status" color="text.secondary">
+          Получаем данные…
+        </Text>
+      ) : (
+        <WarehouseRead
+          model={data.movementReport(query)}
+          section="Аналитика"
+          title="Не удалось загрузить движение продуктов"
+        >
+          {(value) => (
+            <FlowBody
+              report={value.result}
+              timeZone={value.context.settings.timeZone}
+              view={view}
+              onView={setView}
+            />
+          )}
+        </WarehouseRead>
+      )}
     </ChartCard>
   );
 }
