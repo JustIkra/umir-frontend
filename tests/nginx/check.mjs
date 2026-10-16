@@ -476,6 +476,23 @@ const checks = {
       assertSecurityHeaders(health, crossOrigin, 'healthz');
     },
 
+  // A stopped replica must not hold a stream request for the 5 s of the other locations.
+  'gives the live stream a short connect timeout so a stopped replica is skipped quickly':
+    () => {
+      const config = readFileSync(
+        new URL('../../nginx.conf', import.meta.url),
+        'utf8',
+      );
+      const live =
+        /location ~ \^\/api\/v2\/r\/\[0-9a-f-\]\+\/live\$ \{([^}]*)\}/.exec(
+          config,
+        );
+      assert.ok(live, 'the live location was not found');
+      const seconds = /proxy_connect_timeout (\d+)s;/.exec(live[1]);
+      assert.ok(seconds, 'the live location has no connect timeout of its own');
+      assert.ok(Number(seconds[1]) <= 2, 'connect timeout above 2 s');
+    },
+
   // The 504 answer needs a 30 s wait, so the file is read instead: nginx
   // drops inherited add_header lines in a block with its own, so each such
   // block must include the shared file again.
@@ -855,7 +872,7 @@ const checks = {
       execFileSync('docker', ['stop', '--time', '1', first.id]);
       try {
         // At once Nginx may still list the stopped replica. The call that finds it out can end in a
-        // 504 (the connect to a stopped container times out after 5 s, and Nginx does not always
+        // 504 (the connect to a stopped container times out after 2 s, and Nginx does not always
         // have a second try left while it re-reads the replicas' addresses); it marks the replica
         // failed, and the very next call of the same session reaches the other one.
         let now = await answeredBy(owned);

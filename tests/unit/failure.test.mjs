@@ -44,3 +44,20 @@ test('a rate limit carries the seconds to wait', () => {
     { kind: 'rate-limited', retryAfterSeconds: 60 },
   );
 });
+
+test('DUR1 admission answers on a read: 429 waits, 503 before dispatch is unavailable', () => {
+  assert.deepEqual(
+    screenFailure(
+      refused(429, 'RateLimited', 'not_committed', { retryAfterSeconds: 7 }),
+    ),
+    { kind: 'rate-limited', retryAfterSeconds: 7 },
+  );
+  assert.deepEqual(
+    screenFailure(refused(429, 'RateLimited', 'not_committed')),
+    { kind: 'rate-limited', retryAfterSeconds: undefined },
+  );
+  assert.equal(
+    screenFailure(refused(503, 'ServiceUnavailable', 'unavailable')).kind,
+    'unavailable',
+  );
+});
