@@ -901,6 +901,66 @@ const checks = {
     assert.notEqual(tried.at(-1).node, tried.at(-2).node);
   },
 
+  // C55: the error log is set to "crit". At "error" Nginx writes the client address and the request
+  // line of a failed upstream call, which the access-log rules (no address, no query) forbid.
+  'keeps the client address and the request out of the error log': async () => {
+    // The checks before this one made Nginx fail upstream calls (a dropped answer, a stopped replica);
+    // sending another dropped answer here would leave both replicas out for the next 10 s.
+    for (const service of ['frontend', 'frontend-untrusted']) {
+      const log = compose('logs', '--no-log-prefix', service);
+      assert.doesNotMatch(log, /\[(error|warn)\]/, `${service}: error line`);
+      assert.ok(!log.includes('client:'), `${service}: client address`);
+      assert.ok(!log.includes('request:'), `${service}: request line`);
+      assert.ok(!log.includes('?drop'), `${service}: query string`);
+    }
+    assert.match(
+      compose('logs', '--no-log-prefix', 'frontend'),
+      / GET \/api\/v2\/r\/[^ ]+\/live 502 /,
+      'the failed call is not in the access log',
+    );
+    const config = readFileSync(
+      new URL('../../nginx.conf', import.meta.url),
+      'utf8',
+    );
+    assert.match(config, /^error_log stderr crit;$/m);
+  },
+
+  // C34: UMIR_TRUSTED_PROXY is exactly one CIDR (or address). An empty value or a list would give
+  // an invalid "set_real_ip_from"; the image must refuse to start rather than trust anyone.
+  'refuses to start on an empty or a many-valued UMIR_TRUSTED_PROXY': () => {
+    const test = (value) => {
+      try {
+        execFileSync(
+          'docker',
+          [
+            'run',
+            '--rm',
+            '-e',
+            'NGINX_ENVSUBST_FILTER=^UMIR_',
+            '-e',
+            `UMIR_TRUSTED_PROXY=${value}`,
+            '-v',
+            `${new URL('../../nginx.conf', import.meta.url).pathname}:/etc/nginx/templates/default.conf.template:ro`,
+            '-v',
+            `${new URL('../../security-headers.conf', import.meta.url).pathname}:/etc/nginx/security-headers.conf:ro`,
+            process.env.NGINX_IMAGE,
+            'nginx',
+            '-t',
+          ],
+          { encoding: 'utf8', stdio: 'pipe' },
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    assert.ok(test('10.0.0.0/8'), 'one CIDR must start');
+    assert.ok(test('10.0.0.1'), 'one address must start');
+    assert.ok(!test(''), 'an empty value must not start');
+    assert.ok(!test('10.0.0.0/8,172.16.0.0/12'), 'a comma list must not start');
+    assert.ok(!test('10.0.0.0/8 172.16.0.0/12'), 'a space list must not start');
+  },
+
   // The last check: it stops the stand-in and starts it again.
   'answers /readyz without gateway and without caching': async () => {
     compose('stop', 'gateway');
