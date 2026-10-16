@@ -202,10 +202,28 @@ export const orderSnapshot = (overrides = {}) => ({
   phase: { kind: 'compose' },
   notice: undefined,
   locked: false,
+  notSaved: false,
   ...overrides,
 });
 
 const done = () => Promise.resolve({ kind: 'done', value: undefined });
+
+// The state of one saved attempt as a screen reads it. discards counts the
+// calls of discardCorrupt, which answers `discard`.
+export const attemptState = ({
+  notSaved = false,
+  damaged = false,
+  discard = 'ok',
+  discards = { count: 0 },
+} = {}) => ({
+  notSaved: () => notSaved,
+  damaged: () => damaged,
+  discardCorrupt: () => {
+    discards.count += 1;
+    return discard;
+  },
+  subscribe: () => () => {},
+});
 
 const staticModel = (snapshot) => ({
   subscribe: () => () => {},
@@ -250,8 +268,9 @@ export const registerSnapshot = (overrides = {}) => ({
 
 // Screens only read these ports during render; nothing is sent. refresh()
 // answers refreshed; accessCalls counts the reads of access; notice is the
-// «Данные обновлены» notice of models; invite is the snapshot of the
-// invitation page; register the snapshot of the registration page.
+// «Данные обновлены» notice of models; sessionCalls counts the sign-outs and
+// checks of the session (signOutResult is what a sign-out answers); invite is
+// the snapshot of the invitation page; register the snapshot of the registration page.
 // organizations carries the snapshots of the organization models (members,
 // invitations, profile; loading by default), operations (the followed
 // preparations and deletions), pending (command keys without a known
@@ -265,6 +284,8 @@ export function fakeServices({
   access = readyAccess(),
   refreshed = access,
   accessCalls = { ensure: 0, refresh: 0 },
+  sessionCalls = { signOut: 0, check: 0 },
+  signOutResult = 'done',
   remembered,
   attempts = [],
   notice,
@@ -275,6 +296,9 @@ export function fakeServices({
   data = {},
   pendingProduct,
   pendingDish,
+  attempt = attemptState(),
+  writeoffAttempts = {},
+  commandResult,
   order = orderSnapshot(),
   organizations = {},
 } = {}) {
@@ -371,9 +395,15 @@ export function fakeServices({
     session: {
       ...store(session),
       ensure: () => Promise.resolve(session),
-      check: () => Promise.resolve('active'),
+      check: () => {
+        sessionCalls.check += 1;
+        return Promise.resolve('active');
+      },
       signIn: () => Promise.reject(new Error('no sign-in in render tests')),
-      signOut: () => Promise.resolve('done'),
+      signOut: () => {
+        sessionCalls.signOut += 1;
+        return Promise.resolve(signOutResult);
+      },
       signOutEverywhere: () => Promise.resolve('done'),
       adopt: () => {},
       updateUser: () => {},
@@ -436,20 +466,28 @@ export function fakeServices({
     }),
     warehouseCommands: () => ({
       receiveDelivery: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       pendingDelivery: () => undefined,
       pendingDeliveryTimeZone: () => undefined,
       confirmWriteoff: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       pendingWriteoff: () => false,
+      deliveryAttempt: attempt,
+      writeoffAttempt: (batchID) => writeoffAttempts[batchID] ?? attempt,
     }),
     catalogCommands: () => ({
       registerProduct: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       defineDish: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       pendingProduct: () => pendingProduct,
       pendingDish: () => pendingDish,
+      productAttempt: attempt,
+      dishAttempt: attempt,
     }),
     orderFlow: () => ({
       subscribe: () => () => {},

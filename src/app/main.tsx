@@ -25,6 +25,7 @@ import { createOrganizationsApi } from '@/adapters/api/organizations-api';
 import { createTimerScheduler } from '@/adapters/browser-page/scheduler';
 import { createPageVisibility } from '@/adapters/browser-page/visibility';
 import { createCookieNoticeStore } from '@/adapters/browser-storage/cookie-notice-store';
+import { createAttemptStore } from '@/adapters/browser-storage/attempt-store';
 import { createOrderStore } from '@/adapters/browser-storage/order-store';
 import { createInvitationStore } from '@/adapters/browser-storage/invitation-store';
 import { createRegistrationStore } from '@/adapters/browser-storage/registration-store';
@@ -37,10 +38,18 @@ import { createEventSourceFeed } from '@/adapters/live/event-source-feed';
 import { createAccountSettings } from '@/application/account-settings';
 import { createAccessStore } from '@/application/access';
 import {
+  restoreAttempts,
+  restoreWhenActive,
+} from '@/application/attempts-restore';
+import {
   createCatalogCommands,
   type CatalogCommands,
 } from '@/application/catalog-commands';
 import { createCommandRunner } from '@/application/commands';
+import {
+  inertCatalogCommands,
+  inertWarehouseCommands,
+} from '@/application/inert-commands';
 import { createEpochRegistry } from '@/application/epochs';
 import {
   createFeedbackSubmitter,
@@ -129,8 +138,9 @@ const lifecycles = createLifecycleTracker({
     void access.refresh();
   },
 });
+const liveFeed = createEventSourceFeed((url) => new EventSource(url));
 const live = createLiveSync({
-  feed: createEventSourceFeed((url) => new EventSource(url)),
+  feed: liveFeed,
   scheduler,
   visibility,
   sessionCheck: { check: () => session.check() },
@@ -154,34 +164,45 @@ const restaurantReads = {
 };
 const catalogApi = createCatalogApi(client);
 const warehouseApi = createWarehouseApi(client);
+// The factories of warehouse and catalog commands, one per user and
+// restaurant. Their saved attempts are not erased with them.
 const warehouseCommands = new Map<string, WarehouseCommands>();
 const orderApi = createOrderApi(client);
 const orderStore = createOrderStore(browserSessionStorage());
+const attemptStore = createAttemptStore(browserSessionStorage());
+// The user of the active session, or nobody. The warehouse and catalog
+// screens sit behind the session gate, but a screen can still call a factory
+// in the moment the session ends; it then gets inert commands that send and
+// save nothing, never a factory for nobody.
+const activeUserID = (): string | undefined => {
+  const state = session.getSnapshot();
+  return state.status === 'active' ? state.user.userID : undefined;
+};
+const inertWarehouse = inertWarehouseCommands();
+const inertCatalog = inertCatalogCommands();
 const restaurantData = new Map<string, RestaurantData>();
 const catalogCommands = new Map<string, CatalogCommands>();
 const restaurantFeedback = new Map<string, FeedbackSubmitter>();
-const orderFlows = createOrderFlowRegistry(
-  (userID, restaurantID) =>
-    createOrderFlow({
-      api: orderApi,
-      commands,
-      epochs,
-      storage: orderStore,
-      scheduler,
-      now,
-      restaurantID,
-      userID,
-      onReset: () => {
-        models.reset(restaurantID);
-      },
-      onOrdered: () => {
-        models.markStale(restaurantID, ['orders', 'stock', 'menu']);
-      },
-      onUnauthenticated: () => {
-        void session.check();
-      },
-    }),
-  orderStore,
+const orderFlows = createOrderFlowRegistry((userID, restaurantID) =>
+  createOrderFlow({
+    api: orderApi,
+    commands,
+    epochs,
+    storage: orderStore,
+    scheduler,
+    now,
+    restaurantID,
+    userID,
+    onReset: () => {
+      models.reset(restaurantID);
+    },
+    onOrdered: () => {
+      models.markStale(restaurantID, ['orders', 'stock', 'menu']);
+    },
+    onUnauthenticated: () => {
+      void session.check();
+    },
+  }),
 );
 const accountApi = createAccountApi(client);
 const session = createSessionStore({
@@ -195,6 +216,7 @@ const session = createSessionStore({
   },
   onSignedOut: () => {
     live.stop();
+    liveFeed.forget();
     models.clear();
     commands.clear();
     epochs.clear();
@@ -219,6 +241,7 @@ const session = createSessionStore({
   // Another user signed in, here or in another tab. The shown restaurant
   // reads that user's access again.
   onUserChanged: () => {
+    liveFeed.forget();
     models.clear();
     commands.clear();
     epochs.clear();
@@ -335,12 +358,18 @@ const services: PresentationServices = {
     return data;
   },
   catalogCommands: (restaurantID) => {
-    let catalog = catalogCommands.get(restaurantID);
+    const userID = activeUserID();
+    if (userID === undefined) return inertCatalog;
+    const key = `${userID}/${restaurantID}`;
+    let catalog = catalogCommands.get(key);
     if (catalog === undefined) {
       catalog = createCatalogCommands({
         api: catalogApi,
         commands,
         restaurantID,
+        userID,
+        attempts: attemptStore,
+        now,
         markStale: (topics) => {
           models.markStale(restaurantID, topics);
         },
@@ -348,17 +377,23 @@ const services: PresentationServices = {
           void session.check();
         },
       });
-      catalogCommands.set(restaurantID, catalog);
+      catalogCommands.set(key, catalog);
     }
     return catalog;
   },
   warehouseCommands: (restaurantID) => {
-    let value = warehouseCommands.get(restaurantID);
+    const userID = activeUserID();
+    if (userID === undefined) return inertWarehouse;
+    const key = `${userID}/${restaurantID}`;
+    let value = warehouseCommands.get(key);
     if (value === undefined) {
       value = createWarehouseCommands({
         api: warehouseApi,
         commands,
         restaurantID,
+        userID,
+        attempts: attemptStore,
+        now,
         newID: () => crypto.randomUUID(),
         markStale: (topics) => {
           models.markStale(restaurantID, topics);
@@ -367,7 +402,7 @@ const services: PresentationServices = {
           void session.check();
         },
       });
-      warehouseCommands.set(restaurantID, value);
+      warehouseCommands.set(key, value);
     }
     return value;
   },
@@ -378,6 +413,16 @@ const services: PresentationServices = {
       : undefined;
   },
 };
+// After sign-in the saved attempts of the user come back without an open
+// page: W11 lists them and they hold the restaurant switch.
+restoreWhenActive(session, (userID) => {
+  restoreAttempts({
+    store: attemptStore,
+    userID,
+    warehouseCommands: services.warehouseCommands,
+    catalogCommands: services.catalogCommands,
+  });
+});
 const router = createBrowserRouter(createRoutes(services));
 
 createRoot(root).render(

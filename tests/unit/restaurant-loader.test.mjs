@@ -59,7 +59,6 @@ function servicesWithStoredAttempt() {
               load: () => stored,
               save: () => {},
               clear: () => {},
-              clearAll: () => {},
             },
             scheduler: { schedule: () => () => {} },
             now: () => 42,

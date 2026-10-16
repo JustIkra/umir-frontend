@@ -16,6 +16,8 @@ import {
 import { media } from '@/presentation/theme/system';
 import { Button } from '@/presentation/ui/actions';
 import { SearchInput } from '@/presentation/ui/form';
+import { orderNotSaved } from '@/presentation/ui/attempt-messages';
+import { NotSavedNotice } from '@/presentation/ui/attempt-notices';
 import { rem } from '@/presentation/ui/units';
 import { MenuTabs } from './menu-tabs';
 import { draftTotals } from '@/domain/order-draft';
@@ -314,6 +316,7 @@ function OrdersView({ flow }: { flow: OrderFlow }) {
           {orderView && back !== undefined && (
             <Box display={{ base: 'block', sm: 'none' }}>{back}</Box>
           )}
+          {snapshot.notSaved && <NotSavedNotice text={orderNotSaved} />}
           {panel}
         </Stack>
       </Grid>

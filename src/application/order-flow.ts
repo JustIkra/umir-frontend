@@ -85,6 +85,9 @@ export interface OrderSnapshot {
   readonly phase: OrderPhase;
   readonly notice: OrderNotice | undefined;
   readonly locked: boolean; // preparing, confirming, unknown, pending, conflict
+  // The browser refused to keep the order: after a reload the result has to
+  // be checked in the order history. The order itself works as before.
+  readonly notSaved: boolean;
 }
 export interface OrderFlow {
   readonly subscribe: (listener: () => void) => () => void;
@@ -166,13 +169,20 @@ export function createOrderFlow({
   let attempt: StoredAttempt | undefined = stored?.attempt;
   let phase: OrderPhase = { kind: 'compose' };
   let notice: OrderNotice | undefined;
+  let notSaved = false;
   // The proposal of the latest evaluation: the replacement for F1.
   let latest: OrderProposal | undefined;
   let cancelTimer: (() => void) | undefined;
   let disposed = false;
 
   function view(): OrderSnapshot {
-    return { draft, phase, notice, locked: lockedPhases.has(phase.kind) };
+    return {
+      draft,
+      phase,
+      notice,
+      locked: lockedPhases.has(phase.kind),
+      notSaved,
+    };
   }
 
   function publish(): void {
@@ -186,13 +196,20 @@ export function createOrderFlow({
     publish();
   }
 
+  // The last write decides: a refused one raises the warning, a later
+  // accepted one lowers it.
   function save(): void {
-    storage.save({ userID, restaurantID, lines: draft, attempt });
+    notSaved =
+      storage.save({ userID, restaurantID, lines: draft, attempt }) ===
+      'unavailable';
   }
 
   function keepAttempt(next: StoredAttempt): StoredAttempt {
+    const was = notSaved;
     attempt = next;
     save();
+    // Written inside a send, where no screen update follows by itself.
+    if (notSaved !== was) publish();
     return next;
   }
 

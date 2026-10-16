@@ -30,6 +30,12 @@ import {
   SelectField,
   TextInput,
 } from '@/presentation/ui/form';
+import { attemptPlaces } from '@/presentation/ui/attempt-messages';
+import {
+  DamagedAttempt,
+  NotSavedNotice,
+  useAttemptFlags,
+} from '@/presentation/ui/attempt-notices';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
@@ -89,6 +95,7 @@ export function NewDishPage() {
   const products = useReadModel(data.products()).value?.result.items ?? [];
   const known = useReadModel(data.dishCatalog()).value?.result.items;
   useAttempts();
+  const attempt = useAttemptFlags(catalog.dishAttempt);
   const pending = catalog.pendingDish();
   const [start] = useState(() =>
     pending === undefined ? undefined : dishDraftOf(pending),
@@ -102,6 +109,8 @@ export function NewDishPage() {
   const [status, setStatus] = useState<Status>(
     start === undefined ? 'idle' : 'unknown',
   );
+  // The code of the latest refusal: a saved attempt that blocks says so.
+  const [refusedCode, setRefusedCode] = useState<string | undefined>();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -118,7 +127,10 @@ export function NewDishPage() {
   }, [settledElsewhere, dishesModel]);
   const shown: Status = settledElsewhere ? 'idle' : status;
   const closed =
-    shown === 'sending' || shown === 'unknown' || shown === 'reset';
+    shown === 'sending' ||
+    shown === 'unknown' ||
+    shown === 'reset' ||
+    attempt.damaged;
   const codeValue = code ?? suggested;
   const rows = lines;
   const productOptions = products.map((product) => ({
@@ -188,6 +200,7 @@ export function NewDishPage() {
         setStatus('rejected');
         return;
       case 'refused':
+        setRefusedCode(outcome.code);
         setStatus('refused');
         return;
       case 'ended':
@@ -234,15 +247,19 @@ export function NewDishPage() {
           }
         : shown === 'unknown' || shown === 'reset'
           ? { tone: 'unknown' as const, ...outcomeMessage('dish', shown) }
-          : shown === 'rejected' || shown === 'refused'
-            ? {
-                tone: 'error' as const,
-                ...outcomeMessage(
-                  'dish',
-                  shown === 'rejected' ? 'invalid' : 'refused',
-                ),
-              }
-            : undefined;
+          : shown === 'refused' && refusedCode === 'AttemptDamaged'
+            ? // The closed form already says it; after the cancel nothing stale stays.
+              undefined
+            : shown === 'rejected' || shown === 'refused'
+              ? {
+                  tone: 'error' as const,
+                  ...outcomeMessage(
+                    'dish',
+                    shown === 'rejected' ? 'invalid' : 'refused',
+                    refusedCode,
+                  ),
+                }
+              : undefined;
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <Stack gap={{ base: '4', sm: '6' }}>
@@ -258,6 +275,12 @@ export function NewDishPage() {
           description="Рецепт — на одну порцию. После создания блюдо нельзя изменить."
         />
       </Stack>
+      {attempt.damaged && (
+        <DamagedAttempt state={catalog.dishAttempt} place="dishes" />
+      )}
+      {attempt.notSaved && (
+        <NotSavedNotice text={attemptPlaces.dishes.notSaved} />
+      )}
       {message !== undefined && (
         <FormMessage tone={message.tone} title={message.title}>
           {message.text}

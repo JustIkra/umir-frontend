@@ -230,8 +230,7 @@ export interface StoredOrder {
 }
 export interface OrderStorage {
   load(userID: string, restaurantID: string): StoredOrder | undefined;
-  save(record: StoredOrder): void;
+  // `unavailable`: the browser refused the write, the order stays in memory.
+  save(record: StoredOrder): 'ok' | 'unavailable';
   clear(userID: string, restaurantID: string): void;
-  // Another user signed in or the user signed out.
-  clearAll(): void;
 }

@@ -2,6 +2,7 @@ import { Flex, Stack, Text, chakra } from '@chakra-ui/react';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { findRestaurant } from '@/application/access';
+import type { AttemptState } from '@/application/durable-attempts';
 import { formatQuantity } from '@/domain/quantity';
 import {
   useAccess,
@@ -13,11 +14,51 @@ import { useServices } from '@/presentation/services';
 import { Button } from '@/presentation/ui/actions';
 import { Badge } from '@/presentation/ui/badge';
 import { ListCard } from '@/presentation/ui/card';
+import {
+  attemptPlaces,
+  attemptRefusalText,
+} from '@/presentation/ui/attempt-messages';
+import {
+  DamagedAttempt,
+  NotSavedNotice,
+  useAttemptFlags,
+} from '@/presentation/ui/attempt-notices';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { rem } from '@/presentation/ui/units';
 import { formatAbsoluteStamp } from '@/presentation/ui/zones';
 import { WarehouseLayout } from './warehouse-layout';
 import { WarehouseRead, warehouseStamp } from './warehouse-read';
 import { remainingTime } from './warehouse-time';
+
+// The button of one batch's write-off with the warnings of its saved attempt:
+// a damaged one closes the button until the attempt is cancelled.
+function WriteoffControls({
+  state,
+  disabled,
+  label,
+  onConfirm,
+}: {
+  state: AttemptState;
+  disabled: boolean;
+  label: string;
+  onConfirm: () => void;
+}) {
+  const attempt = useAttemptFlags(state);
+  return (
+    <Stack gap="2" maxW={{ sm: rem(360) }}>
+      {attempt.damaged ? (
+        <DamagedAttempt state={state} place="warehouse" />
+      ) : (
+        <Button variant="secondary" disabled={disabled} onClick={onConfirm}>
+          {label}
+        </Button>
+      )}
+      {attempt.notSaved && (
+        <NotSavedNotice text={attemptPlaces.warehouse.notSaved} />
+      )}
+    </Stack>
+  );
+}
 
 export function ExpiryPage() {
   const { restaurantID = '' } = useParams();
@@ -77,20 +118,25 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
               : 'refused',
       }));
       setMessage(
-        result.kind === 'unknown'
-          ? {
-              title: 'Не знаем, прошло ли списание',
-              text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не спишется.',
-            }
-          : result.kind === 'reset'
+        result.kind === 'refused' && result.code === 'AttemptDamaged'
+          ? undefined
+          : result.kind === 'unknown'
             ? {
                 title: 'Не знаем, прошло ли списание',
-                text: 'Данные обновились. Обновите список и проверьте, списана ли партия.',
+                text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не спишется.',
               }
-            : {
-                title: 'Не удалось списать',
-                text: 'Обновите страницу и попробуйте ещё раз.',
-              },
+            : result.kind === 'reset'
+              ? {
+                  title: 'Не знаем, прошло ли списание',
+                  text: 'Данные обновились. Обновите список и проверьте, списана ли партия.',
+                }
+              : {
+                  title: 'Не удалось списать',
+                  text:
+                    (result.kind === 'refused'
+                      ? attemptRefusalText(result.code, 'warehouse')
+                      : undefined) ?? 'Обновите страницу и попробуйте ещё раз.',
+                },
       );
     }
   };
@@ -226,27 +272,28 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                       <Badge tone="expiry">Ожидает списания</Badge>
                     </Stack>
                     {canWriteoff && (
-                      <Button
-                        variant="secondary"
+                      <WriteoffControls
+                        state={commands.writeoffAttempt(batch.batchID)}
                         disabled={
                           unit === undefined ||
                           status === 'sending' ||
                           status === 'done' ||
                           status === 'reset'
                         }
-                        onClick={() => {
+                        label={
+                          status === 'sending'
+                            ? 'Списываем…'
+                            : status === 'unknown'
+                              ? 'Проверить результат'
+                              : 'Подтвердить списание'
+                        }
+                        onConfirm={() => {
                           void confirm(
                             batch.batchID,
                             value.context.runtimeEpoch,
                           );
                         }}
-                      >
-                        {status === 'sending'
-                          ? 'Списываем…'
-                          : status === 'unknown'
-                            ? 'Проверить результат'
-                            : 'Подтвердить списание'}
-                      </Button>
+                      />
                     )}
                   </Flex>
                 );

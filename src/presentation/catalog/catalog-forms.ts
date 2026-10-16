@@ -12,6 +12,7 @@ import {
   type BaseUnit,
   type QuantityError,
 } from '@/domain/quantity';
+import { attemptRefusalText } from '@/presentation/ui/attempt-messages';
 import { listText, plural } from '@/presentation/ui/plural';
 
 export interface ProductDraft {
@@ -170,6 +171,8 @@ export function createdDishText(
 export function outcomeMessage(
   kind: 'product' | 'dish',
   outcome: 'unknown' | 'reset' | 'invalid' | 'refused',
+  // The code of a refusal: a saved attempt that blocks the create says so.
+  code?: string,
 ): { readonly title: string; readonly text: string } {
   const product = kind === 'product';
   const notCreated = product ? 'Продукт не создан' : 'Блюдо не создано';
@@ -197,7 +200,11 @@ export function outcomeMessage(
     case 'refused':
       return {
         title: notCreated,
-        text: 'Не получилось сохранить. Данные остались в форме — попробуйте ещё раз.',
+        text:
+          (code === undefined
+            ? undefined
+            : attemptRefusalText(code, product ? 'products' : 'dishes')) ??
+          'Не получилось сохранить. Данные остались в форме — попробуйте ещё раз.',
       };
   }
 }

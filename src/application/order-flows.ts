@@ -1,9 +1,9 @@
 import type { OrderFlow } from './order-flow';
-import type { OrderStorage } from './restaurant';
 
 export interface OrderFlowRegistry {
   get(userID: string, restaurantID: string): OrderFlow;
-  // Sign-out or another user: drop every flow and the orders of the tab.
+  // Sign-out or another user: stop every flow of the tab. The saved orders
+  // stay: they belong to their user and come back when that user returns.
   forget(): void;
 }
 
@@ -11,7 +11,6 @@ export interface OrderFlowRegistry {
 // draft and an unchecked attempt survive leaving the section.
 export function createOrderFlowRegistry(
   create: (userID: string, restaurantID: string) => OrderFlow,
-  storage: Pick<OrderStorage, 'clearAll'>,
 ): OrderFlowRegistry {
   const flows = new Map<string, OrderFlow>();
   return {
@@ -27,7 +26,6 @@ export function createOrderFlowRegistry(
     forget() {
       for (const flow of flows.values()) flow.dispose();
       flows.clear();
-      storage.clearAll();
     },
   };
 }

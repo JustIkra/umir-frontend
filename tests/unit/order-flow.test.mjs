@@ -64,7 +64,7 @@ function manualScheduler() {
 }
 
 function memory(initial) {
-  const box = { record: initial, cleared: 0 };
+  const box = { record: initial, blocked: false };
   return {
     box,
     load: (userID, restaurantID) =>
@@ -72,13 +72,11 @@ function memory(initial) {
         ? box.record
         : undefined,
     save: (record) => {
+      if (box.blocked) return 'unavailable';
       box.record = record;
+      return 'ok';
     },
     clear: () => {
-      box.record = undefined;
-    },
-    clearAll: () => {
-      box.cleared += 1;
       box.record = undefined;
     },
   };
@@ -561,3 +559,50 @@ for (const [status, code] of [
     assert.equal(phase(flow).kind, 'confirmed');
   });
 }
+
+test('storage that refuses writes: prepare and confirm go out and the flow says it is not saved', async () => {
+  const context = setup();
+  context.storage.box.blocked = true;
+  const { flow, answers, calls } = context;
+  assert.equal(flow.getSnapshot().notSaved, false);
+  flow.add('206');
+  assert.equal(flow.getSnapshot().notSaved, true);
+  answers.prepare.push(envelope(proposalOf('prp-1')));
+  await flow.prepare();
+  assert.equal(phase(flow).kind, 'proposal');
+  assert.deepEqual(calls[0].slice(0, 2), ['prepare', R]);
+  assert.equal(flow.getSnapshot().notSaved, true);
+  // The attempt is not written, yet the confirmation is sent with its command.
+  let during;
+  flow.subscribe(() => {
+    during ??= flow.getSnapshot().notSaved;
+  });
+  answers.confirm.push(lost());
+  await flow.confirm();
+  assert.deepEqual(calls.at(-1), ['confirm', R, 'prp-1', 'cmd-1', EPOCH]);
+  assert.equal(phase(flow).kind, 'unknown');
+  assert.equal(flow.getSnapshot().notSaved, true);
+  assert.equal(during, true);
+  assert.equal(context.storage.box.record, undefined);
+});
+
+test('the warning goes away when the storage takes the order again', async () => {
+  const context = await atProposal();
+  const { flow, storage, answers } = context;
+  storage.box.blocked = true;
+  answers.confirm.push(lost());
+  await flow.confirm();
+  assert.equal(flow.getSnapshot().notSaved, true);
+  storage.box.blocked = false;
+  answers.confirm.push(envelope({ kind: 'OrderConfirmed', order }));
+  await flow.check();
+  assert.equal(phase(flow).kind, 'confirmed');
+  assert.equal(flow.getSnapshot().notSaved, false);
+});
+
+test('a storage that takes the order never raises the warning', async () => {
+  const { flow, answers } = await atProposal();
+  answers.confirm.push(lost());
+  await flow.confirm();
+  assert.equal(flow.getSnapshot().notSaved, false);
+});
