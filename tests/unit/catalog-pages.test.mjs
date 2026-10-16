@@ -156,3 +156,25 @@ test('a dish the catalog does not have shows «Блюдо не найдено»'
   assert.ok(plain.includes('Блюдо не найдено'));
   assert.ok(plain.includes('К списку блюд'));
 });
+
+test('the new dish picks ingredients with search, not a system select', async () => {
+  const html = await renderRoute(`/app/r/${R}/catalog/dishes/new`);
+  assert.doesNotMatch(html, /<select/);
+});
+
+test('an ingredient line chooses its product with search', async () => {
+  const html = await renderRoute(`/app/r/${R}/catalog/dishes/new`, {
+    pendingDish: {
+      dishID: '213',
+      name: 'Паста',
+      ingredients: [{ productID: '125', quantity: '20000', baseUnit: 'g' }],
+    },
+  });
+  assert.doesNotMatch(html, /<select/);
+  assert.match(html, /role="combobox"/);
+  // The unfinished attempt keeps the form closed: the search field is too.
+  assert.match(
+    html,
+    /<input[^>]*role="combobox"[^>]*disabled|<input[^>]*disabled[^>]*role="combobox"/,
+  );
+});

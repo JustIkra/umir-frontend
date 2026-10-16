@@ -19,7 +19,6 @@ import { FormMessage } from '@/presentation/ui/form-message';
 import { formatInstant } from '@/presentation/ui/time';
 import { formatSectionDate } from '@/presentation/ui/zones';
 import { civilFields, draftFromForm } from './delivery-forms';
-import { media } from '@/presentation/theme/system';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
 import { Breadcrumbs } from '@/presentation/ui/breadcrumbs';
 import {
@@ -27,23 +26,30 @@ import {
   SplitCardBody,
   SplitCardForm,
 } from '@/presentation/ui/card';
+import { DateField } from '@/presentation/ui/date-field';
 import {
-  DateInput,
   FieldGroup,
   FieldLabel,
   FieldMessage,
   QuantityInput,
-  SelectField,
   TextInput,
-  TimeInput,
 } from '@/presentation/ui/form';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
+import { ruDateToIso } from '@/presentation/ui/masks';
+import { SearchSelect } from '@/presentation/ui/search-select';
+import { Stepper, daysUnit } from '@/presentation/ui/stepper';
+import { TimeField } from '@/presentation/ui/time-field';
 import { rem } from '@/presentation/ui/units';
 
-// From 1367 the column heads name the fields, so the labels are hidden
+// The delivery lines are a table from 1420, not from the theme's 2xl (1367):
+// at 1367 the content is 997 and the columns need 1039, so the product field
+// would clip its «Найти продукт». Below it the lines stay cards.
+const wide = '@media (min-width: 1420px)';
+
+// In the table the column heads name the fields, so the labels are hidden
 // visually but stay for screen readers.
 const hiddenWide = {
-  [media.wide]: {
+  [wide]: {
     position: 'absolute',
     width: '1px',
     height: '1px',
@@ -53,17 +59,52 @@ const hiddenWide = {
   },
 } as const;
 
-const wideColumns = `${rem(28)} minmax(${rem(160)}, ${rem(200)}) ${rem(128)} ${rem(188)} ${rem(176)} ${rem(188)} ${rem(40)}`;
+// Columns of the table layout, in px. The fixed ones are 24 + 104 + 254 + 170
+// + 254 + 32 = 838 and the 6 gaps of 6 add 36, so with the product field at
+// least 165 (its placeholder is 111 and the field adds 52) the content needs
+// 1039. The content is the viewport less 370: 1050 at 1420 (the product has
+// 176) and 1070 at 1440 (196). A date with a time is 254: the date field is
+// at least 148, the gap 6, the time 100.
+const wideColumns = `${rem(24)} minmax(${rem(165)}, 1fr) ${rem(104)} ${rem(254)} ${rem(170)} ${rem(254)} ${rem(32)}`;
+const wideGap = '1.5';
+const rowTimeWide = { [wide]: { width: rem(100) } } as const;
+const rowWide = {
+  [wide]: {
+    gridTemplateAreas: "'number product quantity made shelf received remove'",
+    gridTemplateColumns: wideColumns,
+    alignItems: 'center',
+    columnGap: wideGap,
+    p: '0',
+    py: '3',
+    borderWidth: '0 0 1px',
+    borderRadius: '0',
+  },
+} as const;
+const numberWide = {
+  [wide]: {
+    px: '0',
+    bg: 'transparent',
+    textStyle: 'body.default',
+    color: 'text.secondary',
+  },
+} as const;
 
 function RowLabel({
   htmlFor,
+  id,
   children,
 }: {
   htmlFor: string;
+  id?: string;
   children: string;
 }) {
   return (
-    <chakra.label htmlFor={htmlFor} textStyle="caption.strong" css={hiddenWide}>
+    <chakra.label
+      htmlFor={htmlFor}
+      id={id}
+      textStyle="caption.strong"
+      css={hiddenWide}
+    >
       {children}
     </chakra.label>
   );
@@ -72,6 +113,9 @@ function RowLabel({
 interface Row {
   readonly key: number;
   readonly product: string;
+  // The Stepper is controlled, so the row keeps its own copy of the value it
+  // posts as `shelf-N`.
+  readonly shelf: string;
 }
 
 export function DeliveryPage() {
@@ -126,16 +170,23 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
     productRead.value === undefined;
   const [dirty, setDirty] = useState(false);
   useLeaveGuard(dirty && pending === undefined ? 'Форма поставки' : undefined);
+  const todayIso = ruDateToIso(formatInstant(openedAt, timeZone, 'date'));
+  const nowTime = formatInstant(now(), timeZone, 'time');
   const productOptions = products.map((product) => ({
     value: product.productID,
     label: product.name,
+    code: product.productID,
   }));
+  const markDirty = () => {
+    setDirty(true);
+  };
   const [rows, setRows] = useState<readonly Row[]>(() =>
     pending === undefined
-      ? [{ key: 1, product: '' }]
+      ? [{ key: 1, product: '', shelf: '' }]
       : pending.lines.map((line, index) => ({
           key: index + 1,
           product: line.productID,
+          shelf: line.shelfLife.value,
         })),
   );
   const [next, setNext] = useState(() => rows.length + 1);
@@ -198,7 +249,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
           if (input === undefined) {
             setStatus('invalid');
             setMessage(
-              'Заполните все поля. Дата — дд.мм.гггг, время — чч:мм, срок — целое число дней, количество — больше нуля, с точностью до 0,001.',
+              'Заполните все поля: номер поставки, продукт, количество больше нуля, срок годности, даты и время. Время — от 00:00 до 23:59.',
             );
             return;
           }
@@ -268,29 +319,36 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                 />
               </FieldGroup>
               <FieldGroup>
-                <FieldLabel htmlFor="delivery-date">
+                <FieldLabel htmlFor="delivery-date" id="delivery-date-label">
                   Дата и время создания поставки
                 </FieldLabel>
                 <Flex gap="1.5">
-                  <DateInput
+                  <DateField
                     id="delivery-date"
+                    labelId="delivery-date-label"
                     name="createdDate"
-                    defaultValue={
-                      created.date || formatInstant(openedAt, timeZone, 'date')
-                    }
-                    w="auto"
-                    flex="1"
-                    minW="0"
+                    defaultValue={ruDateToIso(created.date) || todayIso}
+                    today={todayIso}
+                    timeZone={timeZone}
+                    disabled={closed}
+                    onValueChange={markDirty}
                     aria-describedby="delivery-date-hint"
                   />
-                  <TimeInput
-                    name="createdTime"
-                    defaultValue={
-                      created.time || formatInstant(openedAt, timeZone, 'time')
-                    }
-                    aria-label="Время создания поставки"
-                    aria-describedby="delivery-date-hint"
-                  />
+                  <Box w={rem(112)} flexShrink="0">
+                    <TimeField
+                      id="delivery-time"
+                      name="createdTime"
+                      defaultValue={
+                        created.time ||
+                        formatInstant(openedAt, timeZone, 'time')
+                      }
+                      now={nowTime}
+                      disabled={closed}
+                      onValueChange={markDirty}
+                      aria-label="Время создания поставки"
+                      aria-describedby="delivery-date-hint"
+                    />
+                  </Box>
                 </Flex>
                 <FieldMessage
                   id="delivery-date-hint"
@@ -308,9 +366,10 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
             <Stack gap="0">
               <Grid
                 aria-hidden="true"
-                display={{ base: 'none', '2xl': 'grid' }}
+                display="none"
+                css={{ [wide]: { display: 'grid' } }}
                 gridTemplateColumns={wideColumns}
-                columnGap="3"
+                columnGap={wideGap}
                 alignItems="start"
                 pb="2"
                 borderBottomWidth="1px"
@@ -327,7 +386,8 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               </Grid>
               <Stack
                 as="ol"
-                gap={{ base: '3', '2xl': '0' }}
+                gap="3"
+                css={{ [wide]: { gap: '0' } }}
                 listStyleType="none"
               >
                 {rows.map((row, index) => {
@@ -348,48 +408,43 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                       gridTemplateAreas={{
                         base: "'head' 'product' 'quantity' 'made' 'shelf' 'received'",
                         sm: "'head head' 'product quantity' 'made shelf' 'received received'",
-                        '2xl':
-                          "'number product quantity made shelf received remove'",
                       }}
                       gridTemplateColumns={{
                         base: '1fr',
                         sm: 'repeat(2, minmax(0, 1fr))',
-                        '2xl': wideColumns,
                       }}
-                      alignItems={{ base: 'start', '2xl': 'center' }}
-                      columnGap={{ base: '4', '2xl': '3' }}
+                      alignItems="start"
+                      columnGap="4"
                       rowGap="3"
-                      p={{ base: '4', '2xl': '0' }}
-                      py={{ '2xl': '3' }}
+                      p="4"
                       bg="bg.surface"
-                      borderWidth={{ base: '1px', '2xl': '0 0 1px' }}
+                      borderWidth="1px"
                       borderColor="border.default"
-                      borderRadius={{ base: 'md', '2xl': '0' }}
+                      borderRadius="md"
+                      css={rowWide}
                     >
                       <Flex
                         gridArea="head"
-                        display={{ base: 'flex', '2xl': 'contents' }}
+                        display="flex"
                         align="center"
                         gap="3"
+                        css={{ [wide]: { display: 'contents' } }}
                       >
                         <Text
                           gridArea="number"
                           minW="6"
-                          px={{ base: '2', '2xl': '0' }}
-                          bg={{ base: 'bg.subtle', '2xl': 'transparent' }}
+                          px="2"
+                          bg="bg.subtle"
                           borderRadius="sm"
                           textAlign="center"
-                          textStyle={{
-                            base: 'caption.strong',
-                            '2xl': 'body.default',
-                          }}
-                          color={{ '2xl': 'text.secondary' }}
+                          textStyle="caption.strong"
+                          css={numberWide}
                         >
                           {number}
                         </Text>
                         <Text
                           flex="1"
-                          display={{ '2xl': 'none' }}
+                          css={{ [wide]: { display: 'none' } }}
                           textStyle="caption.default"
                           color="text.secondary"
                         >
@@ -400,7 +455,8 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                           gridArea="remove"
                           display="flex"
                           boxSize="10"
-                          my={{ base: '-2', '2xl': '0' }}
+                          my="-2"
+                          css={{ [wide]: { boxSize: '8', my: '0' } }}
                           alignItems="center"
                           justifyContent="center"
                           borderRadius="md"
@@ -423,13 +479,15 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                       </Flex>
                       <Stack gridArea="product" gap="1">
                         <RowLabel htmlFor={id('product')}>Продукт</RowLabel>
-                        <SelectField
+                        <SearchSelect
                           id={id('product')}
-                          value={row.product}
-                          placeholder="Выберите продукт"
                           options={productOptions}
-                          onChange={(event) => {
-                            const product = event.target.value;
+                          value={row.product}
+                          placeholder="Найти продукт"
+                          listLabel="Продукты"
+                          disabled={closed}
+                          onValueChange={(product) => {
+                            markDirty();
                             setRows((list) =>
                               list.map((item) =>
                                 item.key === row.key
@@ -454,81 +512,99 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                         />
                       </Stack>
                       <Stack gridArea="made" gap="1">
-                        <RowLabel htmlFor={id('made')}>
+                        <RowLabel htmlFor={id('made')} id={id('made-label')}>
                           Дата и время изготовления
                         </RowLabel>
                         <Flex gap="1.5">
-                          <DateInput
+                          <DateField
                             id={id('made')}
+                            labelId={id('made-label')}
                             name={`made-date-${String(row.key)}`}
-                            defaultValue={
+                            defaultValue={ruDateToIso(
                               civilFields(pending?.lines[index]?.manufacturedAt)
-                                .date
-                            }
-                            w="auto"
-                            flex="1"
-                            minW="0"
+                                .date,
+                            )}
+                            today={todayIso}
+                            timeZone={timeZone}
+                            disabled={closed}
+                            onValueChange={markDirty}
                           />
-                          <TimeInput
-                            w={{ base: rem(96), '2xl': rem(72) }}
-                            name={`made-time-${String(row.key)}`}
-                            defaultValue={
-                              civilFields(pending?.lines[index]?.manufacturedAt)
-                                .time
-                            }
-                            aria-label={`Время изготовления, строка ${number}`}
-                          />
-                        </Flex>
-                      </Stack>
-                      <Stack gridArea="shelf" gap="1">
-                        <RowLabel htmlFor={id('shelf')}>Срок годности</RowLabel>
-                        <Flex gap="1.5">
-                          <TextInput
-                            id={id('shelf')}
-                            name={`shelf-${String(row.key)}`}
-                            defaultValue={
-                              pending?.lines[index]?.shelfLife.value
-                            }
-                            inputMode="numeric"
-                            placeholder="0"
-                            w={rem(64)}
-                            flexShrink="0"
-                          />
-                          <Box flex="1" minW="0">
-                            <SelectField
-                              options={[{ value: 'days', label: 'дней' }]}
-                              aria-label={`Единица срока годности, строка ${number}`}
+                          <Box w={rem(112)} css={rowTimeWide} flexShrink="0">
+                            <TimeField
+                              id={id('made-time')}
+                              name={`made-time-${String(row.key)}`}
+                              defaultValue={
+                                civilFields(
+                                  pending?.lines[index]?.manufacturedAt,
+                                ).time
+                              }
+                              now={nowTime}
+                              disabled={closed}
+                              onValueChange={markDirty}
+                              aria-label={`Время изготовления, строка ${number}`}
                             />
                           </Box>
                         </Flex>
                       </Stack>
+                      <Stack gridArea="shelf" gap="1">
+                        <RowLabel htmlFor={id('shelf')}>Срок годности</RowLabel>
+                        <Stepper
+                          id={id('shelf')}
+                          name={`shelf-${String(row.key)}`}
+                          value={row.shelf}
+                          label={`строка ${number}`}
+                          unit={daysUnit}
+                          disabled={closed}
+                          onChange={(shelf) => {
+                            markDirty();
+                            setRows((list) =>
+                              list.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, shelf }
+                                  : item,
+                              ),
+                            );
+                          }}
+                        />
+                      </Stack>
                       <Stack gridArea="received" gap="1">
-                        <RowLabel htmlFor={id('received')}>
+                        <RowLabel
+                          htmlFor={id('received')}
+                          id={id('received-label')}
+                        >
                           Дата и время поступления
                         </RowLabel>
                         <Flex gap="1.5">
-                          <DateInput
+                          <DateField
                             id={id('received')}
+                            labelId={id('received-label')}
                             name={`received-date-${String(row.key)}`}
                             defaultValue={
-                              civilFields(pending?.lines[index]?.receivedAt)
-                                .date ||
-                              formatInstant(openedAt, timeZone, 'date')
+                              ruDateToIso(
+                                civilFields(pending?.lines[index]?.receivedAt)
+                                  .date,
+                              ) || todayIso
                             }
-                            w="auto"
-                            flex="1"
-                            minW="0"
+                            today={todayIso}
+                            timeZone={timeZone}
+                            disabled={closed}
+                            onValueChange={markDirty}
                           />
-                          <TimeInput
-                            w={{ base: rem(96), '2xl': rem(72) }}
-                            name={`received-time-${String(row.key)}`}
-                            defaultValue={
-                              civilFields(pending?.lines[index]?.receivedAt)
-                                .time ||
-                              formatInstant(openedAt, timeZone, 'time')
-                            }
-                            aria-label={`Время поступления, строка ${number}`}
-                          />
+                          <Box w={rem(112)} css={rowTimeWide} flexShrink="0">
+                            <TimeField
+                              id={id('received-time')}
+                              name={`received-time-${String(row.key)}`}
+                              defaultValue={
+                                civilFields(pending?.lines[index]?.receivedAt)
+                                  .time ||
+                                formatInstant(openedAt, timeZone, 'time')
+                              }
+                              now={nowTime}
+                              disabled={closed}
+                              onValueChange={markDirty}
+                              aria-label={`Время поступления, строка ${number}`}
+                            />
+                          </Box>
                         </Flex>
                       </Stack>
                     </Grid>
@@ -542,7 +618,10 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               px="calc({spacing.3} - 1px)"
               py="calc({spacing.2} - 1px)"
               onClick={() => {
-                setRows((list) => [...list, { key: next, product: '' }]);
+                setRows((list) => [
+                  ...list,
+                  { key: next, product: '', shelf: '' },
+                ]);
                 setNext((value) => value + 1);
               }}
             >

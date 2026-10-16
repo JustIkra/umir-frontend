@@ -12,13 +12,12 @@ import { useState, type ReactNode, type Ref } from 'react';
 import alertIcon from '@/presentation/assets/icons/alert-16.svg';
 import checkDisabledIcon from '@/presentation/assets/icons/check-disabled-16.svg';
 import checkIcon from '@/presentation/assets/icons/check-on-action-16.svg';
-import chevronIcon from '@/presentation/assets/icons/chevron-down-24.svg';
 import eyeOffIcon from '@/presentation/assets/icons/eye-off-24.svg';
 import eyeIcon from '@/presentation/assets/icons/eye-24.svg';
 import lockIcon from '@/presentation/assets/icons/lock-24.svg';
 import searchIcon from '@/presentation/assets/icons/search-24.svg';
 import { Icon } from './icon';
-import { rem } from './units';
+import { sanitizeQuantity } from './masks';
 
 // Figma Field 117:1418: label, control, then a hint or an error that says what
 // to fix. Error text replaces the hint and is linked through aria-describedby.
@@ -390,60 +389,6 @@ export function SearchInput({
   );
 }
 
-// Figma Select (P1, K14): a native <select> styled as Input 117:1393 with a
-// chevron. The placeholder is a disabled first option; without one the first
-// option is chosen («дней» in P1).
-export function SelectField({
-  placeholder,
-  options,
-  invalid = false,
-  ...props
-}: {
-  placeholder?: string;
-  invalid?: boolean;
-  options: readonly { value: string; label: string }[];
-} & HTMLChakraProps<'select'>) {
-  return (
-    <Box position="relative" w="full">
-      <chakra.select
-        {...controlStyles(invalid)}
-        appearance="none"
-        h="2.75rem"
-        pl={invalid ? 'calc({spacing.3} - 1px)' : '3'}
-        pr="10"
-        cursor="pointer"
-        defaultValue={
-          placeholder === undefined || props.value !== undefined
-            ? undefined
-            : ''
-        }
-        aria-invalid={invalid || undefined}
-        {...props}
-      >
-        {placeholder !== undefined && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </chakra.select>
-      <Icon
-        src={chevronIcon}
-        size={24}
-        position="absolute"
-        top="50%"
-        right="3"
-        transform="translateY(-50%)"
-        pointerEvents="none"
-      />
-    </Box>
-  );
-}
-
 // Figma Radio 641:4290 in a fieldset whose legend names the group (K05):
 // options in a row from 768, one under another with 44px rows on 390.
 export function RadioGroupField({
@@ -524,36 +469,6 @@ export function RadioGroupField({
   );
 }
 
-// Figma date and time fields: text inputs with «дд.мм.гггг» and «чч:мм»; the
-// service validates Moscow time, the browser does not pick dates.
-export function DateInput(
-  props: { ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>,
-) {
-  return (
-    <TextInput
-      inputMode="numeric"
-      placeholder="дд.мм.гггг"
-      w={rem(156)}
-      flexShrink="0"
-      {...props}
-    />
-  );
-}
-
-export function TimeInput(
-  props: { ref?: Ref<HTMLInputElement> } & HTMLChakraProps<'input'>,
-) {
-  return (
-    <TextInput
-      inputMode="numeric"
-      placeholder="чч:мм"
-      w={rem(96)}
-      flexShrink="0"
-      {...props}
-    />
-  );
-}
-
 // Figma quantity field: a number with its unit inside the right edge.
 export function QuantityInput({
   unit,
@@ -587,6 +502,13 @@ export function QuantityInput({
         _placeholder={{ color: 'text.secondary' }}
         _focusVisible={{ outline: 'none' }}
         {...props}
+        onChange={(event) => {
+          const clean = sanitizeQuantity(event.currentTarget.value);
+          if (clean !== event.currentTarget.value) {
+            event.currentTarget.value = clean;
+          }
+          props.onChange?.(event);
+        }}
       />
       <Text as="span" textStyle="body.default" color="text.secondary">
         {unit}

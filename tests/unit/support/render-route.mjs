@@ -275,6 +275,7 @@ export function fakeServices({
   data = {},
   pendingProduct,
   pendingDish,
+  pendingDelivery,
   order = orderSnapshot(),
   organizations = {},
 } = {}) {
@@ -437,8 +438,9 @@ export function fakeServices({
     warehouseCommands: () => ({
       receiveDelivery: () =>
         Promise.reject(new Error('no commands in render tests')),
-      pendingDelivery: () => undefined,
-      pendingDeliveryTimeZone: () => undefined,
+      pendingDelivery: () => pendingDelivery,
+      pendingDeliveryTimeZone: () =>
+        pendingDelivery === undefined ? undefined : 'Europe/Moscow',
       confirmWriteoff: () =>
         Promise.reject(new Error('no commands in render tests')),
       pendingWriteoff: () => false,
