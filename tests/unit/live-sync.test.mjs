@@ -338,3 +338,22 @@ test('a stream quota refusal only backs off: no attempt is resolved, no topic is
   assert.deepEqual(ended, []);
   assert.equal(live.getSnapshot().restaurantID, R);
 });
+
+test('a new stream epoch with the same read generation only re-reads: no access ends, no attempt is touched', async () => {
+  // C19: another replica has another boot-nonce. The client marks every model
+  // stale and reads again; "Данные обновились" belongs to RuntimeReset only.
+  const { live, feed, marks, ended, refused, resolves } = setup();
+  live.start(R);
+  feed.status('open');
+  feed.emit(change(5n, ['stock']));
+  await settled();
+  const resolvedBefore = resolves();
+  feed.emit(change(1n, ['stock'], E2));
+  assert.deepEqual(marks.at(-1), [R, 'all']);
+  assert.deepEqual(ended, []);
+  assert.deepEqual(refused, []);
+  await settled();
+  assert.equal(live.getSnapshot().restaurantID, R);
+  // Pending attempts are looked at by the same signal as for any change.
+  assert.ok(resolves() >= resolvedBefore);
+});

@@ -314,7 +314,7 @@ test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
   assert.deepEqual(outcomeMessage({ kind: 'reset' }, tz), {
     tone: 'unknown',
     title: 'Не знаем, оформлен ли заказ',
-    text: 'Была короткая техническая пауза, проверить заказ нельзя. Загляните в историю склада перед новым заказом.',
+    text: 'Данные на сервере обновились, и мы не можем подтвердить результат. Загляните в историю склада перед новым заказом.',
   });
   assert.deepEqual(
     outcomeMessage({ kind: 'superseded', replacement: proposal }, tz),
