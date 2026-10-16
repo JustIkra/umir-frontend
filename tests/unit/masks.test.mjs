@@ -39,9 +39,10 @@ test('a count keeps digits without leading zeros', () => {
 test('a time takes digits and puts the colon itself', () => {
   assert.equal(maskTime('1427'), '14:27');
   assert.equal(maskTime('14:2'), '14:2');
-  assert.equal(maskTime('9'), '09');
+  assert.equal(maskTime('9'), '9');
   assert.equal(maskTime('930'), '09:30');
-  assert.equal(maskTime('25'), '02:5');
+  assert.equal(maskTime('25'), '25');
+  assert.equal(maskTime('250'), '02:50');
   assert.equal(maskTime('14ч30м'), '14:30');
   assert.equal(maskTime('143059'), '14:30');
   assert.equal(maskTime('1:30'), '01:30');
@@ -82,5 +83,14 @@ test('explicit out-of-range hours remain invalid instead of changing time', () =
   for (const value of ['24:00', '25:30', '29:59']) {
     assert.equal(maskTime(value), value);
     assert.equal(normalizeTime(value), undefined);
+  }
+});
+
+test('typing an explicit invalid hour does not rewrite it before the colon', () => {
+  for (const intended of ['24:00', '25:30', '30:00']) {
+    let entered = '';
+    for (const character of intended) entered = maskTime(entered + character);
+    assert.equal(entered, intended);
+    assert.equal(normalizeTime(entered), undefined);
   }
 });
