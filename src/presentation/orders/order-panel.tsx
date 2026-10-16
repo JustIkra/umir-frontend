@@ -13,6 +13,7 @@ import checkIcon from '@/presentation/assets/icons/check-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import trashIcon from '@/presentation/assets/icons/trash-24.svg';
 import { Button, TextLink } from '@/presentation/ui/actions';
+import { RateLimitMessage, useDeadline } from '@/presentation/ui/rate-limit';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { Icon } from '@/presentation/ui/icon';
 import { Stepper } from '@/presentation/ui/stepper';
@@ -208,7 +209,12 @@ export function DraftOrder({
   const preparing = snapshot.phase.kind === 'preparing';
   const notice = snapshot.notice;
   const flagged = notice?.kind === 'portions' ? notice.lines : [];
-  const message = notice === undefined ? undefined : noticeMessage(notice);
+  const limited = notice?.kind === 'rate-limited' ? notice : undefined;
+  const wait = useDeadline(limited?.retryUntil, limited?.retryAfterSeconds);
+  const message =
+    notice === undefined || limited !== undefined
+      ? undefined
+      : noticeMessage(notice);
   return (
     <Panel
       header={
@@ -221,6 +227,7 @@ export function DraftOrder({
               {message.text}
             </FormMessage>
           )}
+          <RateLimitMessage wait={wait} />
           <Text textStyle="caption.default" color="text.secondary">
             {preparing
               ? 'Пока мы проверяем заказ, состав менять нельзя.'
@@ -228,7 +235,7 @@ export function DraftOrder({
           </Text>
           <Button
             w="full"
-            disabled={preparing}
+            disabled={preparing || wait.waiting}
             aria-busy={preparing ? 'true' : undefined}
             onClick={onPrepare}
           >
@@ -454,6 +461,10 @@ export function OutcomeOrder({
   onOpenReplacement: () => void;
 }) {
   const message = outcomeMessage(phase, timeZone);
+  const wait = useDeadline(
+    phase.kind === 'refused' ? phase.retryUntil : undefined,
+    phase.kind === 'refused' ? phase.retryAfterSeconds : undefined,
+  );
   const back = (label: string) => (
     <Button variant="secondary" w="full" onClick={onEdit}>
       {label}
@@ -472,7 +483,7 @@ export function OutcomeOrder({
     caption = `Состав заказа · ${compositionText(positions)}`;
     actions = (
       <>
-        <Button w="full" onClick={onRetry}>
+        <Button w="full" disabled={wait.waiting} onClick={onRetry}>
           Оформить ещё раз
         </Button>
         {back('Изменить заказ')}
@@ -504,12 +515,16 @@ export function OutcomeOrder({
   return (
     <Panel header={<Heading title="Оформление заказа" />} footer={actions}>
       <Stack gap="3" py="2">
-        <FormMessage tone={message.tone} title={message.title}>
-          {message.stamp !== undefined && (
-            <Text textStyle="caption.default">{message.stamp}</Text>
-          )}
-          {message.text}
-        </FormMessage>
+        {wait.started ? (
+          <RateLimitMessage wait={wait} />
+        ) : (
+          <FormMessage tone={message.tone} title={message.title}>
+            {message.stamp !== undefined && (
+              <Text textStyle="caption.default">{message.stamp}</Text>
+            )}
+            {message.text}
+          </FormMessage>
+        )}
         {caption !== undefined && (
           <Text textStyle="caption.strong">{caption}</Text>
         )}

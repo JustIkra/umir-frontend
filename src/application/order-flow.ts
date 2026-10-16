@@ -13,7 +13,13 @@ import {
   type Envelope,
   type BusinessContext,
 } from './api';
-import type { CommandResult, CommandRunner, CommandSpec } from './commands';
+import { defaultWaitSeconds } from './credentials';
+import {
+  isAdmissionRefusal,
+  type CommandResult,
+  type CommandRunner,
+  type CommandSpec,
+} from './commands';
 import type { EpochRegistry } from './epochs';
 import type { Scheduler } from './live-sync';
 import type {
@@ -74,11 +80,24 @@ export type OrderPhase =
       readonly kind: 'refused';
       readonly code: string;
       readonly proposal: OrderProposal;
+      // A 429: the wait Gateway named and the moment it ends. Nothing was
+      // sent, the order stays, and the button opens again at the end.
+      readonly retryAfterSeconds: number | undefined;
+      readonly retryUntil: number | undefined;
     }
   | { readonly kind: 'reset' };
 export type OrderNotice =
   | { readonly kind: 'portions'; readonly lines: readonly number[] }
   | { readonly kind: 'prepare-failed' }
+  // C15: more than 200 positions (400) or more than 2000 open proposals of the
+  // restaurant (409). The server decides; the order is kept.
+  | { readonly kind: 'too-many-positions' }
+  | { readonly kind: 'limit-exceeded' }
+  | {
+      readonly kind: 'rate-limited';
+      readonly retryAfterSeconds: number;
+      readonly retryUntil: number;
+    }
   | { readonly kind: 'check-failed' };
 export interface OrderSnapshot {
   readonly draft: Draft;
@@ -345,7 +364,17 @@ export function createOrderFlow({
       return;
     }
     clearAttempt();
-    show({ kind: 'refused', code: failure.code, proposal });
+    const limited = failure.status === 429 || failure.code === 'RateLimited';
+    const wait = limited
+      ? (failure.retryAfterSeconds ?? defaultWaitSeconds)
+      : undefined;
+    show({
+      kind: 'refused',
+      code: failure.code,
+      proposal,
+      retryAfterSeconds: wait,
+      retryUntil: wait === undefined ? undefined : now() + wait * 1000,
+    });
   }
 
   function settle(
@@ -376,7 +405,14 @@ export function createOrderFlow({
         return;
       case 'unknown':
         if (attempt !== undefined) {
-          show({ kind: 'unknown', attempt, checking: false });
+          // A refusal of Gateway's admission on the check says nothing about
+          // the order: the check can be repeated.
+          show(
+            { kind: 'unknown', attempt, checking: false },
+            checking && isAdmissionRefusal(result.failure)
+              ? { kind: 'check-failed' }
+              : undefined,
+          );
         }
         return;
       case 'reset':
@@ -454,6 +490,21 @@ export function createOrderFlow({
     show({ kind: 'compose' });
   }
 
+  function prepareNotice(failure: ApiFailure): OrderNotice {
+    if (failure.status === 429 || failure.code === 'RateLimited') {
+      const seconds = failure.retryAfterSeconds ?? defaultWaitSeconds;
+      return {
+        kind: 'rate-limited',
+        retryAfterSeconds: seconds,
+        retryUntil: now() + seconds * 1000,
+      };
+    }
+    if (failure.code === 'InvalidArgument')
+      return { kind: 'too-many-positions' };
+    if (failure.code === 'LimitExceeded') return { kind: 'limit-exceeded' };
+    return { kind: 'prepare-failed' };
+  }
+
   async function prepare(): Promise<void> {
     if (!preparable.has(phase.kind) || attempt !== undefined) return;
     if (draft.length === 0) return;
@@ -486,7 +537,7 @@ export function createOrderFlow({
         failureOf(error) ?? localFailure('Malformed', 'unavailable');
       if (ended(failure)) onUnauthenticated();
       if (wasReset(failure)) onReset();
-      show({ kind: 'compose' }, { kind: 'prepare-failed' });
+      show({ kind: 'compose' }, prepareNotice(failure));
       return;
     }
     if (disposed) return;

@@ -456,3 +456,42 @@ test('the panel follows the phase of the order', async () => {
   // The order ID is not shown.
   assert.ok(!placed.includes('ord-1'));
 });
+
+test('limits and admission refusals of an order use plain words', () => {
+  const proposal = { acceptedPositions: [] };
+  const refusal = (code) =>
+    outcomeMessage(
+      {
+        kind: 'refused',
+        code,
+        proposal,
+        retryAfterSeconds: undefined,
+        retryUntil: undefined,
+      },
+      'Europe/Moscow',
+    ).text;
+  assert.equal(
+    refusal('InvalidArgument'),
+    'В заказе слишком много позиций. Уберите часть и попробуйте снова.',
+  );
+  assert.equal(
+    refusal('LimitExceeded'),
+    'Сейчас у ресторана слишком много неоформленных заказов. Подождите немного и попробуйте снова.',
+  );
+  assert.match(refusal('ServiceUnavailable'), /Ничего не оформлено/);
+  for (const code of [
+    'InvalidArgument',
+    'LimitExceeded',
+    'ServiceUnavailable',
+  ]) {
+    assert.doesNotMatch(refusal(code), /503|400|409|[A-Z][a-z]+[A-Z]/);
+  }
+  assert.equal(
+    noticeMessage({ kind: 'too-many-positions' }).text,
+    refusal('InvalidArgument'),
+  );
+  assert.equal(
+    noticeMessage({ kind: 'limit-exceeded' }).text,
+    refusal('LimitExceeded'),
+  );
+});

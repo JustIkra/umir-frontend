@@ -182,6 +182,24 @@ const notFound: PanelMessage = {
   text: 'Данные проверки устарели, заказ не оформлен. Блюда в заказе сохранены.',
 };
 
+const limitExceededText =
+  'Сейчас у ресторана слишком много неоформленных заказов. Подождите немного и попробуйте снова.';
+
+function refusedText(code: string): string {
+  switch (code) {
+    case 'InventoryUnavailable':
+      return 'Не получилось проверить остатки. Ничего не списано — попробуйте ещё раз.';
+    case 'InvalidArgument':
+      return 'В заказе слишком много позиций. Уберите часть и попробуйте снова.';
+    case 'LimitExceeded':
+      return limitExceededText;
+    case 'ServiceUnavailable':
+      return 'Сейчас мы не можем принять заказ. Ничего не оформлено и не списано — попробуйте ещё раз чуть позже.';
+    default:
+      return 'Заказ не прошёл. Ничего не списано — попробуйте ещё раз.';
+  }
+}
+
 export function outcomeMessage(
   phase: Extract<
     OrderPhase,
@@ -205,10 +223,7 @@ export function outcomeMessage(
       return {
         tone: 'error',
         title: 'Заказ не оформлен',
-        text:
-          phase.code === 'InventoryUnavailable'
-            ? 'Не получилось проверить остатки. Ничего не списано — попробуйте ещё раз.'
-            : 'Заказ не прошёл. Ничего не списано — попробуйте ещё раз.',
+        text: refusedText(phase.code),
       };
     case 'reset':
       return {
@@ -252,6 +267,25 @@ export function noticeMessage(notice: OrderNotice): PanelMessage {
         tone: 'error',
         title: 'Не удалось проверить результат',
         text: 'Попробуйте ещё раз через минуту.',
+      };
+    case 'too-many-positions':
+      return {
+        tone: 'error',
+        title: 'Заказ не проверен',
+        text: 'В заказе слишком много позиций. Уберите часть и попробуйте снова.',
+      };
+    case 'limit-exceeded':
+      return {
+        tone: 'error',
+        title: 'Заказ не проверен',
+        text: limitExceededText,
+      };
+    case 'rate-limited':
+      // The panel shows the countdown itself (RateLimitMessage).
+      return {
+        tone: 'error',
+        title: 'Слишком много запросов',
+        text: 'Мы ничего не отправили, блюда в заказе сохранены.',
       };
   }
 }
