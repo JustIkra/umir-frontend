@@ -26,6 +26,7 @@ export function SearchSelect({
   disabled = false,
   'aria-describedby': describedBy,
   'aria-label': ariaLabel,
+  listLabel = 'Варианты',
 }: {
   id: string;
   name?: string;
@@ -38,6 +39,8 @@ export function SearchSelect({
   disabled?: boolean;
   'aria-describedby'?: string;
   'aria-label'?: string;
+  // The name of the open list, for a screen reader.
+  listLabel?: string;
 }) {
   const [own, setOwn] = useState(defaultValue);
   const current = value ?? own;
@@ -74,6 +77,9 @@ export function SearchSelect({
       onOpenChange={(details) => {
         if (!details.open) setInput(undefined);
       }}
+      // Enter picks the first match once something is typed; Tab and blur
+      // still go back to the chosen name.
+      inputBehavior="autohighlight"
       openOnClick
       disabled={disabled}
       invalid={invalid}
@@ -102,8 +108,14 @@ export function SearchSelect({
       <Portal>
         <Combobox.Positioner>
           {/* At least as wide as the field, and wide enough for a name with its
-              code in a narrow table column. */}
-          <Combobox.Content minW="max(var(--reference-width), 15rem)">
+              code in a narrow table column. The list has no label element, so
+              zag's aria-labelledby points nowhere and would win over the name:
+              it is emptied. */}
+          <Combobox.Content
+            minW="max(var(--reference-width), 15rem)"
+            aria-labelledby=""
+            aria-label={listLabel}
+          >
             <Combobox.Empty>Ничего не нашли</Combobox.Empty>
             {collection.items.map((item) => (
               <Combobox.Item key={item.value} item={item}>

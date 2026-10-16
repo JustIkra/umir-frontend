@@ -152,6 +152,29 @@ test('the date field has segments, a calendar button and a hidden value', () => 
   assert.doesNotMatch(html, /type="date"/);
 });
 
+// zag speaks English unless told: every accessible name the page can show a
+// screen reader is Russian. The calendar itself is portalled and not drawn on
+// the server, so its day cells and roles are checked in the DOM probe.
+test('the date field names its segments and buttons in Russian only', () => {
+  const html = renderElement(
+    h(DateField, {
+      id: 'd',
+      defaultValue: '2026-10-15',
+      today: '2026-10-15',
+      timeZone: 'Europe/Moscow',
+    }),
+  );
+  for (const name of ['День', 'Месяц', 'Год'])
+    assert.match(html, new RegExp(`aria-label="${name}"`));
+  const names = [...html.matchAll(/aria-(?:label|roledescription)="([^"]*)"/g)]
+    .map((match) => match[1])
+    .join(' | ');
+  assert.doesNotMatch(
+    names,
+    /Choose|Selected|Not available|[Cc]alendar|datepicker|Day|Month|Year|Open|Close|Switch/,
+  );
+});
+
 test('an empty date field gives an empty hidden value', () => {
   const html = renderElement(
     h(DateField, {

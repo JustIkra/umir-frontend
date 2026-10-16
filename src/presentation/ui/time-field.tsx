@@ -115,7 +115,8 @@ export function TimeField({
       )}
       <Portal>
         <Combobox.Positioner>
-          <Combobox.Content minW="7rem">
+          {/* No label element: zag's aria-labelledby is emptied so the name wins. */}
+          <Combobox.Content minW="7rem" aria-labelledby="" aria-label="Время">
             {items.items.map((item) => (
               <Combobox.Item key={item} item={item}>
                 <Combobox.ItemText textStyle="numeric.body">

@@ -113,6 +113,8 @@ function RowLabel({
 interface Row {
   readonly key: number;
   readonly product: string;
+  // The Stepper is controlled, so the row keeps its own copy of the value it
+  // posts as `shelf-N`.
   readonly shelf: string;
 }
 
@@ -482,6 +484,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                           options={productOptions}
                           value={row.product}
                           placeholder="Найти продукт"
+                          listLabel="Продукты"
                           disabled={closed}
                           onValueChange={(product) => {
                             markDirty();

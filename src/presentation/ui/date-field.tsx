@@ -9,6 +9,7 @@ import {
   useDatePickerStyles,
 } from '@chakra-ui/react';
 import { useEffect, useRef, useState } from 'react';
+import type { ComponentProps } from 'react';
 import calendarIcon from '@/presentation/assets/icons/calendar-24.svg';
 import { Button } from './actions';
 import { Icon } from './icon';
@@ -16,6 +17,47 @@ import { isoDateToRu, monthTitle } from './masks';
 
 const weekday = (name: string) =>
   `${name.charAt(0).toUpperCase()}${name.slice(1).replace('.', '')}`;
+
+// What a screen reader says, in Russian: zag speaks English unless told. The
+// date text inside is Intl's own («15 октября 2026 г.»).
+const translations: ComponentProps<typeof DatePicker.Root>['translations'] = {
+  dayCell: (state) => {
+    if (state.unavailable) return `Недоступно: ${state.valueText}`;
+    if (state.selected) return `Выбрана дата: ${state.valueText}`;
+    return `Выбрать ${state.valueText}`;
+  },
+  content: 'Календарь',
+  trigger: (open) => (open ? 'Закрыть календарь' : 'Открыть календарь'),
+  prevTrigger: () => 'Предыдущий месяц',
+  nextTrigger: () => 'Следующий месяц',
+  viewTrigger: () => 'Сменить вид календаря',
+  monthSelect: 'Месяц',
+  yearSelect: 'Год',
+  clearTrigger: 'Очистить дату',
+};
+
+// zag labels the segments «Day», «Month», «Year» and gives no way to change
+// that through translations, so the segments are drawn here with their names.
+const segmentNames: Record<string, string> = {
+  day: 'День',
+  month: 'Месяц',
+  year: 'Год',
+};
+
+function Segments(props: ComponentProps<typeof DateInput.SegmentGroup>) {
+  const api = useDateInputContext();
+  return (
+    <DateInput.SegmentGroup {...props}>
+      {api.getSegments().map((segment, index) => (
+        <DateInput.Segment
+          key={index}
+          segment={segment}
+          aria-label={segmentNames[segment.type]}
+        />
+      ))}
+    </DateInput.SegmentGroup>
+  );
+}
 
 const two = (n: number) => String(n).padStart(2, '0');
 
@@ -173,6 +215,7 @@ export function DateField({
         setFromCalendar(details.value[0]?.toString() ?? '');
       }}
       locale="ru-RU"
+      translations={translations}
       startOfWeek={1}
       timeZone={timeZone}
       disabled={disabled}
@@ -204,14 +247,14 @@ export function DateField({
             }}
           />
           <DateInput.Control>
-            <DateInput.Segments
+            <Segments
               id={id}
               aria-labelledby={labelId}
               aria-describedby={describedBy}
             />
           </DateInput.Control>
         </DateInput.Root>
-        <DatePicker.Trigger ref={trigger} aria-label="Открыть календарь">
+        <DatePicker.Trigger ref={trigger}>
           <Icon src={calendarIcon} size={24} />
         </DatePicker.Trigger>
       </DatePicker.Control>
@@ -220,17 +263,17 @@ export function DateField({
       )}
       <Portal>
         <DatePicker.Positioner>
-          <DatePicker.Content>
+          <DatePicker.Content aria-roledescription="выбор даты">
             <DatePicker.Context>
               {(api) => (
                 <>
                   <DatePicker.View view="day">
                     <DatePicker.ViewControl>
-                      <DatePicker.PrevTrigger aria-label="Предыдущий месяц" />
+                      <DatePicker.PrevTrigger />
                       <MonthTitle />
-                      <DatePicker.NextTrigger aria-label="Следующий месяц" />
+                      <DatePicker.NextTrigger />
                     </DatePicker.ViewControl>
-                    <DatePicker.Table>
+                    <DatePicker.Table aria-roledescription="месяц">
                       <DatePicker.TableHead>
                         <DatePicker.TableRow>
                           {api.weekDays.map((day) => (

@@ -428,6 +428,7 @@ export function NewDishPage() {
                           <SearchSelect
                             id={productId}
                             placeholder="Найти продукт"
+                            listLabel="Продукты"
                             options={productOptions}
                             value={row.productID}
                             invalid={productFault}
