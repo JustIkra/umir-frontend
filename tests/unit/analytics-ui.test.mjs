@@ -139,12 +139,12 @@ test('«Скоро закончится» puts the dish blocker first and shows 
     assert.ok(plain.includes(label), label);
   assert.ok(
     html.includes(
-      'aria-label="Flour: 2 г — можно использовать, 1\u00a0г — расход в день, 2\u00a0дня — хватит"',
+      'aria-label="Flour: Хватит на 2\u00a0дня; 2 г — можно использовать, 1\u00a0г — расход в день, 2\u00a0дня — хватит"',
     ),
   );
   assert.ok(
     html.includes(
-      'aria-label="Milk: 0 мл — можно использовать, 0\u00a0мл — расход в день, 1\u00a0блюдо — в стоп-листе"',
+      'aria-label="Milk: Держит в стоп-листе 1\u00a0блюдо; 0 мл — можно использовать, 0\u00a0мл — расход в день, 1\u00a0блюдо — в стоп-листе"',
     ),
   );
   assert.equal(count(html, 'data-segment="cover"'), 1);
@@ -223,10 +223,14 @@ test('«Что может испортиться» ranks products by the share a
     assert.ok(plain.includes(label), label);
   assert.ok(
     html.includes(
-      'aria-label="Сыр: 3 000 г — не испортится за 2 дня, 1 000 г — испортится за 2 дня, 1 000 г — ждёт списания"',
+      'aria-label="Сыр: Риск 40\u00a0%; 3 000 г — не испортится за 2 дня, 1 000 г — испортится за 2 дня, 1 000 г — ждёт списания"',
     ),
   );
-  assert.ok(html.includes('aria-label="Молоко: 500 г — ждёт списания"'));
+  assert.ok(
+    html.includes(
+      'aria-label="Молоко: Риск 100\u00a0%; 500 г — ждёт списания"',
+    ),
+  );
   assert.equal(count(html, 'data-segment='), 4);
 });
 
@@ -330,7 +334,7 @@ test('«Куда ушли продукты» ranks write-off shares and leaves o
   assert.ok(!html.includes('aria-label="Сыр'));
   assert.ok(
     html.includes(
-      'aria-label="Мука: 9 г — ушло в блюда, 1 г — списано, 10 г — поступило"',
+      'aria-label="Мука: Списано 10\u00a0%; 9 г — ушло в блюда, 1 г — списано, 10 г — поступило"',
     ),
   );
   assert.ok(plain.includes('Ушло в блюда'));

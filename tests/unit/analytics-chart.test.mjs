@@ -52,7 +52,7 @@ test('a bar chart is one list stop with a full label per row and no empty parts'
   assert.ok(html.includes('aria-label="Что может испортиться"'));
   assert.ok(
     html.includes(
-      'aria-label="Сыр: 3 кг — не испортится за 2 дня, 1 кг — испортится за 2 дня"',
+      'aria-label="Сыр: Риск 40\u00a0%; 3 кг — не испортится за 2 дня, 1 кг — испортится за 2 дня"',
     ),
   );
   assert.equal(html.match(/tabindex="0"/g)?.length, 1);

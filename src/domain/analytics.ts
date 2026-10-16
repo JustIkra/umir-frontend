@@ -78,8 +78,8 @@ export function shareTenths(part: bigint, whole: bigint): bigint {
 
 // «64 %»; a share above zero but under one percent reads «<1 %».
 export function percentText(tenths: bigint): string {
-  if (tenths > 0n && tenths < 10n) return '<1 %';
-  return `${(tenths / 10n).toString()} %`;
+  if (tenths > 0n && tenths < 10n) return '<1\u00a0%';
+  return `${(tenths / 10n).toString()}\u00a0%`;
 }
 
 // Widths of the parts of one bar in percent of their sum.

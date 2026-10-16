@@ -152,7 +152,7 @@ function RiskBody({
       <MoreRows total={chart.rows.length} view={view} onView={onView} />
       {chart.calm > 0 && (
         <Text color="text.secondary">
-          {`Без риска: ещё ${String(chart.calm)} ${plural(chart.calm, 'продукт', 'продукта', 'продуктов')}`}
+          {`Без риска: ещё ${String(chart.calm)}\u00a0${plural(chart.calm, 'продукт', 'продукта', 'продуктов')}`}
         </Text>
       )}
     </Stack>

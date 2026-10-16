@@ -173,7 +173,11 @@ export function BarChart({
             items.current[index] = node;
           }}
           tabIndex={index === current ? 0 : -1}
-          aria-label={`${row.name}: ${row.details.map(detailText).join(', ')}`}
+          aria-label={
+            row.details.length === 0
+              ? `${row.name}: ${row.figure}`
+              : `${row.name}: ${row.figure}; ${row.details.map(detailText).join(', ')}`
+          }
           position="relative"
           display="grid"
           gridTemplateColumns={{

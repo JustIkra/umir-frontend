@@ -29,10 +29,10 @@ test('shares are exact tenths of a percent rounded down, even near int64', () =>
   assert.equal(shareTenths(1n, 3n), 333n);
   assert.equal(shareTenths(5n, 0n), 0n);
   assert.equal(shareTenths(MAX - 1n, MAX), 999n);
-  assert.equal(percentText(333n), '33 %');
-  assert.equal(percentText(1000n), '100 %');
-  assert.equal(percentText(5n), '<1 %');
-  assert.equal(percentText(0n), '0 %');
+  assert.equal(percentText(333n), '33\u00a0%');
+  assert.equal(percentText(1000n), '100\u00a0%');
+  assert.equal(percentText(5n), '<1\u00a0%');
+  assert.equal(percentText(0n), '0\u00a0%');
   assert.deepEqual(segmentShares([1n, 1n, 2n]), [25, 25, 50]);
   assert.deepEqual(segmentShares([0n, 0n]), [0, 0]);
   assert.deepEqual(segmentShares([MAX, MAX]), [50, 50]);
