@@ -54,7 +54,7 @@ export const attemptPlaces = {
 export type AttemptPlaceKey = keyof typeof attemptPlaces;
 
 export const orderNotSaved =
-  'Браузер не даёт запомнить этот заказ. Если страница перезагрузится, проверьте результат в истории заказов.';
+  'Браузер не даёт запомнить этот заказ. Если страница перезагрузится, проверьте результат в разделе «Заказы».';
 
 export const unresolvedAttempt =
   'Прошлая отправка ещё не завершена. Подождите или перезагрузите страницу.';
