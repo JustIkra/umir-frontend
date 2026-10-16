@@ -286,3 +286,126 @@ test('«Что может испортиться» with an empty warehouse, with
   assert.ok(mixed.includes('Не удалось загрузить подсказку о закупках'));
   assert.ok(mixed.includes('Риск 100 %'));
 });
+
+const coverage = (complete) => ({
+  epoch: '44444444-4444-4444-8444-444444444444',
+  coverageFrom: instantOf('2026-10-13T00:00:00+03:00'),
+  complete,
+  requestedFrom: instantOf('2026-10-08T00:00:00+03:00'),
+  availableFrom: instantOf('2026-10-13T00:00:00+03:00'),
+});
+const moveRow = (productID, name, received, ordered, writtenOff) => ({
+  productID,
+  name,
+  baseUnit: 'g',
+  receivedQuantity: received,
+  orderedQuantity: ordered,
+  writtenOffQuantity: writtenOff,
+});
+const movements = (items, complete = true) =>
+  loaded({
+    from: instantOf('2026-10-08T00:00:00+03:00'),
+    to: instantOf('2026-10-15T00:00:00+03:00'),
+    coverage: coverage(complete),
+    items,
+  });
+
+test('«Куда ушли продукты» ranks write-off shares and leaves out products that only arrived', async () => {
+  const html = await renderRoute(page, {
+    access: warehouse,
+    data: {
+      movementReport: movements([
+        moveRow('a', 'Мука', '10000', '9000', '1000'),
+        moveRow('b', 'Сыр', '5000', '0', '0'),
+        moveRow('c', 'Молоко', '300', '0', '300'),
+      ]),
+    },
+  });
+  const plain = text(html);
+  assert.ok(plain.includes('Куда ушли продукты за 7 дней'));
+  assert.ok(plain.indexOf('Молоко') < plain.indexOf('Мука'));
+  assert.ok(plain.includes('Списано 100 %'));
+  assert.ok(plain.includes('Списано 10 %'));
+  assert.ok(!html.includes('aria-label="Сыр'));
+  assert.ok(
+    html.includes(
+      'aria-label="Мука: 9 г — ушло в блюда, 1 г — списано, 10 г — поступило"',
+    ),
+  );
+  assert.ok(plain.includes('Ушло в блюда'));
+  assert.ok(!plain.includes('Склад помнит движение только с'));
+});
+
+test('«Куда ушли продукты» names the start of a short history, the empty week and a failed read', async () => {
+  const short = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: {
+        movementReport: movements(
+          [moveRow('a', 'Мука', '0', '1000', '0')],
+          false,
+        ),
+      },
+    }),
+  );
+  assert.ok(
+    short.includes(
+      'Склад помнит движение только с 13 октября, 00:00. Более ранние дни не учтены.',
+    ),
+  );
+  const empty = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: {
+        movementReport: movements([moveRow('b', 'Сыр', '5000', '0', '0')]),
+      },
+    }),
+  );
+  assert.ok(empty.includes('За 7 дней продукты не продавали и не списывали.'));
+  const failed = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: { movementReport: failedRead('UpstreamUnavailable', 503) },
+    }),
+  );
+  assert.ok(failed.includes('Не удалось загрузить движение продуктов'));
+});
+
+test('«Куда ушли продукты» reads the week of the restaurant zone', async () => {
+  const periods = [];
+  await renderRoute(page, {
+    access: access(['Warehouse'], { timeZone: 'Pacific/Honolulu' }),
+    data: {
+      movementReport: (period) => {
+        periods.push(period);
+        return movements([]);
+      },
+    },
+  });
+  // The render clock is 2026-10-14 07:00 UTC: 13 October, 21:00 in Honolulu.
+  assert.deepEqual(periods.at(-1), {
+    fromDate: '2026-10-07',
+    throughDate: '2026-10-13',
+  });
+});
+
+test('«Куда ушли продукты» as a table shows what arrived too', async () => {
+  const plain = text(
+    await renderRoute(`${page}?flow=table`, {
+      access: warehouse,
+      data: {
+        movementReport: movements([
+          moveRow('a', 'Мука', '10000', '9000', '1000'),
+        ]),
+      },
+    }),
+  );
+  for (const header of [
+    'Поступило',
+    'Ушло в блюда',
+    'Списано',
+    'Доля списаний',
+  ])
+    assert.ok(plain.includes(header), header);
+  assert.ok(plain.includes('10 %'));
+});
