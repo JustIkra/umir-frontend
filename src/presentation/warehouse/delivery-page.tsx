@@ -18,6 +18,7 @@ import { useLeaveGuard } from '@/presentation/app-shell/leave-guard';
 import {
   attemptPlaces,
   attemptRefusalText,
+  serviceUnavailableText,
 } from '@/presentation/ui/attempt-messages';
 import {
   DamagedAttempt,
@@ -25,6 +26,7 @@ import {
   useAttemptFlags,
 } from '@/presentation/ui/attempt-notices';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { RateLimitMessage, useRetryWait } from '@/presentation/ui/rate-limit';
 import { formatInstant } from '@/presentation/ui/time';
 import { formatSectionDate } from '@/presentation/ui/zones';
 import { civilFields, draftFromForm } from './delivery-forms';
@@ -118,6 +120,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
     'idle' | 'invalid' | 'sending' | 'unknown' | 'refused' | 'reset'
   >(pending === undefined ? 'idle' : 'unknown');
   const [message, setMessage] = useState<string | undefined>();
+  const wait = useRetryWait();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -186,6 +189,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
           {message}
         </FormMessage>
       )}
+      <RateLimitMessage wait={wait} />
       {timezoneChanged && (
         <FormMessage tone="error" title="Изменился часовой пояс ресторана">
           Обновите страницу и проверьте даты и время. Если поставка уже
@@ -201,6 +205,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
           event.preventDefault();
           if (
             status === 'sending' ||
+            wait.waiting ||
             timezoneChanged ||
             productRead.value === undefined
           )
@@ -220,6 +225,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
             return;
           }
           setStatus('sending');
+          wait.clear();
           void commands
             .receiveDelivery(
               input,
@@ -231,6 +237,12 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               if (result.kind === 'created') {
                 setDirty(false);
                 void navigate(path('/warehouse'));
+                return;
+              }
+              if (result.kind === 'rate-limited') {
+                setStatus('refused');
+                setMessage(undefined);
+                wait.begin(result.retryAfterSeconds);
                 return;
               }
               setStatus(
@@ -248,12 +260,15 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                     : result.kind === 'reset'
                       ? 'Была короткая техническая пауза. Прежде чем отправлять снова, проверьте поставку в истории склада.'
                       : result.kind === 'refused' &&
-                          result.code === 'SettingsChanged'
-                        ? 'Изменились настройки времени ресторана. Обновите страницу и проверьте даты.'
-                        : ((result.kind === 'refused'
-                            ? attemptRefusalText(result.code, 'warehouse')
-                            : undefined) ??
-                          'Проверьте даты и количество и попробуйте ещё раз.'),
+                          result.code === 'ServiceUnavailable'
+                        ? serviceUnavailableText
+                        : result.kind === 'refused' &&
+                            result.code === 'SettingsChanged'
+                          ? 'Изменились настройки времени ресторана. Обновите страницу и проверьте даты.'
+                          : ((result.kind === 'refused'
+                              ? attemptRefusalText(result.code, 'warehouse')
+                              : undefined) ??
+                            'Проверьте даты и количество и попробуйте ещё раз.'),
               );
             });
         }}
@@ -587,7 +602,9 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               <Button
                 type="submit"
                 disabled={
-                  productRead.value === undefined || products.length === 0
+                  productRead.value === undefined ||
+                  products.length === 0 ||
+                  wait.waiting
                 }
               >
                 {status === 'sending' ? 'Принимаем…' : 'Принять поставку'}

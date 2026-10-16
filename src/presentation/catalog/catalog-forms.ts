@@ -12,7 +12,10 @@ import {
   type BaseUnit,
   type QuantityError,
 } from '@/domain/quantity';
-import { attemptRefusalText } from '@/presentation/ui/attempt-messages';
+import {
+  attemptRefusalText,
+  serviceUnavailableText,
+} from '@/presentation/ui/attempt-messages';
 import { listText, plural } from '@/presentation/ui/plural';
 
 export interface ProductDraft {
@@ -201,9 +204,11 @@ export function outcomeMessage(
       return {
         title: notCreated,
         text:
-          (code === undefined
-            ? undefined
-            : attemptRefusalText(code, product ? 'products' : 'dishes')) ??
+          (code === 'ServiceUnavailable'
+            ? serviceUnavailableText
+            : code === undefined
+              ? undefined
+              : attemptRefusalText(code, product ? 'products' : 'dishes')) ??
           'Не получилось сохранить. Данные остались в форме — попробуйте ещё раз.',
       };
   }

@@ -37,6 +37,7 @@ import {
   useAttemptFlags,
 } from '@/presentation/ui/attempt-notices';
 import { FormMessage } from '@/presentation/ui/form-message';
+import { RateLimitMessage, useRetryWait } from '@/presentation/ui/rate-limit';
 import { Icon, MaskIcon } from '@/presentation/ui/icon';
 import { rem } from '@/presentation/ui/units';
 import {
@@ -111,6 +112,7 @@ export function NewDishPage() {
   );
   // The code of the latest refusal: a saved attempt that blocks says so.
   const [refusedCode, setRefusedCode] = useState<string | undefined>();
+  const wait = useRetryWait();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -167,6 +169,7 @@ export function NewDishPage() {
 
   const send = async (input: DishInput) => {
     setStatus('sending');
+    wait.clear();
     const outcome = await catalog.defineDish(input);
     if (!mounted.current) return;
     switch (outcome.kind) {
@@ -198,6 +201,12 @@ export function NewDishPage() {
         return;
       case 'invalid':
         setStatus('rejected');
+        return;
+      case 'rate-limited':
+        // Nothing was sent: the fields stay and the button waits.
+        setRefusedCode('RateLimited');
+        setStatus('refused');
+        wait.begin(outcome.retryAfterSeconds);
         return;
       case 'refused':
         setRefusedCode(outcome.code);
@@ -247,7 +256,9 @@ export function NewDishPage() {
           }
         : shown === 'unknown' || shown === 'reset'
           ? { tone: 'unknown' as const, ...outcomeMessage('dish', shown) }
-          : shown === 'refused' && refusedCode === 'AttemptDamaged'
+          : shown === 'refused' &&
+              (refusedCode === 'AttemptDamaged' ||
+                refusedCode === 'RateLimited')
             ? // The closed form already says it; after the cancel nothing stale stays.
               undefined
             : shown === 'rejected' || shown === 'refused'
@@ -286,11 +297,12 @@ export function NewDishPage() {
           {message.text}
         </FormMessage>
       )}
+      <RateLimitMessage wait={wait} />
       <SplitCardForm
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (!closed) submit();
+          if (!closed && !wait.waiting) submit();
         }}
       >
         <chakra.fieldset
@@ -587,7 +599,10 @@ export function NewDishPage() {
                 <ButtonLink variant="secondary" to={path('/catalog/dishes')}>
                   Отменить
                 </ButtonLink>
-                <Button type="submit" disabled={shown === 'sending'}>
+                <Button
+                  type="submit"
+                  disabled={shown === 'sending' || wait.waiting}
+                >
                   {shown === 'sending' ? 'Создаём…' : 'Создать блюдо'}
                 </Button>
               </>
