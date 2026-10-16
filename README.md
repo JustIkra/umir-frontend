@@ -275,7 +275,7 @@ docker compose up --build -d --wait
 
 ### Контракт API
 
-Каталог `api/` хранит побайтовую копию composed REG1 public contract из `umir-factory@4374042b0245ecb107a94bf64e814653c20a3dcb` (`info.version` = `2.0.0-REG.1`) под прежним именем `backend-v2-public.json`, отдельные REG1 и FIN1 examples и неизменённые исторические C2 examples. Точные sources и SHA-256 закреплены в [api/README.md](api/README.md). Файлы не правят и не форматируют вручную.
+Каталог `api/` хранит побайтовую копию composed DUR1 public contract из `umir-factory@c1ad88cff4616ed683d7fbb832ded1647e886125` (`info.version` = `2.0.0-DUR.1`) под прежним именем `backend-v2-public.json`, отдельные DUR1, REG1 и FIN1 examples и неизменённые исторические C2 examples. Точные sources и SHA-256 закреплены в [api/README.md](api/README.md). Файлы не правят и не форматируют вручную.
 
 - `npm run api:types` генерирует из `backend-v2-public.json` типы `src/adapters/api/backend-v2.d.ts` через `openapi-typescript` и форматирует их Prettier.
 - `npm run api:check` входит в `npm run check`: сверяет SHA-256 всех четырёх файлов с закреплёнными и проверяет, что `backend-v2.d.ts` совпадает с новой генерацией.

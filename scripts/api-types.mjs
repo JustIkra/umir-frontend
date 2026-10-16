@@ -26,13 +26,14 @@ function pins() {
     'backend-v2-examples.json',
     'completion-v1-examples.json',
     'registration-v1-examples.json',
+    'durable-v1-examples.json',
   ];
   if (
     rows.length !== expected.length ||
     !expected.every((file) => rows.some(([, name]) => name === file))
   ) {
     throw new Error(
-      'api/README.md must pin the public profile, predecessor, FIN1 and REG1 examples',
+      'api/README.md must pin the public profile, predecessor, FIN1, REG1 and DUR1 examples',
     );
   }
   return rows.map(([, file, hash]) => ({ file, hash }));
