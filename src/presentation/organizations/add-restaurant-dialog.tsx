@@ -2,6 +2,7 @@ import { useRef, useState, type RefObject } from 'react';
 import { orgKeys, type Refusal } from '@/application/organization-commands';
 import { useServices } from '@/presentation/services';
 import { Button } from '@/presentation/ui/actions';
+import { limitReachedText } from '@/presentation/ui/attempt-messages';
 import { ModalPanel } from '@/presentation/ui/dialog';
 import {
   FieldGroup,
@@ -27,6 +28,8 @@ export type RestaurantState =
   | {
       readonly kind: 'not-added';
       readonly seconds?: number;
+      // Auth's quota of restaurants is used up (LimitExceeded).
+      readonly limit?: boolean;
       // The attempt was sent again and Auth says it did not complete.
       readonly checked?: boolean;
     };
@@ -55,7 +58,10 @@ export function restaurantStateOf(
     case 'invited':
     case 'closed':
     case 'delivery':
+      return checked ? { kind: 'not-added', checked } : { kind: 'not-added' };
     case 'unavailable':
+      if (refusal.code === 'LimitExceeded')
+        return { kind: 'not-added', limit: true };
       return checked ? { kind: 'not-added', checked } : { kind: 'not-added' };
   }
 }
@@ -91,11 +97,13 @@ export function addRestaurantMessage(
       return {
         title: 'Ресторан не добавлен',
         text:
-          state.seconds !== undefined
-            ? `Слишком много попыток. Попробуйте через ${String(state.seconds)} ${plural(state.seconds, 'секунду', 'секунды', 'секунд')}. Название осталось в поле.`
-            : state.checked
-              ? 'Не получилось. Название осталось в поле — отправьте ещё раз.'
-              : 'Не получилось. Попробуйте через пару минут. Название осталось в поле.',
+          state.limit === true
+            ? limitReachedText
+            : state.seconds !== undefined
+              ? `Слишком много попыток. Попробуйте через ${String(state.seconds)} ${plural(state.seconds, 'секунду', 'секунды', 'секунд')}. Название осталось в поле.`
+              : state.checked
+                ? 'Не получилось. Название осталось в поле — отправьте ещё раз.'
+                : 'Не получилось. Попробуйте через пару минут. Название осталось в поле.',
       };
     case 'editing':
     case 'invalid':

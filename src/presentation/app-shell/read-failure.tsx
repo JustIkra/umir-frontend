@@ -1,9 +1,12 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { findRestaurant } from '@/application/access';
+import { defaultWaitSeconds } from '@/application/credentials';
 import type { ScreenFailure } from '@/application/failure';
 import { useServices } from '@/presentation/services';
 import { useAccess } from '@/presentation/session/hooks';
+import { Button } from '@/presentation/ui/actions';
+import { RateLimitMessage, useDeadline } from '@/presentation/ui/rate-limit';
 import { ServiceUnavailableAlert } from '@/presentation/ui/states';
 import {
   AccessRevoked,
@@ -60,6 +63,7 @@ export function ReadFailure({
         />
       );
     case 'rate-limited':
+      return <RateLimitedRead failure={failure} onRetry={onRetry} />;
     case 'unavailable':
     case 'error':
       return (
@@ -68,4 +72,34 @@ export function ReadFailure({
         </ServiceUnavailableAlert>
       );
   }
+}
+
+// A 429 on a read (C16): nothing is wrong with the data, the screen asks to
+// wait and opens the retry when the wait is over.
+export function RateLimitedRead({
+  failure,
+  onRetry,
+}: {
+  failure: Extract<ScreenFailure, { kind: 'rate-limited' }>;
+  onRetry: () => void;
+}) {
+  const { now } = useServices();
+  const seconds = failure.retryAfterSeconds ?? defaultWaitSeconds;
+  // The wait starts when this failure first shows.
+  const [started, setStarted] = useState({
+    failure,
+    until: now() + seconds * 1000,
+  });
+  if (started.failure !== failure) {
+    setStarted({ failure, until: now() + seconds * 1000 });
+  }
+  const wait = useDeadline(started.until, seconds);
+  return (
+    <>
+      <RateLimitMessage wait={wait} />
+      <Button variant="secondary" disabled={wait.waiting} onClick={onRetry}>
+        Попробовать ещё раз
+      </Button>
+    </>
+  );
 }

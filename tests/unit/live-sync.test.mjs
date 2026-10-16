@@ -317,3 +317,24 @@ test('pending attempts are checked once per burst of signals', async () => {
   await settled();
   assert.equal(resolves(), 2);
 });
+
+test('a stream quota refusal only backs off: no attempt is resolved, no topic is marked, access stays', async () => {
+  // 8 streams per session, 200 per organization, 2000 per cell (C36): the
+  // refusal arrives as a closed EventSource, like any other refusal.
+  const { live, feed, scheduler, marks, ended, resolves } = setup();
+  live.start(R);
+  for (const delayMs of [3_000, 6_000, 12_000, 24_000, 48_000, 60_000]) {
+    feed.status('closed');
+    await settled();
+    scheduler.advance(delayMs);
+  }
+  assert.equal(feed.opened.length, 7);
+  assert.equal(resolves(), 0);
+  // Only the minute clock of time-dependent models runs; no topic is marked.
+  assert.deepEqual(
+    marks.filter(([, topics]) => topics !== 'time'),
+    [],
+  );
+  assert.deepEqual(ended, []);
+  assert.equal(live.getSnapshot().restaurantID, R);
+});

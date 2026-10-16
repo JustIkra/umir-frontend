@@ -454,3 +454,19 @@ test('NE06 names the enterprise as the followed operation does', () => {
     'Организация «Северная кухня» готова к работе',
   );
 });
+
+test('an exhausted quota says so with the same plain words in both dialogs', () => {
+  const refusal = { kind: 'unavailable', code: 'LimitExceeded' };
+  const created = refusalState(refusal, false);
+  assert.deepEqual(created, { kind: 'not-created', limit: true });
+  const added = restaurantStateOf(refusal, false);
+  assert.deepEqual(added, { kind: 'not-added', limit: true });
+  const words = 'Достигнут предел. Обратитесь к администратору организации.';
+  assert.equal(creationMessage(created, 'Кафе').text, words);
+  assert.equal(addRestaurantMessage(added, 'Кафе').text, words);
+  // Any other code keeps the generic words.
+  assert.equal(
+    refusalState({ kind: 'unavailable', code: 'Other' }, false).limit,
+    undefined,
+  );
+});

@@ -6,6 +6,7 @@ import { PageHeader } from '@/presentation/app-shell/pages';
 import { useServices } from '@/presentation/services';
 import { useStore } from '@/presentation/session/hooks';
 import { Button, ButtonLink } from '@/presentation/ui/actions';
+import { limitReachedText } from '@/presentation/ui/attempt-messages';
 import { Card, CardForm } from '@/presentation/ui/card';
 import {
   FieldGroup,
@@ -40,6 +41,8 @@ export type CreationState =
       readonly kind: 'not-created';
       readonly checked?: boolean;
       readonly seconds?: number;
+      // The quota of Auth is used up (LimitExceeded).
+      readonly limit?: boolean;
     }
   | { readonly kind: 'forbidden' } // NE11
   // The organization was created, but its preparation can no longer be read.
@@ -110,11 +113,13 @@ export function creationMessage(
       return {
         title: notCreated,
         text:
-          state.seconds !== undefined
-            ? `Слишком много попыток. Попробуйте через ${String(state.seconds)} ${plural(state.seconds, 'секунду', 'секунды', 'секунд')}. Данные остались в форме.`
-            : state.checked
-              ? 'Не получилось. Данные остались в форме — отправьте ещё раз.'
-              : 'Не получилось. Попробуйте через пару минут. Данные остались в форме.',
+          state.limit === true
+            ? limitReachedText
+            : state.seconds !== undefined
+              ? `Слишком много попыток. Попробуйте через ${String(state.seconds)} ${plural(state.seconds, 'секунду', 'секунды', 'секунд')}. Данные остались в форме.`
+              : state.checked
+                ? 'Не получилось. Данные остались в форме — отправьте ещё раз.'
+                : 'Не получилось. Попробуйте через пару минут. Данные остались в форме.',
       };
     case 'forbidden':
       return {
@@ -160,7 +165,13 @@ export function refusalState(
     case 'closed':
     case 'gone':
     case 'delivery':
+      return checked
+        ? { kind: 'not-created', checked }
+        : { kind: 'not-created' };
     case 'unavailable':
+      if (refusal.code === 'LimitExceeded') {
+        return { kind: 'not-created', limit: true };
+      }
       return checked
         ? { kind: 'not-created', checked }
         : { kind: 'not-created' };

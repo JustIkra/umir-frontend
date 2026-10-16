@@ -61,6 +61,10 @@ export const orderNotSaved =
 export const serviceUnavailableText =
   'Сейчас мы не можем принять это. Ничего не выполнено — попробуйте ещё раз чуть позже.';
 
+// 409 LimitExceeded outside the order (C13: the restaurant quota of Auth).
+export const limitReachedText =
+  'Достигнут предел. Обратитесь к администратору организации.';
+
 export const unresolvedAttempt =
   'Прошлая отправка ещё не завершена. Подождите или перезагрузите страницу.';
 
