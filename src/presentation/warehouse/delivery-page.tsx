@@ -15,6 +15,15 @@ import {
 } from '@/presentation/session/hooks';
 import { useServices } from '@/presentation/services';
 import { useLeaveGuard } from '@/presentation/app-shell/leave-guard';
+import {
+  attemptPlaces,
+  attemptRefusalText,
+} from '@/presentation/ui/attempt-messages';
+import {
+  DamagedAttempt,
+  NotSavedNotice,
+  useAttemptFlags,
+} from '@/presentation/ui/attempt-notices';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { formatInstant } from '@/presentation/ui/time';
 import { formatSectionDate } from '@/presentation/ui/zones';
@@ -94,6 +103,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
   const { warehouseCommands, now } = useServices();
   const commands = warehouseCommands(restaurantID);
   useAttempts();
+  const attempt = useAttemptFlags(commands.deliveryAttempt);
   const pending = commands.pendingDelivery();
   const restaurant = findRestaurant(useAccess(), restaurantID);
   const [timeZone] = useState(
@@ -122,6 +132,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
     status === 'sending' ||
     status === 'unknown' ||
     status === 'reset' ||
+    attempt.damaged ||
     timezoneChanged ||
     productRead.value === undefined;
   const [dirty, setDirty] = useState(false);
@@ -155,6 +166,12 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
           description="Одна строка — одна партия. Срок годности посчитаем сами по дате изготовления."
         />
       </Stack>
+      {attempt.damaged && (
+        <DamagedAttempt state={commands.deliveryAttempt} place="warehouse" />
+      )}
+      {attempt.notSaved && (
+        <NotSavedNotice text={attemptPlaces.warehouse.notSaved} />
+      )}
       {message !== undefined && (
         <FormMessage
           tone={status === 'unknown' ? 'unknown' : 'error'}
@@ -231,7 +248,10 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                     : result.kind === 'refused' &&
                         result.code === 'SettingsChanged'
                       ? 'Изменились настройки времени ресторана. Обновите страницу и проверьте даты.'
-                      : 'Проверьте даты и количество и попробуйте ещё раз.',
+                      : ((result.kind === 'refused'
+                          ? attemptRefusalText(result.code, 'warehouse')
+                          : undefined) ??
+                        'Проверьте даты и количество и попробуйте ещё раз.'),
               );
             });
         }}

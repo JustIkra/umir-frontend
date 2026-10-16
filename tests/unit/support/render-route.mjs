@@ -202,10 +202,28 @@ export const orderSnapshot = (overrides = {}) => ({
   phase: { kind: 'compose' },
   notice: undefined,
   locked: false,
+  notSaved: false,
   ...overrides,
 });
 
 const done = () => Promise.resolve({ kind: 'done', value: undefined });
+
+// The state of one saved attempt as a screen reads it. discards counts the
+// calls of discardCorrupt, which answers `discard`.
+export const attemptState = ({
+  notSaved = false,
+  damaged = false,
+  discard = 'ok',
+  discards = { count: 0 },
+} = {}) => ({
+  notSaved: () => notSaved,
+  damaged: () => damaged,
+  discardCorrupt: () => {
+    discards.count += 1;
+    return discard;
+  },
+  subscribe: () => () => {},
+});
 
 const staticModel = (snapshot) => ({
   subscribe: () => () => {},
@@ -278,6 +296,9 @@ export function fakeServices({
   data = {},
   pendingProduct,
   pendingDish,
+  attempt = attemptState(),
+  writeoffAttempts = {},
+  commandResult,
   order = orderSnapshot(),
   organizations = {},
 } = {}) {
@@ -445,20 +466,28 @@ export function fakeServices({
     }),
     warehouseCommands: () => ({
       receiveDelivery: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       pendingDelivery: () => undefined,
       pendingDeliveryTimeZone: () => undefined,
       confirmWriteoff: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       pendingWriteoff: () => false,
+      deliveryAttempt: attempt,
+      writeoffAttempt: (batchID) => writeoffAttempts[batchID] ?? attempt,
     }),
     catalogCommands: () => ({
       registerProduct: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       defineDish: () =>
+        commandResult ??
         Promise.reject(new Error('no commands in render tests')),
       pendingProduct: () => pendingProduct,
       pendingDish: () => pendingDish,
+      productAttempt: attempt,
+      dishAttempt: attempt,
     }),
     orderFlow: () => ({
       subscribe: () => () => {},

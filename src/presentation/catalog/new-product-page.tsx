@@ -27,6 +27,12 @@ import {
   RadioGroupField,
   TextInput,
 } from '@/presentation/ui/form';
+import { attemptPlaces } from '@/presentation/ui/attempt-messages';
+import {
+  DamagedAttempt,
+  NotSavedNotice,
+  useAttemptFlags,
+} from '@/presentation/ui/attempt-notices';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { rem } from '@/presentation/ui/units';
 import {
@@ -70,6 +76,7 @@ export function NewProductPage() {
     useReadModel(data.suggestion('product')).value?.result.suggestedID ?? '';
   const known = useReadModel(data.products()).value?.result.items;
   useAttempts();
+  const attempt = useAttemptFlags(catalog.productAttempt);
   const pending = catalog.pendingProduct();
   const [start] = useState(() =>
     pending === undefined ? undefined : productDraftOf(pending),
@@ -80,6 +87,8 @@ export function NewProductPage() {
   const [status, setStatus] = useState<Status>(
     start === undefined ? 'idle' : 'unknown',
   );
+  // The code of the latest refusal: a saved attempt that blocks says so.
+  const [refusedCode, setRefusedCode] = useState<string | undefined>();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -96,7 +105,10 @@ export function NewProductPage() {
   }, [settledElsewhere, productsModel]);
   const shown: Status = settledElsewhere ? 'idle' : status;
   const closed =
-    shown === 'sending' || shown === 'unknown' || shown === 'reset';
+    shown === 'sending' ||
+    shown === 'unknown' ||
+    shown === 'reset' ||
+    attempt.damaged;
   const codeValue = code ?? suggested;
   const errors =
     shown === 'invalid' ? productErrors({ name, code: codeValue, unit }) : {};
@@ -142,6 +154,7 @@ export function NewProductPage() {
         setStatus('rejected');
         return;
       case 'refused':
+        setRefusedCode(outcome.code);
         setStatus('refused');
         return;
       case 'ended':
@@ -183,6 +196,7 @@ export function NewProductPage() {
                 ...outcomeMessage(
                   'product',
                   shown === 'rejected' ? 'invalid' : 'refused',
+                  refusedCode,
                 ),
               }
             : undefined;
@@ -201,6 +215,12 @@ export function NewProductPage() {
           description="Продукт — то, что приходит на склад и идёт в блюда. После создания его нельзя изменить."
         />
       </Stack>
+      {attempt.damaged && (
+        <DamagedAttempt state={catalog.productAttempt} place="products" />
+      )}
+      {attempt.notSaved && (
+        <NotSavedNotice text={attemptPlaces.products.notSaved} />
+      )}
       {message !== undefined && (
         <FormMessage tone={message.tone} title={message.title}>
           {message.text}
