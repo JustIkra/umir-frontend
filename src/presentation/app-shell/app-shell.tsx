@@ -161,7 +161,7 @@ export function AppShell({
               notice !== undefined &&
               notice.restaurantID === context.restaurantID && (
                 <InfoNotice title="Данные обновлены">
-                  Была короткая техническая пауза. Если вы что-то отправляли,
+                  Данные на сервере обновились. Если вы что-то отправляли,
                   проверьте, сохранилось ли.
                 </InfoNotice>
               )}

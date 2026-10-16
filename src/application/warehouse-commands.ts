@@ -1,6 +1,7 @@
 import { ApiError, localFailure, type Envelope, type Topic } from './api';
 import type { AttemptBody, AttemptStore } from './attempt-store';
 import type { CreateOutcome } from './catalog-commands';
+import { defaultWaitSeconds } from './credentials';
 import type { CommandResult, CommandRunner, CommandSpec } from './commands';
 import {
   attemptDamagedCode,
@@ -86,6 +87,16 @@ export function createWarehouseCommands({
     ) {
       onUnauthenticated();
       return { kind: 'ended' };
+    }
+    if (
+      result.failure.status === 429 ||
+      result.failure.code === 'RateLimited'
+    ) {
+      return {
+        kind: 'rate-limited',
+        retryAfterSeconds:
+          result.failure.retryAfterSeconds ?? defaultWaitSeconds,
+      };
     }
     if (
       result.failure.code === 'InvalidArgument' ||

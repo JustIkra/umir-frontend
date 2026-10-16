@@ -345,3 +345,61 @@ test('isInFlight: on its way is true, an unknown answer or a settled one is fals
   assert.equal(runner.isInFlight('k'), false);
   assert.deepEqual(runner.getSnapshot(), []);
 });
+
+const limiter = () =>
+  new ApiError({
+    ...localFailure('RateLimited', 'not_committed', 429),
+    retryable: true,
+    retryAfterSeconds: 3,
+  });
+const admission = () =>
+  new ApiError({
+    ...localFailure('ServiceUnavailable', 'not_committed', 503),
+    retryable: true,
+  });
+
+test('a first send refused by the limiter or by admission closes the attempt', async () => {
+  for (const refusal of [limiter, admission]) {
+    const { runner } = setup();
+    const sent = command(refusal(), 'ok');
+    const first = await runner.run({
+      key: 'k',
+      label: 'x',
+      execute: sent.execute,
+    });
+    assert.equal(first.kind, 'rejected');
+    assert.deepEqual(runner.getSnapshot(), []);
+    await runner.run({ key: 'k', label: 'x', execute: sent.execute });
+    assert.deepEqual(
+      sent.calls.map((call) => call.commandID),
+      ['cmd-1', 'cmd-2'],
+    );
+  }
+});
+
+test('a repeat refused by the limiter or admission leaves the lost send unknown', async () => {
+  for (const refusal of [limiter, admission]) {
+    const { runner } = setup();
+    const sent = command(timeout(), refusal(), 'ok');
+    const spec = { key: 'k', label: 'x', execute: sent.execute };
+    assert.equal((await runner.run(spec)).kind, 'unknown');
+    const again = await runner.run(spec);
+    assert.equal(again.kind, 'unknown');
+    assert.equal(again.attempt.commandID, 'cmd-1');
+    assert.equal(runner.getSnapshot().length, 1);
+    assert.equal((await runner.run(spec)).kind, 'committed');
+    assert.deepEqual(
+      sent.calls.map((call) => call.commandID),
+      ['cmd-1', 'cmd-1', 'cmd-1'],
+    );
+  }
+});
+
+test('a restored attempt refused by the limiter on its first repeat stays', async () => {
+  const { runner } = setup();
+  const sent = command(limiter());
+  const spec = { key: 'k', label: 'x', execute: sent.execute };
+  runner.restore(spec, { commandID: 'saved', epoch: undefined, startedAt: 5 });
+  assert.equal((await runner.run(spec)).kind, 'unknown');
+  assert.equal(runner.getSnapshot()[0].commandID, 'saved');
+});

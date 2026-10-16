@@ -274,3 +274,53 @@ test('a second product command is not sent over a readable record of another com
   await first;
   assert.equal(run.store.load(refOf('product')).status, 'absent');
 });
+
+const limited = (retryAfterSeconds) =>
+  new ApiError({
+    ...localFailure('RateLimited', 'not_committed', 429),
+    retryable: true,
+    retryAfterSeconds,
+  });
+
+test('a 429 reports the wait, drops the attempt and never repeats on its own', async () => {
+  const { catalog, calls, answers, store } = setup();
+  answers.push(limited(7));
+  assert.deepEqual(await catalog.registerProduct(product), {
+    kind: 'rate-limited',
+    retryAfterSeconds: 7,
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(catalog.pendingProduct(), undefined);
+  assert.equal(store.load(refOf('product')).status, 'absent');
+  // The next send is a new command.
+  answers.push({ context: {}, result: product });
+  await catalog.registerProduct(product);
+  assert.deepEqual(calls[1], ['registerProduct', R, product, 'cmd-2', EPOCH]);
+});
+
+test('a 429 without a wait gets the default one', async () => {
+  const { catalog, answers } = setup();
+  answers.push(limited(undefined));
+  assert.deepEqual(await catalog.defineDish(dish), {
+    kind: 'rate-limited',
+    retryAfterSeconds: 60,
+  });
+});
+
+test('a 503 before dispatch is a refusal that frees the command; after dispatch it stays unknown', async () => {
+  const { catalog, calls, answers, store } = setup();
+  answers.push(refused(503, 'ServiceUnavailable', 'not_committed'));
+  assert.deepEqual(await catalog.registerProduct(product), {
+    kind: 'refused',
+    code: 'ServiceUnavailable',
+  });
+  assert.equal(store.load(refOf('product')).status, 'absent');
+  answers.push(refused(503, 'ServiceUnavailable', 'unknown'));
+  assert.deepEqual(await catalog.registerProduct(product), { kind: 'unknown' });
+  assert.deepEqual(catalog.pendingProduct(), product);
+  answers.push({ context: {}, result: product });
+  await catalog.registerProduct(product);
+  assert.equal(calls[0][3], 'cmd-1');
+  assert.equal(calls[1][3], 'cmd-2');
+  assert.equal(calls[2][3], 'cmd-2');
+});

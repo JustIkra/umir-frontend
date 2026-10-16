@@ -319,3 +319,29 @@ test('an envelope gives the business context and the result', () => {
     DecodeError,
   );
 });
+
+test('DUR1 admission answers keep their outcome and wait', async () => {
+  const { default: dur } = await import('../../api/durable-v1-examples.json', {
+    with: { type: 'json' },
+  });
+  const byName = Object.fromEntries(dur.examples.map((e) => [e.name, e]));
+  const limited = byName['error-rate-limited'];
+  const failure = decodeFailure(
+    limited.status,
+    limited.value,
+    limited.headers['Retry-After'],
+  );
+  assert.equal(failure.code, 'RateLimited');
+  assert.equal(failure.outcome, 'not_committed');
+  assert.equal(failure.retryAfterSeconds, 7);
+  for (const [name, outcome] of [
+    ['error-service-unavailable-write', 'not_committed'],
+    ['error-service-unavailable-read', 'unavailable'],
+    ['error-service-unavailable-after-dispatch', 'unknown'],
+  ]) {
+    const item = byName[name];
+    const decoded = decodeFailure(item.status, item.value);
+    assert.equal(decoded.code, 'ServiceUnavailable');
+    assert.equal(decoded.outcome, outcome);
+  }
+});

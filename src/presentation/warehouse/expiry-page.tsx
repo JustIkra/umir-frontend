@@ -17,12 +17,14 @@ import { ListCard } from '@/presentation/ui/card';
 import {
   attemptPlaces,
   attemptRefusalText,
+  serviceUnavailableText,
 } from '@/presentation/ui/attempt-messages';
 import {
   DamagedAttempt,
   NotSavedNotice,
   useAttemptFlags,
 } from '@/presentation/ui/attempt-notices';
+import { RateLimitMessage, useRetryWait } from '@/presentation/ui/rate-limit';
 import { FormMessage } from '@/presentation/ui/form-message';
 import { rem } from '@/presentation/ui/units';
 import { formatAbsoluteStamp } from '@/presentation/ui/zones';
@@ -85,6 +87,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
   const [message, setMessage] = useState<
     { readonly title: string; readonly text: string } | undefined
   >();
+  const wait = useRetryWait();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -99,6 +102,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
       : `Продукт с кодом ${id}`;
   const confirm = async (batchID: string, epoch: string) => {
     setStates((v) => ({ ...v, [batchID]: 'sending' }));
+    wait.clear();
     const result = await commands.confirmWriteoff(batchID, epoch);
     if (!mounted.current) return;
     if (result.kind === 'created') {
@@ -107,6 +111,10 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
         title: 'Готово',
         text: `Списание подтверждено: ${name(result.value.productID, epoch)}, ${formatQuantity(result.value.writtenOffQuantity, result.value.baseUnit)}.`,
       });
+    } else if (result.kind === 'rate-limited') {
+      setStates((v) => ({ ...v, [batchID]: 'refused' }));
+      setMessage(undefined);
+      wait.begin(result.retryAfterSeconds);
     } else {
       setStates((v) => ({
         ...v,
@@ -134,7 +142,9 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                   title: 'Не удалось списать',
                   text:
                     (result.kind === 'refused'
-                      ? attemptRefusalText(result.code, 'warehouse')
+                      ? result.code === 'ServiceUnavailable'
+                        ? serviceUnavailableText
+                        : attemptRefusalText(result.code, 'warehouse')
                       : undefined) ?? 'Обновите страницу и попробуйте ещё раз.',
                 },
       );
@@ -218,6 +228,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
           {message.text}
         </FormMessage>
       )}
+      <RateLimitMessage wait={wait} />
       <WarehouseRead
         model={data.pendingWriteoffs()}
         title="Не удалось загрузить партии к списанию"
@@ -276,6 +287,7 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
                         state={commands.writeoffAttempt(batch.batchID)}
                         disabled={
                           unit === undefined ||
+                          wait.waiting ||
                           status === 'sending' ||
                           status === 'done' ||
                           status === 'reset'

@@ -1,6 +1,17 @@
 // Texts of the legal templates from Figma Templates (32:489, 32:490, 218:350).
 // Square brackets mark values the operator fills in before publication.
 
+// Retention periods the documents state (G1-2, R9). One number each, so the
+// text and the consent never disagree.
+// A message from the landing form: name, address, phone and text are erased.
+export const feedbackRetentionDays = 30;
+// A message a restaurant sends from the app.
+export const restaurantFeedbackRetentionDays = 180;
+// Seven days after the restaurant or the organization is deleted.
+export const deletedRestaurantRetentionDays = 7;
+// The web server journal holds no personal data and rotates after this long.
+export const webServerLogRetentionDays = 14;
+
 export interface DocumentLink {
   text: string;
   to: string;
@@ -119,13 +130,16 @@ export const privacyPolicy: LegalDocument = {
           'Обработка автоматизированная: сбор, запись, хранение, использование и удаление.',
         ),
         item(
-          'Журналы веб-сервера хранятся не более [N]\u00A0дней, затем удаляются автоматически.',
+          `Журналы веб-сервера хранятся не более ${String(webServerLogRetentionDays)}\u00A0дней, затем удаляются автоматически.`,
         ),
         item(
           'Данные хранятся на серверах, расположенных в Российской Федерации: [место размещения].',
         ),
         item(
-          'Учётная запись оператора хранится, пока у ресторана есть доступ к Сервису. Обращения из формы обратной связи хранятся не более [N] дней с даты получения или до отзыва согласия, затем удаляются.',
+          `Учётная запись оператора хранится, пока у ресторана есть доступ к Сервису. Обращения из формы обратной связи на сайте хранятся не более ${String(feedbackRetentionDays)}\u00A0дней с даты получения или до отзыва согласия, затем имя, адрес, телефон и текст стираются.`,
+        ),
+        item(
+          `Обращения, которые рестораны отправляют из приложения, хранятся ${String(restaurantFeedbackRetentionDays)}\u00A0дней с даты получения, а если ресторан или организацию удалили, то ${String(deletedRestaurantRetentionDays)}\u00A0дней после удаления.`,
         ),
       ],
     },
@@ -387,7 +401,7 @@ export const personalDataConsent: LegalDocument = {
       title: 'Срок и отзыв согласия',
       blocks: [
         item(
-          'Согласие действует [N] дней с даты отправки обращения или до его отзыва. Отозвать согласие можно письмом на [e-mail]; после отзыва данные удаляются в течение [N] рабочих дней.',
+          `Согласие действует ${String(feedbackRetentionDays)}\u00A0дней с даты отправки обращения или до его отзыва. Отозвать согласие можно письмом на [e-mail]; после отзыва данные удаляются в течение [N] рабочих дней.`,
         ),
       ],
     },

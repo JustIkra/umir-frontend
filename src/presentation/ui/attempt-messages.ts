@@ -56,6 +56,15 @@ export type AttemptPlaceKey = keyof typeof attemptPlaces;
 export const orderNotSaved =
   'Браузер не даёт запомнить этот заказ. Если страница перезагрузится, проверьте результат в разделе «Заказы».';
 
+// 503 ServiceUnavailable before the request was sent (C16): nothing ran, the
+// next send is a new command.
+export const serviceUnavailableText =
+  'Сейчас мы не можем принять это. Ничего не выполнено — попробуйте ещё раз чуть позже.';
+
+// 409 LimitExceeded outside the order (C13: the restaurant quota of Auth).
+export const limitReachedText =
+  'Достигнут предел. Обратитесь к администратору организации.';
+
 export const unresolvedAttempt =
   'Прошлая отправка ещё не завершена. Подождите или перезагрузите страницу.';
 

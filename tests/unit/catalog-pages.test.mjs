@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'bun:test';
+import { ApiError, localFailure } from '../../src/application/api.ts';
 import {
   catalogStamp,
   dishRows,
@@ -155,4 +156,30 @@ test('a dish the catalog does not have shows «Блюдо не найдено»'
   );
   assert.ok(plain.includes('Блюдо не найдено'));
   assert.ok(plain.includes('К списку блюд'));
+});
+
+test('a 429 on a read asks to wait and holds the retry', async () => {
+  const limited = (retryAfterSeconds) => ({
+    ...failedRead('RateLimited', 429, 'unavailable'),
+    failure: new ApiError({
+      ...localFailure('RateLimited', 'unavailable', 429),
+      retryable: true,
+      retryAfterSeconds,
+    }),
+  });
+  const page = async (retryAfterSeconds) =>
+    renderRoute(`/app/r/${R}/catalog`, {
+      data: { products: limited(retryAfterSeconds) },
+    });
+  const shown = text(await page(7));
+  assert.ok(shown.includes('Слишком много запросов'));
+  assert.ok(shown.includes('Повторите через 0:07'));
+  assert.ok(
+    /<button[^>]*disabled[^>]*>Попробовать ещё раз<\/button>/.test(
+      await page(7),
+    ),
+  );
+  // Without a named wait the screen uses a minute.
+  assert.ok(text(await page(undefined)).includes('Повторите через 1:00'));
+  assert.ok(!shown.includes('RateLimited'));
 });

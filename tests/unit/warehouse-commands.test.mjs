@@ -697,3 +697,77 @@ test('the state of one operation keeps its identity between reads', () => {
   assert.notEqual(value.writeoffAttempt('B'), value.writeoffAttempt('C'));
   assert.equal(value.deliveryAttempt, value.deliveryAttempt);
 });
+
+const limited = (retryAfterSeconds) =>
+  new ApiError({
+    ...localFailure('RateLimited', 'not_committed', 429),
+    retryable: true,
+    retryAfterSeconds,
+  });
+
+test('a 429 on a delivery or a write-off reports the wait and frees the command', async () => {
+  const calls = [];
+  const answers = [limited(7), limited(undefined)];
+  const { value, store } = setup({
+    receiveDelivery: async (...args) => {
+      calls.push(args);
+      throw answers.shift();
+    },
+    confirmWriteoff: async (...args) => {
+      calls.push(args);
+      throw answers.shift();
+    },
+  });
+  assert.deepEqual(await value.receiveDelivery(draft(), 'Europe/Moscow', E), {
+    kind: 'rate-limited',
+    retryAfterSeconds: 7,
+  });
+  assert.equal(value.pendingDelivery(), undefined);
+  assert.deepEqual(await value.confirmWriteoff('B', E), {
+    kind: 'rate-limited',
+    retryAfterSeconds: 60,
+  });
+  assert.equal(value.pendingWriteoff('B'), false);
+  assert.equal(calls.length, 2);
+  assert.equal(
+    store.load({ kind: 'writeoff', userID: U, restaurantID: R, batchID: 'B' })
+      .status,
+    'absent',
+  );
+});
+
+test('a 503 before dispatch frees the delivery; after dispatch the same command is repeated', async () => {
+  const calls = [];
+  const answers = [
+    new ApiError(localFailure('ServiceUnavailable', 'not_committed', 503)),
+    new ApiError(localFailure('ServiceUnavailable', 'unknown', 503)),
+    {
+      context: { runtimeEpoch: E },
+      result: { deliveryID: 'd', batchIDs: [], batches: [] },
+    },
+  ];
+  const { value } = setup({
+    receiveDelivery: async (...args) => {
+      calls.push(args);
+      const next = answers.shift();
+      if (next instanceof Error) throw next;
+      return next;
+    },
+  });
+  assert.deepEqual(await value.receiveDelivery(draft(), 'Europe/Moscow', E), {
+    kind: 'refused',
+    code: 'ServiceUnavailable',
+  });
+  assert.equal(value.pendingDelivery(), undefined);
+  assert.equal(
+    (await value.receiveDelivery(draft(), 'Europe/Moscow', E)).kind,
+    'unknown',
+  );
+  assert.equal(
+    (await value.receiveDelivery(draft(), 'Europe/Moscow', E)).kind,
+    'created',
+  );
+  assert.notEqual(calls[0][2], calls[1][2]);
+  assert.equal(calls[1][2], calls[2][2]);
+  assert.deepEqual(calls[1][1], calls[2][1]);
+});

@@ -1126,7 +1126,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    /** @description Opaque identifier. Unicode and reserved characters are allowed. Percent-encode query values; do not require UUID syntax. */
+    /** @description Opaque identifier of at most 256 code points. Unicode and reserved characters are allowed. Percent-encode query values; do not require UUID syntax. Owners check the length before any write; a longer value is 400 InvalidArgument with outcome not_committed (C43). */
     ID: string;
     /** @description Caller-generated command identity. Preserve the same value and identical input on retry. The expiration/ namespace belongs to warehouse. */
     ClientCommandID: string;
@@ -1249,7 +1249,7 @@ export interface components {
       changes: components['schemas']['Change'][];
       warehouseEpoch: components['schemas']['Epoch'];
     };
-    /** @description Process positions in source order. An empty list produces an empty proposal. Do not send lineNo or an accepted composition. */
+    /** @description Process positions in source order. An empty list produces an empty proposal. Do not send lineNo or an accepted composition. At most 200 positions; more is 400 InvalidArgument with outcome not_committed (C15). At most 2000 active proposals exist per restaurant; creating one more is 409 LimitExceeded with outcome not_committed. The numbers are confirmed at G1. */
     PrepareOrderRequest: {
       positions: components['schemas']['RequestedPosition'][];
     };
@@ -1634,6 +1634,7 @@ export interface components {
      * @description Auth-generated canonical UUIDv4. Global identities and tombstoned IDs are never reused.
      */
     EntityID: string;
+    /** @description Storage generation (R2, C9). A UUID that the owning service creates in its first migration and stores with its data (storage_meta). It changes only when the storage is reset or restored to an earlier history (generation rotate by the owner under the owner role), never on a process restart, redeploy or replica change. Warehouse, Serving and Auth each have their own generation. runtimeEpoch, readerEpoch, expectedEpoch, currentEpoch and X-Umir-Runtime-Epoch carry it; the UUID format is unchanged. The replica identifier (INSTANCE_ID) is not an epoch and is not on the wire: it appears only in /readyz and logs. The SSE epoch and the stream cursor of the edge service carry a random boot nonce that is independent of INSTANCE_ID (C19). RuntimeReset is returned only after a confirmed generation reset. */
     Epoch: components['schemas']['EntityID'];
     Version: components['schemas']['PositiveInt64'];
     Fingerprint: string;
@@ -1755,6 +1756,7 @@ export interface components {
       | 'unknown'
       | 'unavailable'
       | 'indeterminate';
+    /** @description Typed failure. CommandConflict (409) is the only code for a command identity that is reused with a different fingerprint while its record is retained: outcome not_committed for a POST and unavailable for a passive GET lookup, and the original result is never exposed. CommandConflict with outcome unknown means only that Auth has already cleared the stored result of an old command (results 30 days, fingerprint tombstone 180 days, C29, C53); after the tombstone a repeat runs as a new command. CommandIdentityConflict does not exist. RateLimited (429) carries the Retry-After header and details.retryAfterSeconds and always has outcome not_committed; every RateLimited answer, including those defined before DUR1, must carry both. ServiceUnavailable (503) from the admission store before the request was dispatched is not_committed for a write and unavailable for a read; there is no AdmissionUnavailable code. A failure after dispatch keeps its earlier code (ServiceUnavailable or UpstreamTimeout) with outcome unknown. LimitExceeded is 409 for quotas and 503 for existing page reads (C53). */
     Error: {
       /** @enum {string} */
       code:
@@ -1835,7 +1837,7 @@ export interface components {
         email?: string;
       };
       sessionRevoked?: boolean;
-    };
+    } & unknown;
     Command: {
       commandID: components['schemas']['ClientCommandID'];
     };
@@ -1948,6 +1950,7 @@ export interface components {
       commandID: components['schemas']['ClientCommandID'];
       /** @constant */
       outcome: 'committed';
+      /** @description Monotonic database sequence value of the aggregate at commit. Values are not consecutive; consumers must not infer missing events from gaps (C30). Continuity is guaranteed only for warehouse.* events. */
       aggregateRevision: components['schemas']['Version'];
       resourceID: components['schemas']['EntityID'];
       mailJobs: components['schemas']['MailJob'][];
@@ -1955,7 +1958,7 @@ export interface components {
     /** @description Readiness for one explicit restaurant and service, bound to lifecycleVersion and exact peer epoch. Registry envelope restaurantID and runtime route restaurantID must agree with this value. */
     RuntimeReadiness: {
       /** @enum {string} */
-      service: 'warehouse' | 'serving' | 'gateway';
+      service: 'warehouse' | 'serving';
       epoch: components['schemas']['Epoch'];
       /** @enum {string} */
       state: 'pending' | 'ready' | 'closed';
@@ -2044,6 +2047,8 @@ export interface components {
       finalWriteoffs: 0;
       committedVersion: components['schemas']['NonNegativeInt64'];
       invalidationRequired: boolean;
+      /** @description Next instant at which this restaurant has an expiry transition due, after the run. Absent when nothing is scheduled. A hint for the scheduler: the authoritative list is GET /internal/warehouse/v2/expiry-due (C22). */
+      nextDueAt?: components['schemas']['Instant'];
     };
     StockRow: {
       productID: components['schemas']['ID'];
@@ -2142,6 +2147,7 @@ export interface components {
           /** @constant */
           type: 'change';
           tenantID: components['schemas']['EntityID'];
+          /** @description Stream identity of the edge service: a random boot nonce chosen by the process, independent of INSTANCE_ID and of any storage generation (C19). The client treats a change as a reason to read again. */
           epoch: components['schemas']['Epoch'];
           sequence: components['schemas']['PositiveInt64'];
           topics: ('catalog' | 'stock' | 'menu' | 'orders' | 'analytics')[];
@@ -2158,6 +2164,7 @@ export interface components {
           /** @constant */
           type: 'refresh-required';
           tenantID: components['schemas']['EntityID'];
+          /** @description Stream identity of the edge service: a random boot nonce chosen by the process, independent of INSTANCE_ID and of any storage generation (C19). The client treats a change as a reason to read again. */
           epoch: components['schemas']['Epoch'];
         };
     AuthorizationRequest: {
@@ -2188,12 +2195,22 @@ export interface components {
       restaurantID: components['schemas']['EntityID'];
       operation: string;
     };
-    ServiceAuthorizationRequest: {
-      restaurantID: components['schemas']['EntityID'];
-      /** @enum {string} */
-      operation: 'expiry.due' | 'runtime.register' | 'runtime.close';
-      epoch: components['schemas']['Epoch'];
-    };
+    /** @description Request for a service token. Restaurant tokens name a restaurant and the exact peer epoch (storage generation): expiry.due, runtime.register, runtime.close, and order.resolve (Serving to Warehouse: one restaurant, the storage generation of Warehouse, only the passive order-attempts and commands reads; Warehouse checks the operation claim against the route and refuses the orders route). The cell-level expiry.due token names neither restaurant nor epoch and serves only the expiry schedule list (C11). Gateway readiness is not checked for any of them. */
+    ServiceAuthorizationRequest:
+      | {
+          restaurantID: components['schemas']['EntityID'];
+          /** @enum {string} */
+          operation:
+            | 'expiry.due'
+            | 'runtime.register'
+            | 'runtime.close'
+            | 'order.resolve';
+          epoch: components['schemas']['Epoch'];
+        }
+      | {
+          /** @constant */
+          operation: 'expiry.due';
+        };
     AnonymousAuthorizationRequest: {
       /** @constant */
       operation: 'feedback.anonymous.submit';
@@ -2227,19 +2244,20 @@ export interface components {
     RegistryEntry: {
       restaurant: components['schemas']['Restaurant'];
       settings: components['schemas']['Settings'];
+      /** @description Readiness confirmed by acknowledgement for warehouse and serving, at most one entry each. No live peer status is read. */
       services: components['schemas']['RuntimeReadiness'][];
     };
+    /** @description One page of the registry. Without since it lists live restaurants only and tombstones is empty. With since it lists records changed after that revision, including tombstones. A page holds at most limit records (entries plus tombstones), at most 1000. Each record reflects the readiness confirmed by acknowledgement; no live peer status is read (C13). A walk that follows nextAfter takes the registryRevision of its first page as R0 and ends with ?since=R0 to catch up with changes made during the walk. The cell has at most 10000 active restaurants. The revision is a positive counter that starts at 1; since=0 lists everything. */
     Registry: {
+      /** @description Registry revision at which this page was read. It is also the ETag value. */
       registryRevision: components['schemas']['Version'];
-      /** @constant */
-      complete: true;
+      /** @description True on the last page of the walk. */
+      complete: boolean;
+      /** @description Opaque cursor for the next page; present exactly when complete is false. */
+      nextAfter?: string;
       entries: components['schemas']['RegistryEntry'][];
-      tombstones: {
-        restaurantID: components['schemas']['EntityID'];
-        orgID: components['schemas']['EntityID'];
-        lifecycleVersion: components['schemas']['Version'];
-      }[];
-    };
+      tombstones: components['schemas']['RegistryTombstone'][];
+    } & unknown;
     RegisterRuntime: {
       operationID: components['schemas']['EntityID'];
       expectedEpoch: components['schemas']['Epoch'];
@@ -2251,16 +2269,17 @@ export interface components {
       expectedEpoch: components['schemas']['Epoch'];
       lifecycleVersion: components['schemas']['Version'];
     };
+    /** @description Runtime status of a stateful peer. The service is warehouse or serving; no other service publishes runtime status. epoch is the storage generation. */
     RuntimeStatus: {
       /** @enum {string} */
-      service: 'warehouse' | 'serving' | 'gateway';
+      service: 'warehouse' | 'serving';
       epoch: components['schemas']['Epoch'];
       ready: boolean;
       tzdataVersion: string;
     };
     ReadinessAck: {
       /** @enum {string} */
-      service: 'warehouse' | 'serving' | 'gateway';
+      service: 'warehouse' | 'serving';
       epoch: components['schemas']['Epoch'];
       restaurantID: components['schemas']['EntityID'];
       lifecycleVersion: components['schemas']['Version'];
@@ -2276,6 +2295,7 @@ export interface components {
           /** @enum {integer} */
           httpStatus: 200 | 201 | 202 | 204;
           response: components['schemas']['AuthStoredResponse'];
+          /** @description Monotonic database sequence value of the aggregate at commit. Values are not consecutive; consumers must not infer missing events from gaps (C30). Continuity is guaranteed only for warehouse.* events. */
           aggregateRevision: components['schemas']['Version'];
           requiresSessionRestore: boolean;
         }
@@ -2314,29 +2334,74 @@ export interface components {
       /** @constant */
       azp: 'umir-gateway';
     };
-    ServiceClaims: {
-      /** @constant */
-      iss: 'urn:umir:auth';
-      aud: (
-        'umir-warehouse' | 'umir-serving' | 'umir-gateway' | 'umir-feedback'
-      )[];
-      iat: number;
-      nbf: number;
-      exp: number;
-      jti: components['schemas']['EntityID'];
-      operation: string;
-      permissions: components['schemas']['Capability'][];
-      /** @constant */
-      kind: 'service';
-      /** @enum {string} */
-      sub: 'service:auth' | 'service:gateway';
-      org_id: components['schemas']['EntityID'];
-      tenant_id: components['schemas']['EntityID'];
-      runtime_epoch: components['schemas']['Epoch'];
-      lifecycle_version: components['schemas']['Version'];
-      /** @enum {string} */
-      azp: 'umir-auth' | 'umir-gateway';
-    };
+    ServiceClaims:
+      | {
+          /** @constant */
+          iss: 'urn:umir:auth';
+          aud: (
+            'umir-warehouse' | 'umir-serving' | 'umir-gateway' | 'umir-feedback'
+          )[];
+          iat: number;
+          nbf: number;
+          exp: number;
+          jti: components['schemas']['EntityID'];
+          operation: string;
+          permissions: components['schemas']['Capability'][];
+          /** @constant */
+          kind: 'service';
+          /** @enum {string} */
+          sub: 'service:auth' | 'service:gateway';
+          org_id: components['schemas']['EntityID'];
+          tenant_id: components['schemas']['EntityID'];
+          runtime_epoch: components['schemas']['Epoch'];
+          lifecycle_version: components['schemas']['Version'];
+          /** @enum {string} */
+          azp: 'umir-auth' | 'umir-gateway';
+        }
+      | {
+          /** @constant */
+          iss: 'urn:umir:auth';
+          /** @constant */
+          aud: ['umir-warehouse'];
+          iat: number;
+          nbf: number;
+          exp: number;
+          jti: components['schemas']['EntityID'];
+          /** @constant */
+          operation: 'order.resolve';
+          /** @constant */
+          permissions: ['consumer.order.resolve'];
+          /** @constant */
+          kind: 'service';
+          /** @constant */
+          sub: 'service:serving';
+          org_id: components['schemas']['EntityID'];
+          tenant_id: components['schemas']['EntityID'];
+          runtime_epoch: components['schemas']['Epoch'];
+          lifecycle_version: components['schemas']['Version'];
+          /** @constant */
+          azp: 'umir-serving';
+        }
+      | {
+          /** @constant */
+          iss: 'urn:umir:auth';
+          /** @constant */
+          aud: ['umir-warehouse'];
+          iat: number;
+          nbf: number;
+          exp: number;
+          jti: components['schemas']['EntityID'];
+          /** @constant */
+          operation: 'expiry.due';
+          /** @constant */
+          permissions: ['expiry.due'];
+          /** @constant */
+          kind: 'service';
+          /** @constant */
+          sub: 'service:gateway';
+          /** @constant */
+          azp: 'umir-gateway';
+        };
     AnonymousClaims: {
       /** @constant */
       iss: 'urn:umir:auth';
@@ -2530,14 +2595,25 @@ export interface components {
     WOrderCommitResult:
       | components['schemas']['WOrderCommitted']
       | components['schemas']['WRecheckRequired'];
+    /** @description State of one order commit attempt at Warehouse. Transitions: Unseen -> Pending -> (Interrupted -> Pending)* -> Completed or Rejected. Pending means the attempt is executing; Interrupted means execution stopped without a recorded outcome and permits an exact repeat of the same commit. A receipt recorded for the command always wins over an attempt row. Serving maps Interrupted to an unknown outcome until it resolves the attempt; the earlier working name Abandoned is not used (C21). */
     WOrderAttempt:
       | {
           /** @constant */
           state: 'Unseen';
         }
       | {
-          /** @constant */
+          /**
+           * @description The attempt is executing. It may become Interrupted, Completed or Rejected.
+           * @constant
+           */
           state: 'Pending';
+        }
+      | {
+          /**
+           * @description Execution stopped without a recorded outcome. An exact repeat of the same commit (same commandID, proposalID and accepted positions) is allowed and moves the attempt back to Pending. No new commandID is needed.
+           * @constant
+           */
+          state: 'Interrupted';
         }
       | {
           /** @constant */
@@ -2994,7 +3070,9 @@ export interface components {
     };
     AuthPageIdentity: {
       orgID: components['schemas']['EntityID'];
+      /** @description Storage generation of Auth that produced the first page. */
       readerEpoch: components['schemas']['Epoch'];
+      /** @description Monotonic database sequence value at the first page. Not consecutive (C30). */
       aggregateRevision: components['schemas']['Version'];
       evaluatedAt: components['schemas']['Instant'];
     };
@@ -3153,6 +3231,53 @@ export interface components {
       | 'feedback.read'
       | 'feedback.export'
       | 'consumer.recommendations.read';
+    /** @description Restaurants whose nextDueAt is at or before asOf, in a stable order, page by page. It requires the cell-level expiry.due service token and reveals no business data. */
+    ExpiryDueList: {
+      /** @description Storage generation of Warehouse that produced the page. */
+      runtimeEpoch: components['schemas']['Epoch'];
+      asOf: components['schemas']['Instant'];
+      items: components['schemas']['ExpiryDueRestaurant'][];
+      /** @description Opaque cursor for the next page; absent on the last page. */
+      nextAfter?: string;
+    };
+    ExpiryDueRestaurant: {
+      restaurantID: components['schemas']['EntityID'];
+      /** @description Earliest instant with an expiry transition due for this restaurant. */
+      nextDueAt: components['schemas']['Instant'];
+    };
+    /** @description Body of GET /readyz (C32). The frontend answers {"capabilities":{"static":"ok"}} without instance and generation. */
+    HealthReadiness: {
+      /** @description Replica identifier (INSTANCE_ID). Absent at the frontend. */
+      instance?: string;
+      /** @description Storage generation. Absent at services without storage: Gateway (C49) and the frontend (C42). */
+      generation?: components['schemas']['Epoch'];
+      /** @description State of each capability. The names are fixed per service in docs/durable/configuration.md. */
+      capabilities: {
+        [key: string]: 'ok' | 'degraded' | 'down';
+      };
+    };
+    /** @description Point read of one restaurant. registryRevision is the global registry revision at the moment of the read, as in the list, and is the ETag value: 304 means the registry has not changed since that revision, so the record is unchanged too; a changed registry may answer 200 with the same record. A restaurant that never existed is 404 NotFound. */
+    RegistryPoint:
+      | {
+          /** @description Global registry revision at the moment of the read, the same counter as in the list, not a per-restaurant version. */
+          registryRevision: components['schemas']['Version'];
+          /** @constant */
+          state: 'live';
+          entry: components['schemas']['RegistryEntry'];
+        }
+      | {
+          /** @description Global registry revision at the moment of the read, the same counter as in the list, not a per-restaurant version. */
+          registryRevision: components['schemas']['Version'];
+          /** @constant */
+          state: 'tombstone';
+          tombstone: components['schemas']['RegistryTombstone'];
+        };
+    /** @description A deleted restaurant. Tombstones are kept without time limit and carry no personal data. */
+    RegistryTombstone: {
+      restaurantID: components['schemas']['EntityID'];
+      orgID: components['schemas']['EntityID'];
+      lifecycleVersion: components['schemas']['Version'];
+    };
   };
   responses: {
     /** @description The frontend proxy could not obtain the gateway response. No query result is available. */
@@ -5376,6 +5501,16 @@ export interface operations {
         };
         content: {
           'text/event-stream': components['schemas']['LiveEvent'];
+        };
+      };
+      /** @description Stream quota reached (C36): 8 per session, 200 per organization, 2000 per cell. Retry-After is 1 second. */
+      429: {
+        headers: {
+          'Retry-After': components['headers']['Retry-After'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
         };
       };
       /** @description Typed failure; a transport failure never proves not_committed. */

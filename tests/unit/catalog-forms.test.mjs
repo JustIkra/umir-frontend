@@ -132,7 +132,7 @@ test('conflict, created and outcome texts', () => {
   });
   assert.deepEqual(outcomeMessage('dish', 'reset'), {
     title: 'Не знаем, создано ли блюдо',
-    text: 'Была короткая техническая пауза. Откройте список и проверьте, появилось ли блюдо.',
+    text: 'Мы не можем подтвердить результат: данные на сервере обновились. Откройте список и проверьте, появилось ли блюдо.',
   });
   assert.deepEqual(outcomeMessage('product', 'invalid'), {
     title: 'Продукт не создан',

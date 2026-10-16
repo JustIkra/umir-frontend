@@ -1,5 +1,6 @@
 import type { Envelope, Topic } from './api';
 import type { AttemptStore } from './attempt-store';
+import { defaultWaitSeconds } from './credentials';
 import type { CommandResult, CommandRunner, CommandSpec } from './commands';
 import {
   attemptDamagedCode,
@@ -20,6 +21,7 @@ export type CreateOutcome<T> =
   | { readonly kind: 'invalid' }
   | { readonly kind: 'unknown' }
   | { readonly kind: 'reset' }
+  | { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number }
   | { readonly kind: 'refused'; readonly code: string }
   | { readonly kind: 'ended' };
 
@@ -93,6 +95,14 @@ export function createCatalogCommands({
         if (failure.status === 401 || failure.code === 'Unauthenticated') {
           onUnauthenticated();
           return { kind: 'ended' };
+        }
+        if (failure.status === 429 || failure.code === 'RateLimited') {
+          // Nothing was sent to the service: the input stays and the wait is
+          // shown, the command is not repeated on its own.
+          return {
+            kind: 'rate-limited',
+            retryAfterSeconds: failure.retryAfterSeconds ?? defaultWaitSeconds,
+          };
         }
         if (conflicts.has(failure.code)) return { kind: 'conflict' };
         if (failure.code === 'InvalidArgument') return { kind: 'invalid' };

@@ -71,6 +71,10 @@ export interface CommandRunnerOptions {
 }
 
 interface Pending extends Attempt {
+  // True once a send ended without a known outcome: the service may have run
+  // the command, so a later refusal of Gateway's admission says nothing about
+  // it.
+  unsure: boolean;
   readonly epoch: string | undefined;
   readonly execute: (
     commandID: string,
@@ -81,6 +85,17 @@ interface Pending extends Attempt {
 // Outcomes after which the attempt is settled for good. unavailable on a
 // command means the service did not run it.
 const settledOutcomes = new Set(['committed', 'not_committed', 'unavailable']);
+
+// Gateway refused the request itself (DUR1, C16): the 429 limiter or an
+// admission store that is down. It speaks for this request only.
+export function isAdmissionRefusal(failure: ApiFailure): boolean {
+  return (
+    failure.status === 429 ||
+    failure.code === 'RateLimited' ||
+    (failure.code === 'ServiceUnavailable' &&
+      failure.outcome === 'not_committed')
+  );
+}
 
 // A service restarted, so the outcome is lost for good.
 function isReset(failure: ApiFailure): boolean {
@@ -129,10 +144,16 @@ export function createCommandRunner({
       onReset(attempt.restaurantID);
       return { kind: 'reset', failure };
     }
-    if (settlesAttempt(failure)) {
+    // An admission refusal of a repeat does not settle the earlier send: the
+    // attempt stays to be checked again, with the same commandID.
+    if (
+      settlesAttempt(failure) &&
+      !(attempt.unsure && isAdmissionRefusal(failure))
+    ) {
       release(attempt);
       return { kind: 'rejected', failure };
     }
+    attempt.unsure = true;
     const { key, commandID, label, restaurantID, startedAt } = attempt;
     return {
       kind: 'unknown',
@@ -191,6 +212,7 @@ export function createCommandRunner({
         label: spec.label,
         restaurantID: spec.restaurantID,
         startedAt: now(),
+        unsure: false,
         epoch,
         execute: spec.execute,
       };
@@ -207,6 +229,8 @@ export function createCommandRunner({
         label: spec.label,
         restaurantID: spec.restaurantID,
         startedAt: saved.startedAt,
+        // Restored from the tab: the earlier send may have been lost.
+        unsure: true,
         epoch: saved.epoch,
         execute: spec.execute,
       });

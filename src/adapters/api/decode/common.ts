@@ -193,7 +193,11 @@ const outcomes: readonly Outcome[] = [
 
 // The contract's #Error. An unknown code is kept as text; an unknown outcome
 // or a missing retryable makes the answer malformed.
-export function decodeFailure(status: number, body: unknown): ApiFailure {
+export function decodeFailure(
+  status: number,
+  body: unknown,
+  retryAfterHeader?: string | null,
+): ApiFailure {
   const error = object(body, 'error');
   const details =
     error.details === undefined ? {} : object(error.details, 'error.details');
@@ -216,6 +220,14 @@ export function decodeFailure(status: number, body: unknown): ApiFailure {
       throw new DecodeError('error.details.retryAfterSeconds', 'not a count');
     }
     retryAfterSeconds = retryAfter;
+  } else if (retryAfterHeader != null) {
+    // DUR1 (C16): a 429 carries the wait in the header as well. The field
+    // wins when both are there; a header that is not a whole number of
+    // seconds (the date form) is ignored.
+    const seconds = /^\d{1,9}$/.test(retryAfterHeader.trim())
+      ? Number(retryAfterHeader.trim())
+      : 0;
+    if (seconds >= 1) retryAfterSeconds = seconds;
   }
   string(error.message, 'error.message');
   return {

@@ -314,7 +314,7 @@ test('outcome messages: F1, F2, F4, E12, reset, C2 and notices', () => {
   assert.deepEqual(outcomeMessage({ kind: 'reset' }, tz), {
     tone: 'unknown',
     title: 'Не знаем, оформлен ли заказ',
-    text: 'Была короткая техническая пауза, проверить заказ нельзя. Загляните в историю склада перед новым заказом.',
+    text: 'Данные на сервере обновились, и мы не можем подтвердить результат. Загляните в историю склада перед новым заказом.',
   });
   assert.deepEqual(
     outcomeMessage({ kind: 'superseded', replacement: proposal }, tz),
@@ -455,4 +455,43 @@ test('the panel follows the phase of the order', async () => {
   assert.ok(placed.includes('Продукты списаны: сначала — с ближайшим сроком'));
   // The order ID is not shown.
   assert.ok(!placed.includes('ord-1'));
+});
+
+test('limits and admission refusals of an order use plain words', () => {
+  const proposal = { acceptedPositions: [] };
+  const refusal = (code) =>
+    outcomeMessage(
+      {
+        kind: 'refused',
+        code,
+        proposal,
+        retryAfterSeconds: undefined,
+        retryUntil: undefined,
+      },
+      'Europe/Moscow',
+    ).text;
+  assert.equal(
+    refusal('InvalidArgument'),
+    'В заказе слишком много позиций. Уберите часть и попробуйте снова.',
+  );
+  assert.equal(
+    refusal('LimitExceeded'),
+    'Сейчас у ресторана слишком много неоформленных заказов. Подождите немного и попробуйте снова.',
+  );
+  assert.match(refusal('ServiceUnavailable'), /Ничего не оформлено/);
+  for (const code of [
+    'InvalidArgument',
+    'LimitExceeded',
+    'ServiceUnavailable',
+  ]) {
+    assert.doesNotMatch(refusal(code), /503|400|409|[A-Z][a-z]+[A-Z]/);
+  }
+  assert.equal(
+    noticeMessage({ kind: 'too-many-positions' }).text,
+    refusal('InvalidArgument'),
+  );
+  assert.equal(
+    noticeMessage({ kind: 'limit-exceeded' }).text,
+    refusal('LimitExceeded'),
+  );
 });

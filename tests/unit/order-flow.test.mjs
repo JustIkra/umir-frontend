@@ -606,3 +606,96 @@ test('a storage that takes the order never raises the warning', async () => {
   await flow.confirm();
   assert.equal(flow.getSnapshot().notSaved, false);
 });
+
+const limited = (retryAfterSeconds) =>
+  new ApiError({
+    ...localFailure('RateLimited', 'not_committed', 429),
+    retryable: true,
+    retryAfterSeconds,
+  });
+
+test('a 429 on confirm keeps the order, names the wait and sends nothing again', async () => {
+  const { flow, answers, calls, storage } = await atProposal();
+  answers.confirm.push(limited(7));
+  await flow.confirm();
+  const refusal = phase(flow);
+  assert.equal(refusal.kind, 'refused');
+  assert.equal(refusal.code, 'RateLimited');
+  assert.equal(refusal.retryAfterSeconds, 7);
+  assert.equal(refusal.retryUntil, 42 + 7000);
+  assert.equal(storage.box.record.attempt, undefined);
+  assert.equal(flow.getSnapshot().locked, false);
+  assert.equal(calls.filter(([name]) => name === 'confirm').length, 1);
+  // The next confirmation is a new command.
+  answers.confirm.push(envelope({ kind: 'OrderConfirmed', order }));
+  await flow.confirm();
+  assert.deepEqual(calls.at(-1), ['confirm', R, 'prp-1', 'cmd-2', EPOCH]);
+});
+
+test('a 429 on confirm without a wait gets the default one', async () => {
+  const { flow, answers } = await atProposal();
+  answers.confirm.push(limited(undefined));
+  await flow.confirm();
+  assert.equal(phase(flow).retryAfterSeconds, 60);
+});
+
+test('a 503 before dispatch is a refusal; after dispatch the attempt stays unknown', async () => {
+  const { flow, answers, calls } = await atProposal();
+  answers.confirm.push(refused(503, 'ServiceUnavailable', 'not_committed'));
+  await flow.confirm();
+  assert.equal(phase(flow).kind, 'refused');
+  assert.equal(phase(flow).code, 'ServiceUnavailable');
+  assert.equal(phase(flow).retryUntil, undefined);
+  answers.confirm.push(refused(503, 'ServiceUnavailable', 'unknown'));
+  await flow.confirm();
+  assert.equal(phase(flow).kind, 'unknown');
+  const sent = calls.filter(([name]) => name === 'confirm');
+  assert.notEqual(sent[0][3], sent[1][3]);
+  answers.confirm.push(envelope({ kind: 'OrderConfirmed', order }));
+  await flow.check();
+  assert.equal(calls.at(-1)[3], sent[1][3]);
+});
+
+test('order limits: 400 and 409 leave the draft, no attempt and no new command', async () => {
+  for (const [failure, kind] of [
+    [refused(400, 'InvalidArgument', 'not_committed'), 'too-many-positions'],
+    [refused(409, 'LimitExceeded', 'not_committed'), 'limit-exceeded'],
+  ]) {
+    const { flow, answers, storage } = setup();
+    flow.add('206');
+    answers.prepare.push(failure);
+    await flow.prepare();
+    assert.equal(flow.getSnapshot().notice.kind, kind);
+    assert.equal(phase(flow).kind, 'compose');
+    assert.equal(flow.getSnapshot().draft.length, 1);
+    assert.equal(storage.box.record.attempt, undefined);
+    assert.equal(flow.getSnapshot().locked, false);
+  }
+});
+
+test('the same limits at confirmation are refusals with the code and no stored attempt', async () => {
+  for (const failure of [
+    refused(400, 'InvalidArgument', 'not_committed'),
+    refused(409, 'LimitExceeded', 'not_committed'),
+  ]) {
+    const { flow, answers, storage } = await atProposal();
+    answers.confirm.push(failure);
+    await flow.confirm();
+    assert.equal(phase(flow).kind, 'refused');
+    assert.equal(phase(flow).code, failure.failure.code);
+    assert.equal(storage.box.record.attempt, undefined);
+  }
+});
+
+test('a 429 on prepare is a notice with the wait; the draft stays', async () => {
+  const { flow, answers } = setup();
+  flow.add('206');
+  answers.prepare.push(limited(5));
+  await flow.prepare();
+  assert.deepEqual(flow.getSnapshot().notice, {
+    kind: 'rate-limited',
+    retryAfterSeconds: 5,
+    retryUntil: 42 + 5000,
+  });
+  assert.equal(flow.getSnapshot().draft.length, 1);
+});
