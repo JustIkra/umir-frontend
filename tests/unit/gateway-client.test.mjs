@@ -230,3 +230,37 @@ test('clearing the token makes the next write read a new one', async () => {
   assert.equal(calls[0].url, '/api/v2/csrf');
   assert.equal(calls[1].init.headers['X-CSRF-Token'], 'again');
 });
+
+const limited = (headers, details) =>
+  new Response(
+    JSON.stringify({
+      code: 'RateLimited',
+      outcome: 'not_committed',
+      message: 'too many requests',
+      retryable: true,
+      ...(details === undefined ? {} : { details }),
+    }),
+    {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', ...headers },
+    },
+  );
+
+test('a 429 takes the wait from the field, or from Retry-After without it', async () => {
+  const { fetch } = fakeFetch(
+    limited({ 'Retry-After': '7' }, { retryAfterSeconds: 7 }),
+    limited({ 'Retry-After': '12' }),
+    limited({ 'Retry-After': '9' }, { retryAfterSeconds: 4 }),
+    limited({ 'Retry-After': 'Wed, 21 Oct 2026 07:28:00 GMT' }),
+    limited({}),
+  );
+  const client = createGatewayClient(fetch);
+  const wait = async () =>
+    (await failureOf(client.read('/api/v2/x', { background: false })))
+      .retryAfterSeconds;
+  assert.equal(await wait(), 7);
+  assert.equal(await wait(), 12);
+  assert.equal(await wait(), 4);
+  assert.equal(await wait(), undefined);
+  assert.equal(await wait(), undefined);
+});

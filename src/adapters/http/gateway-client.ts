@@ -71,7 +71,11 @@ export function createGatewayClient(fetch: FetchLike): GatewayClient {
     if (response.ok) return parsed;
     let failure: ApiFailure;
     try {
-      failure = decodeFailure(response.status, parsed);
+      failure = decodeFailure(
+        response.status,
+        parsed,
+        response.headers.get('Retry-After'),
+      );
     } catch (error) {
       if (!(error instanceof DecodeError)) throw error;
       failure = localFailure('Malformed', lostOutcome(method), response.status);
