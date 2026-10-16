@@ -185,3 +185,104 @@ test('«Скоро закончится» when nothing runs out, and when the re
   assert.ok(failed.includes('Не удалось загрузить подсказку о закупках'));
   assert.ok(failed.includes('Попробовать ещё раз'));
 });
+
+const stockRow = (productID, name, available, pending, expiring) => ({
+  productID,
+  name,
+  baseUnit: 'g',
+  availableQuantity: available,
+  pendingWriteoffQuantity: pending,
+  onHandQuantity: String(BigInt(available) + BigInt(pending)),
+  expiringQuantity: expiring,
+});
+
+test('«Что может испортиться» ranks products by the share at risk and counts the calm ones', async () => {
+  const html = await renderRoute(page, {
+    access: warehouse,
+    data: {
+      inventory: loaded({
+        items: [
+          stockRow('p1', 'Сыр', '4000000', '1000000', '1000000'),
+          stockRow('p2', 'Молоко', '0', '500000', '0'),
+          stockRow('p3', 'Мука', '9000000', '0', '0'),
+        ],
+      }),
+    },
+  });
+  const plain = text(html);
+  assert.ok(plain.indexOf('Молоко') < plain.indexOf('Сыр'));
+  assert.ok(plain.includes('Риск 100 %'));
+  assert.ok(plain.includes('Риск 40 %'));
+  assert.ok(plain.includes('Без риска: ещё 1 продукт'));
+  for (const label of [
+    'Не испортится за 2 дня',
+    'Испортится за 2 дня',
+    'Ждёт списания',
+  ])
+    assert.ok(plain.includes(label), label);
+  assert.ok(
+    html.includes(
+      'aria-label="Сыр: 3 000 г — не испортится за 2 дня, 1 000 г — испортится за 2 дня, 1 000 г — ждёт списания"',
+    ),
+  );
+  assert.ok(html.includes('aria-label="Молоко: 500 г — ждёт списания"'));
+  assert.equal(count(html, 'data-segment='), 4);
+});
+
+const many = Array.from({ length: 12 }, (_, i) =>
+  stockRow(`p${String(i)}`, `Продукт ${String(i)}`, '1000', '0', '1000'),
+);
+
+test('«Что может испортиться» shows ten rows, then all of them, then a table', async () => {
+  const read = (path) =>
+    renderRoute(path, {
+      access: warehouse,
+      data: { inventory: loaded({ items: many }) },
+    });
+  const first = await read(page);
+  assert.equal(count(first, 'aria-label="Продукт'), 10);
+  assert.ok(text(first).includes('Показать все (12)'));
+  const all = await read(`${page}?risk=all`);
+  assert.equal(count(all, 'aria-label="Продукт'), 12);
+  assert.ok(text(all).includes('Свернуть'));
+  const table = text(await read(`${page}?risk=table`));
+  assert.ok(table.includes('Риск'));
+  assert.ok(table.includes('Продукт 11'));
+  assert.ok(!table.includes('Показать все'));
+});
+
+test('«Что может испортиться» with an empty warehouse, without risk, and beside a failed card', async () => {
+  const empty = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: { inventory: loaded({ items: [] }) },
+    }),
+  );
+  assert.ok(empty.includes('На складе пока ничего нет.'));
+  const calm = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: {
+        inventory: loaded({
+          items: [stockRow('p3', 'Мука', '9000', '0', '0')],
+        }),
+      },
+    }),
+  );
+  assert.ok(
+    calm.includes('В ближайшие 2 дня ничего не испортится, списаний нет.'),
+  );
+  const mixed = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: {
+        supplySuggestions: failedRead('UpstreamUnavailable', 503),
+        inventory: loaded({
+          items: [stockRow('p2', 'Молоко', '0', '500', '0')],
+        }),
+      },
+    }),
+  );
+  assert.ok(mixed.includes('Не удалось загрузить подсказку о закупках'));
+  assert.ok(mixed.includes('Риск 100 %'));
+});
