@@ -854,8 +854,12 @@ const checks = {
       assert.ok(owned, 'no session of the first replica found');
       execFileSync('docker', ['stop', '--time', '1', first.id]);
       try {
-        // At once Nginx may still list the stopped replica: the second try reaches the other one.
-        const now = await answeredBy(owned);
+        // At once Nginx may still list the stopped replica. The call that finds it out can end in a
+        // 504 (the connect to a stopped container times out after 5 s, and Nginx does not always
+        // have a second try left while it re-reads the replicas' addresses); it marks the replica
+        // failed, and the very next call of the same session reaches the other one.
+        let now = await answeredBy(owned);
+        if (now.status === 504) now = await answeredBy(owned);
         assert.deepEqual([now.status, now.node], [200, second.name]);
         // Docker drops the stopped replica from the name; Nginx notices within the resolver's 10 s.
         await sleep(12000);
