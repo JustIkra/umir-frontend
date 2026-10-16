@@ -11,6 +11,8 @@ import { useAccess, useReadModel } from '@/presentation/session/hooks';
 import { Button, TextLink } from '@/presentation/ui/actions';
 import { Card } from '@/presentation/ui/card';
 import { plural } from '@/presentation/ui/plural';
+import { FormMessage } from '@/presentation/ui/form-message';
+import { warehouseStamp } from '@/presentation/warehouse/warehouse-read';
 
 type Forms = readonly [string, string, string];
 
@@ -54,6 +56,24 @@ function Tile<T>({
         <Text role="status" color="text.secondary">
           Получаем данные…
         </Text>
+      )}
+      {value !== undefined && snapshot.failed && (
+        <FormMessage
+          tone="error"
+          title="Не удалось обновить данные"
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                model.refresh();
+              }}
+            >
+              Повторить
+            </Button>
+          }
+        >
+          Показаны прежние данные. {warehouseStamp(value.context)}.
+        </FormMessage>
       )}
       {link !== undefined && (
         <TextLink to={link.to} alignSelf="flex-start">

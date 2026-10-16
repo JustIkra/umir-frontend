@@ -119,3 +119,27 @@ test('the movement report sends the settings version it expects', async () => {
     ),
   );
 });
+
+test('the movement report refuses a capture that contradicts its context', async () => {
+  for (const mutate of [
+    (value) => {
+      value.page.stateVersion = '99';
+    },
+    (value) => {
+      value.page.prefixSequence = '99';
+    },
+    (value) => {
+      value.page.settings.timeZone = 'Europe/Berlin';
+    },
+    (value) => {
+      value.page.settings.settingsVersion = '99';
+    },
+    (value) => {
+      value.coverage.epoch = '99999999-9999-4999-8999-999999999999';
+    },
+  ]) {
+    const value = page([row('a')]);
+    mutate(value);
+    await refused(value);
+  }
+});

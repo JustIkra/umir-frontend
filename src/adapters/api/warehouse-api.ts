@@ -163,7 +163,14 @@ export function createWarehouseReads(
       const first = page;
       if (
         first.result.page.tenantID !== id ||
-        first.result.page.epoch !== first.context.runtimeEpoch
+        first.result.page.epoch !== first.context.runtimeEpoch ||
+        first.result.page.stateVersion !== first.context.stateVersion ||
+        first.result.page.prefixSequence !== first.context.stateVersion ||
+        first.result.page.settings.timeZone !==
+          first.context.settings.timeZone ||
+        first.result.page.settings.settingsVersion !==
+          first.context.settings.settingsVersion ||
+        first.result.coverage.epoch !== first.context.runtimeEpoch
       )
         return malformed('movement capture identity differs');
       const items: MovementRow[] = [];

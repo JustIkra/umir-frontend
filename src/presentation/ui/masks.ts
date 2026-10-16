@@ -41,7 +41,8 @@ export function maskTime(raw: string): string {
   const lone = hourDigits.length === 1 ? '0' : '';
   let digits =
     colon < 0 ? onlyDigits(raw) : `${lone}${hourDigits}${minuteDigits}`;
-  if (/^[3-9]/.test(digits) || /^2[4-9]/.test(digits)) digits = `0${digits}`;
+  if (colon < 0 && (/^[3-9]/.test(digits) || /^2[4-9]/.test(digits)))
+    digits = `0${digits}`;
   digits = digits.slice(0, 4);
   if (digits.length === 2 && colon >= 0 && minuteDigits === '')
     return `${digits}:`;

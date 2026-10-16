@@ -456,3 +456,22 @@ test('«Куда ушли продукты» as a table shows what arrived too',
     assert.ok(plain.includes(header), header);
   assert.ok(plain.includes('10 %'));
 });
+
+test('a tile retains its count but warns when refreshing the data failed', async () => {
+  const plain = text(
+    await renderRoute(page, {
+      access: warehouse,
+      data: {
+        stopList: {
+          ...stopRead,
+          failed: true,
+          failure: failedRead('UpstreamUnavailable', 503).failure,
+        },
+      },
+    }),
+  );
+  assert.ok(plain.includes('3 блюда'));
+  assert.ok(plain.includes('Не удалось обновить данные'));
+  assert.ok(plain.includes('Показаны прежние данные'));
+  assert.ok(plain.includes('Повторить'));
+});

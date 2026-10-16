@@ -41,10 +41,7 @@ import { Stepper, daysUnit } from '@/presentation/ui/stepper';
 import { TimeField } from '@/presentation/ui/time-field';
 import { rem } from '@/presentation/ui/units';
 
-// The delivery lines are a table from 1420, not from the theme's 2xl (1367):
-// at 1367 the content is 997 and the columns need 1039, so the product field
-// would clip its «Найти продукт». Below it the lines stay cards.
-const wide = '@media (min-width: 1420px)';
+const wide = '@media (min-width: 1367px)';
 
 // In the table the column heads name the fields, so the labels are hidden
 // visually but stay for screen readers.
@@ -62,8 +59,8 @@ const hiddenWide = {
 // Columns of the table layout, in px. The fixed ones are 24 + 104 + 254 + 170
 // + 254 + 32 = 838 and the 6 gaps of 6 add 36, so with the product field at
 // least 165 (its placeholder is 111 and the field adds 52) the content needs
-// 1039. The content is the viewport less 370: 1050 at 1420 (the product has
-// 176) and 1070 at 1440 (196). A date with a time is 254: the date field is
+// 1039. Narrow desktop content scrolls within the delivery lines.
+// A date with a time is 254: the date field is
 // at least 148, the gap 6, the time 100.
 const wideColumns = `${rem(24)} minmax(${rem(165)}, 1fr) ${rem(104)} ${rem(254)} ${rem(170)} ${rem(254)} ${rem(32)}`;
 const wideGap = '1.5';
@@ -363,11 +360,11 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                 {`Строки поставки · ${String(rows.length)}`}
               </chakra.h2>
             </Flex>
-            <Stack gap="0">
+            <Stack gap="0" css={{ [wide]: { overflowX: 'auto' } }}>
               <Grid
                 aria-hidden="true"
                 display="none"
-                css={{ [wide]: { display: 'grid' } }}
+                css={{ [wide]: { display: 'grid', minWidth: rem(1039) } }}
                 gridTemplateColumns={wideColumns}
                 columnGap={wideGap}
                 alignItems="start"
@@ -387,7 +384,7 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
               <Stack
                 as="ol"
                 gap="3"
-                css={{ [wide]: { gap: '0' } }}
+                css={{ [wide]: { gap: '0', minWidth: rem(1039) } }}
                 listStyleType="none"
               >
                 {rows.map((row, index) => {

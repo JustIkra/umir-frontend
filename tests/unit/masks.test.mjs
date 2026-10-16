@@ -77,3 +77,10 @@ test('dates convert between the ISO and the Russian form', () => {
   assert.equal(isoDateToRu(''), '');
   assert.equal(ruDateToIso('15.10'), '');
 });
+
+test('explicit out-of-range hours remain invalid instead of changing time', () => {
+  for (const value of ['24:00', '25:30', '29:59']) {
+    assert.equal(maskTime(value), value);
+    assert.equal(normalizeTime(value), undefined);
+  }
+});
