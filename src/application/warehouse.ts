@@ -1,6 +1,6 @@
 import type { BaseUnit } from '@/domain/quantity';
 import type { Envelope, Instant, Settings } from './api';
-import type { PlanningCapture } from './planning';
+import type { HistoryCoverage, PlanningCapture } from './planning';
 import type { LoadOptions } from './read-model';
 import type { Order } from './restaurant';
 
@@ -44,15 +44,42 @@ export interface ProductBatch {
 export interface ProductBatches {
   readonly productID: string;
   readonly evaluatedAt: Instant;
-  readonly page: {
-    readonly tenantID: string;
-    readonly epoch: string;
-    readonly stateVersion: string;
-    readonly prefixSequence: string;
-    readonly filterFingerprint: string;
-    readonly settings: Settings;
-  };
+  readonly page: CapturePage;
   readonly items: readonly ProductBatch[];
+}
+// The identity of one captured report page: every page of the report repeats
+// it, so a change between pages means a broken answer.
+export interface CapturePage {
+  readonly tenantID: string;
+  readonly epoch: string;
+  readonly stateVersion: string;
+  readonly prefixSequence: string;
+  readonly filterFingerprint: string;
+  readonly settings: Settings;
+}
+export interface MovementRow {
+  readonly productID: string;
+  readonly name: string;
+  readonly baseUnit: BaseUnit;
+  readonly receivedQuantity: string;
+  readonly orderedQuantity: string;
+  readonly writtenOffQuantity: string;
+}
+export interface MovementReport {
+  readonly from: Instant;
+  readonly to: Instant;
+  readonly coverage: HistoryCoverage;
+  readonly items: readonly MovementRow[];
+}
+// Civil dates in the restaurant's zone, both included.
+export interface AnalyticsPeriod {
+  readonly fromDate: string;
+  readonly throughDate: string;
+}
+// The week plus the organization settings version the warehouse checks
+// the report against (409 SettingsChanged when Auth has a newer one).
+export interface MovementQuery extends AnalyticsPeriod {
+  readonly expectedSettingsVersion: string;
 }
 export interface PendingBatch {
   readonly batch: Batch;
@@ -150,6 +177,11 @@ export interface WarehouseReads {
     restaurantID: string,
     options: LoadOptions,
   ): Promise<Envelope<SupplySuggestions>>;
+  movementReport(
+    restaurantID: string,
+    query: MovementQuery,
+    options: LoadOptions,
+  ): Promise<Envelope<MovementReport>>;
 }
 export interface CivilTime {
   readonly civil: { readonly localDateTime: string };

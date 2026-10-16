@@ -19,6 +19,8 @@ const descriptions: Readonly<Partial<Record<SectionKey, string>>> = {
   orders: 'Меню, стоп-лист и новый заказ',
   warehouse: 'Остатки, сроки годности, поставки и списания',
   catalog: 'Продукты, блюда и рецепты',
+  analytics:
+    'Что скоро закончится, что может испортиться и куда уходят продукты',
 };
 
 export function OverviewPage() {

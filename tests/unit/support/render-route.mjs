@@ -434,6 +434,13 @@ export function fakeServices({
       history: () => staticModel(data.history ?? loadingRead),
       supplySuggestions: () =>
         staticModel(data.supplySuggestions ?? loadingRead),
+      // A snapshot, or (period) => snapshot to see which week the page asks for.
+      movementReport: (period) =>
+        staticModel(
+          typeof data.movementReport === 'function'
+            ? data.movementReport(period)
+            : (data.movementReport ?? loadingRead),
+        ),
     }),
     warehouseCommands: () => ({
       receiveDelivery: () =>

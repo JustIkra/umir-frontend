@@ -1,3 +1,4 @@
+import analyticsIcon from '@/presentation/assets/icons/analytics-24.svg';
 import catalogIcon from '@/presentation/assets/icons/catalog-24.svg';
 import ordersIcon from '@/presentation/assets/icons/orders-24.svg';
 import overviewIcon from '@/presentation/assets/icons/overview-24-active.svg';
@@ -25,6 +26,12 @@ export const appSections: readonly {
     suffix: '/catalog',
     title: 'Справочники',
     icon: catalogIcon,
+  },
+  {
+    key: 'analytics',
+    suffix: '/analytics',
+    title: 'Аналитика',
+    icon: analyticsIcon,
   },
 ];
 

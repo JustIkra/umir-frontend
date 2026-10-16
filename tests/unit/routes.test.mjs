@@ -341,7 +341,6 @@ test('unimplemented prototype routes do not expose sample data', async () => {
     '/app/organizations/yug/invitations/new',
     '/app/organizations/yug/profile',
     `/app/r/${R}/menu`,
-    `/app/r/${R}/analytics`,
   ])
     assert.equal(h1(await renderRoute(path)), notFound, path);
   // The organization screens read Auth now: none shows the Figma sample.
@@ -609,7 +608,7 @@ test('overview links lead to implemented sections without sample totals', async 
   ])
     assert.ok(links.includes(path), path);
   assert.ok(!links.includes(`/app/r/${R}/menu`));
-  assert.ok(!links.includes(`/app/r/${R}/analytics`));
+  assert.ok(links.includes(`/app/r/${R}/analytics`));
   assert.doesNotMatch(text(html), /Тальятелле|Масло трюфельное/);
 });
 

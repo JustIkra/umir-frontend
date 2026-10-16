@@ -31,6 +31,7 @@ function fakeReads() {
     reads: {
       products: warehouse('products'),
       dishCatalog: warehouse('dishCatalog'),
+      movementReport: warehouse('movementReport'),
       dish: warehouse('dish'),
       suggestID: warehouse('suggestID'),
       servingProducts: serving('servingProducts'),
@@ -120,4 +121,42 @@ test('menu, stop list and recommendations re-read on a tick', async () => {
   models.markTime(R);
   await settled();
   assert.deepEqual(names(calls), ['menu', 'stopList', 'recommendations']);
+});
+
+test('the movement report is one model per week and follows stock, orders, analytics and the tick', async () => {
+  const { data, models, calls } = setup();
+  const week = {
+    fromDate: '2026-10-08',
+    throughDate: '2026-10-14',
+    expectedSettingsVersion: '1',
+  };
+  assert.equal(data.movementReport(week), data.movementReport({ ...week }));
+  assert.notEqual(
+    data.movementReport(week),
+    data.movementReport({ ...week, expectedSettingsVersion: '2' }),
+  );
+  assert.notEqual(
+    data.movementReport(week),
+    data.movementReport({
+      fromDate: '2026-10-09',
+      throughDate: '2026-10-15',
+      expectedSettingsVersion: '1',
+    }),
+  );
+  data.movementReport(week).subscribe(() => undefined);
+  await settled();
+  assert.deepEqual(calls[0].slice(0, 3), ['movementReport', R, week]);
+  for (const topic of ['stock', 'orders', 'analytics']) {
+    calls.length = 0;
+    models.markStale(R, [topic]);
+    await settled();
+    assert.deepEqual(names(calls), ['movementReport'], topic);
+  }
+  calls.length = 0;
+  models.markStale(R, ['catalog']);
+  await settled();
+  assert.deepEqual(names(calls), []);
+  models.markTime(R);
+  await settled();
+  assert.deepEqual(names(calls), ['movementReport']);
 });

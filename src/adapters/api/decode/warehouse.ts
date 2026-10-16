@@ -2,11 +2,14 @@ import type { Envelope, Settings } from '@/application/api';
 import type {
   Batch,
   BatchFact,
+  CapturePage,
   DeliveryReceipt,
   ExpiringBatches,
   History,
   HistoryRecord,
   Inventory,
+  MovementReport,
+  MovementRow,
   PendingBatches,
   ProductBatch,
   ProductBatches,
@@ -31,6 +34,7 @@ import {
   string,
 } from './common';
 import { decodeContext } from './context';
+import { decodeCoverage } from './planning';
 import { decodeOrder } from './serving';
 
 const batchKeys = [
@@ -175,6 +179,34 @@ export function decodeInventory(value: unknown, path: string): Inventory {
   return { items };
 }
 
+export function decodeCapturePage(value: unknown, path: string): CapturePage {
+  const page = closedObject(value, path, [
+    'tenantID',
+    'epoch',
+    'stateVersion',
+    'prefixSequence',
+    'filterFingerprint',
+    'settings',
+  ]);
+  const fingerprint = string(
+    page.filterFingerprint,
+    `${path}.filterFingerprint`,
+  );
+  if (!/^[a-f0-9]{64}$/.test(fingerprint))
+    throw new DecodeError(path, 'invalid capture fingerprint');
+  return {
+    tenantID: entityId(page.tenantID, `${path}.tenantID`),
+    epoch: entityId(page.epoch, `${path}.epoch`),
+    stateVersion: nonNegativeInt64(page.stateVersion, `${path}.stateVersion`),
+    prefixSequence: nonNegativeInt64(
+      page.prefixSequence,
+      `${path}.prefixSequence`,
+    ),
+    filterFingerprint: fingerprint,
+    settings: decodeSettings(page.settings, `${path}.settings`),
+  };
+}
+
 export interface BatchPage extends ProductBatches {
   readonly nextCursor: string | undefined;
 }
@@ -185,20 +217,6 @@ export function decodeBatchPage(value: unknown, path: string): BatchPage {
     ['productID', 'evaluatedAt', 'page', 'items'],
     ['nextCursor'],
   );
-  const page = closedObject(v.page, `${path}.page`, [
-    'tenantID',
-    'epoch',
-    'stateVersion',
-    'prefixSequence',
-    'filterFingerprint',
-    'settings',
-  ]);
-  const fingerprint = string(
-    page.filterFingerprint,
-    `${path}.page.filterFingerprint`,
-  );
-  if (!/^[a-f0-9]{64}$/.test(fingerprint))
-    throw new DecodeError(path, 'invalid capture fingerprint');
   const items = array(v.items, `${path}.items`, (value, path): ProductBatch => {
     const v = closedObject(value, path, ['batch', 'baseUnit', 'status']);
     const batch = decodeBatch(v.batch, `${path}.batch`);
@@ -222,20 +240,7 @@ export function decodeBatchPage(value: unknown, path: string): BatchPage {
   return {
     productID: nonEmptyString(v.productID, `${path}.productID`),
     evaluatedAt: instant(v.evaluatedAt, `${path}.evaluatedAt`),
-    page: {
-      tenantID: entityId(page.tenantID, `${path}.page.tenantID`),
-      epoch: entityId(page.epoch, `${path}.page.epoch`),
-      stateVersion: nonNegativeInt64(
-        page.stateVersion,
-        `${path}.page.stateVersion`,
-      ),
-      prefixSequence: nonNegativeInt64(
-        page.prefixSequence,
-        `${path}.page.prefixSequence`,
-      ),
-      filterFingerprint: fingerprint,
-      settings: decodeSettings(page.settings, `${path}.page.settings`),
-    },
+    page: decodeCapturePage(v.page, `${path}.page`),
     items,
     nextCursor,
   };
@@ -533,4 +538,83 @@ export function validBatchCapture(
           instantNanos(row.batch.expiresAt) <= instantNanos(c.evaluatedAt)),
     )
   );
+}
+
+export interface MovementPage extends MovementReport {
+  readonly page: CapturePage;
+  readonly nextCursor: string | undefined;
+}
+
+// analytics/movements: the fields lie next to context, like pending-writeoffs.
+export function decodeMovementPage(body: unknown): Envelope<MovementPage> {
+  const v = closedObject(
+    body,
+    'movements',
+    ['context', 'page', 'from', 'to', 'coverage', 'items'],
+    ['nextCursor'],
+  );
+  const context = decodeContext(
+    closedObject(v.context, 'context', [
+      'orgID',
+      'tenantID',
+      'runtimeEpoch',
+      'settings',
+      'evaluatedAt',
+      'stateVersion',
+    ]),
+    'context',
+  );
+  const items = array(
+    v.items,
+    'movements.items',
+    (value, path): MovementRow => {
+      const v = closedObject(value, path, [
+        'productID',
+        'name',
+        'baseUnit',
+        'receivedQuantity',
+        'orderedQuantity',
+        'writtenOffQuantity',
+      ]);
+      return {
+        productID: nonEmptyString(v.productID, `${path}.productID`),
+        name: nonEmptyString(v.name, `${path}.name`),
+        baseUnit: oneOf(v.baseUnit, `${path}.baseUnit`, baseUnits),
+        receivedQuantity: nonNegativeInt64(
+          v.receivedQuantity,
+          `${path}.receivedQuantity`,
+        ),
+        orderedQuantity: nonNegativeInt64(
+          v.orderedQuantity,
+          `${path}.orderedQuantity`,
+        ),
+        writtenOffQuantity: nonNegativeInt64(
+          v.writtenOffQuantity,
+          `${path}.writtenOffQuantity`,
+        ),
+      };
+    },
+  );
+  if (
+    items.length > 500 ||
+    new Set(items.map((item) => item.productID)).size !== items.length
+  )
+    throw new DecodeError('movements.items', 'duplicate or oversized rows');
+  const nextCursor =
+    v.nextCursor === undefined
+      ? undefined
+      : nonEmptyString(v.nextCursor, 'movements.nextCursor');
+  if (nextCursor !== undefined && nextCursor.length > 128)
+    throw new DecodeError('movements.nextCursor', 'invalid cursor');
+  return {
+    context,
+    result: {
+      page: decodeCapturePage(v.page, 'movements.page'),
+      from: instant(v.from, 'movements.from'),
+      to: instant(v.to, 'movements.to'),
+      coverage: decodeCoverage(v.coverage, 'movements.coverage'),
+      items,
+      nextCursor,
+    },
+  };
 }
