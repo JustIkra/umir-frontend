@@ -190,16 +190,19 @@ export function NewProductPage() {
           }
         : shown === 'unknown' || shown === 'reset'
           ? { tone: 'unknown' as const, ...outcomeMessage('product', shown) }
-          : shown === 'rejected' || shown === 'refused'
-            ? {
-                tone: 'error' as const,
-                ...outcomeMessage(
-                  'product',
-                  shown === 'rejected' ? 'invalid' : 'refused',
-                  refusedCode,
-                ),
-              }
-            : undefined;
+          : shown === 'refused' && refusedCode === 'AttemptDamaged'
+            ? // The closed form already says it; after the cancel nothing stale stays.
+              undefined
+            : shown === 'rejected' || shown === 'refused'
+              ? {
+                  tone: 'error' as const,
+                  ...outcomeMessage(
+                    'product',
+                    shown === 'rejected' ? 'invalid' : 'refused',
+                    refusedCode,
+                  ),
+                }
+              : undefined;
   return (
     <Stack gap={{ base: '4', sm: '6' }}>
       <Stack gap={{ base: '4', sm: '6' }}>

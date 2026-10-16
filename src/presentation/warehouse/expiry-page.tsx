@@ -118,23 +118,25 @@ function ExpiryView({ restaurantID }: { restaurantID: string }) {
               : 'refused',
       }));
       setMessage(
-        result.kind === 'unknown'
-          ? {
-              title: 'Не знаем, прошло ли списание',
-              text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не спишется.',
-            }
-          : result.kind === 'reset'
+        result.kind === 'refused' && result.code === 'AttemptDamaged'
+          ? undefined
+          : result.kind === 'unknown'
             ? {
                 title: 'Не знаем, прошло ли списание',
-                text: 'Данные обновились. Обновите список и проверьте, списана ли партия.',
+                text: 'Связь прервалась. Нажмите «Проверить результат» — повторно ничего не спишется.',
               }
-            : {
-                title: 'Не удалось списать',
-                text:
-                  (result.kind === 'refused'
-                    ? attemptRefusalText(result.code, 'warehouse')
-                    : undefined) ?? 'Обновите страницу и попробуйте ещё раз.',
-              },
+            : result.kind === 'reset'
+              ? {
+                  title: 'Не знаем, прошло ли списание',
+                  text: 'Данные обновились. Обновите список и проверьте, списана ли партия.',
+                }
+              : {
+                  title: 'Не удалось списать',
+                  text:
+                    (result.kind === 'refused'
+                      ? attemptRefusalText(result.code, 'warehouse')
+                      : undefined) ?? 'Обновите страницу и попробуйте ещё раз.',
+                },
       );
     }
   };

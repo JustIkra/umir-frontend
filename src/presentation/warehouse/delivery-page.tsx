@@ -241,17 +241,19 @@ function DeliveryView({ restaurantID }: { restaurantID: string }) {
                     : 'refused',
               );
               setMessage(
-                result.kind === 'unknown'
-                  ? 'Связь прервалась. Нажмите «Проверить результат» — поставка не задвоится. Пока форму менять нельзя.'
-                  : result.kind === 'reset'
-                    ? 'Была короткая техническая пауза. Прежде чем отправлять снова, проверьте поставку в истории склада.'
-                    : result.kind === 'refused' &&
-                        result.code === 'SettingsChanged'
-                      ? 'Изменились настройки времени ресторана. Обновите страницу и проверьте даты.'
-                      : ((result.kind === 'refused'
-                          ? attemptRefusalText(result.code, 'warehouse')
-                          : undefined) ??
-                        'Проверьте даты и количество и попробуйте ещё раз.'),
+                result.kind === 'refused' && result.code === 'AttemptDamaged'
+                  ? undefined
+                  : result.kind === 'unknown'
+                    ? 'Связь прервалась. Нажмите «Проверить результат» — поставка не задвоится. Пока форму менять нельзя.'
+                    : result.kind === 'reset'
+                      ? 'Была короткая техническая пауза. Прежде чем отправлять снова, проверьте поставку в истории склада.'
+                      : result.kind === 'refused' &&
+                          result.code === 'SettingsChanged'
+                        ? 'Изменились настройки времени ресторана. Обновите страницу и проверьте даты.'
+                        : ((result.kind === 'refused'
+                            ? attemptRefusalText(result.code, 'warehouse')
+                            : undefined) ??
+                          'Проверьте даты и количество и попробуйте ещё раз.'),
               );
             });
         }}

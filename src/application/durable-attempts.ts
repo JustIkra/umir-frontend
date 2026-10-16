@@ -81,6 +81,8 @@ export function createDurableAttempts({
   // later, before the next command of the operation is refused over it.
   const leftover = new Map<string, string>();
   const listeners = new Set<() => void>();
+  // One state object per slot: a screen subscribing keeps one identity.
+  const states = new Map<string, AttemptState>();
 
   function announce(): void {
     for (const listener of listeners) listener();
@@ -170,7 +172,9 @@ export function createDurableAttempts({
     },
     state(ref) {
       const key = slot(ref);
-      return {
+      const known = states.get(key);
+      if (known !== undefined) return known;
+      const created: AttemptState = {
         notSaved: () => notSaved.has(key),
         damaged: () => damaged.has(key),
         discardCorrupt() {
@@ -185,6 +189,8 @@ export function createDurableAttempts({
           };
         },
       };
+      states.set(key, created);
+      return created;
     },
     blocked(ref) {
       const corrupt = store.load(ref).status === 'corrupt';

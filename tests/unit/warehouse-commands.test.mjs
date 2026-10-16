@@ -690,3 +690,10 @@ test('a readable record of an unsettled command is not removed by the retry of t
   assert.deepEqual(removed, []);
   assert.equal(store.load(writeoffRef).record.commandID, 'foreign');
 });
+
+test('the state of one operation keeps its identity between reads', () => {
+  const { value } = setup({});
+  assert.equal(value.writeoffAttempt('B'), value.writeoffAttempt('B'));
+  assert.notEqual(value.writeoffAttempt('B'), value.writeoffAttempt('C'));
+  assert.equal(value.deliveryAttempt, value.deliveryAttempt);
+});
